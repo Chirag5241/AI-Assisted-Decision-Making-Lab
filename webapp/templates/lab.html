@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% macro slider(key, label, min, max, step, value, swatch="") %}
+<div class="row">
+  <label for="{{ key }}-range"><span class="sym {{ swatch }}">{{ label|safe }}</span></label>
+  <input type="range" id="{{ key }}-range" data-key="{{ key }}" min="{{ min }}" max="{{ max }}" step="{{ step }}" value="{{ value }}">
+  <input type="number" data-key="{{ key }}" min="{{ min }}" max="{{ max }}" step="{{ step }}" value="{{ value }}" aria-label="{{ label|striptags }} value">
+</div>
+{% endmacro %}
+
+{% block body %}
+<div class="layout">
+  <aside class="rail">
+    <form id="controls" autocomplete="off">
+      <fieldset class="card">
+        <legend>Start from a scenario</legend>
+        <div class="presets">
+          {% for p in presets %}
+          <button type="button" class="preset" data-preset="{{ loop.index0 }}" title="{{ p.title }}">
+            <b>{{ p.name }}</b><span>{{ p.title }}</span>
+          </button>
+          {% endfor %}
+        </div>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Truth <i>U</i></legend>
+        {{ slider("u1", "u<sub>1</sub>", -3, 3, 0.05, 1.2, "a1") }}
+        {{ slider("u2", "u<sub>2</sub>", -3, 3, 0.05, 1.0, "a2") }}
+        <p class="derived">true gap &Delta;u = <output id="du"></output></p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Human's first belief <i>H</i><sub>0</sub></legend>
+        {{ slider("h1", "h<sub>1</sub>", -3, 3, 0.05, 0.0, "a1") }}
+        {{ slider("h2", "h<sub>2</sub>", -3, 3, 0.05, 1.5, "a2") }}
+        <p class="derived">belief gap &Delta;h<sub>0</sub> = <output id="dh0"></output></p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>How the human learns</legend>
+        <div class="segmented" role="radiogroup" aria-label="Learning curve">
+          {% for name, spec in curve_specs.items() %}
+          <label><input type="radio" name="curve" value="{{ name }}" {% if loop.first %}checked{% endif %}><span>{{ spec.label }}</span></label>
+          {% endfor %}
+        </div>
+        <div class="row" id="p1-row">
+          <label for="p1-range"><span class="sym" id="p1-label">rate</span></label>
+          <input type="range" id="p1-range" data-key="p1">
+          <input type="number" data-key="p1" aria-label="learning speed">
+        </div>
+        <div class="row" id="p2-row" hidden>
+          <label for="p2-range"><span class="sym a2" id="p2-label">rate</span></label>
+          <input type="range" id="p2-range" data-key="p2">
+          <input type="number" data-key="p2" aria-label="learning speed for action 2">
+        </div>
+        <p class="hint" id="curve-hint"></p>
+        <label class="check"><input type="checkbox" id="split"> A separate speed for each action</label>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Discount <i>&delta;</i> and horizon</legend>
+        {{ slider("delta", "&delta;", 0.01, 0.99, 0.01, 0.95) }}
+        <p class="hint">&delta; is the algorithm's patience: one number in (0, 1), as in the proposal, Noti et al. and Guan et al. Near 0 only the first rounds count; near 1 later rounds count almost as much. It can also be read as the chance, &delta;<sup>t</sup>, that round t happens at all.</p>
+        {{ slider("T", "rounds", 10, 400, 10, 80) }}
+      </fieldset>
+    </form>
+  </aside>
+
+  <main id="bench" aria-busy="true">
+    <section class="verdict" aria-live="polite">
+      <div class="numeral-block">
+        <div class="numeral" id="numeral">&nbsp;</div>
+        <div class="numeral-label" id="numeral-label">&nbsp;</div>
+      </div>
+      <div class="verdict-text">
+        <p class="sentence" id="sentence">Running the first world&hellip;</p>
+        <div class="strip-wrap">
+          <div class="strip" id="strip" role="img" aria-label="Timeline of right and wrong rounds"></div>
+          <div class="strip-axis"><span>round 0</span><span class="strip-key"><i class="key wrong"></i>wrong action <i class="key right"></i>right action</span><span id="strip-end"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tiles" id="tiles"></section>
+
+    <section class="figs">
+      <figure>
+        <figcaption><b>Fig. 1</b> What the human believes each action is worth</figcaption>
+        <div class="chart" id="fig-beliefs"></div>
+      </figure>
+      <div class="fig-stack">
+        <figure>
+          <figcaption><b>Fig. 2</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;</figcaption>
+          <div class="chart" id="fig-regret"></div>
+        </figure>
+        <figure>
+          <figcaption><b>Fig. 3</b> The human's choice &ycirc; for a positive state</figcaption>
+          <div class="chart" id="fig-choice"></div>
+        </figure>
+      </div>
+    </section>
+
+    <section class="map">
+      <figure>
+        <figcaption><b>Fig. 4</b> Every nearby world at once; the ring is the one on the bench</figcaption>
+        <div class="chart" id="fig-map"></div>
+        <div class="heat-key" id="fig-map-key"></div>
+      </figure>
+      <div class="side">
+        <figure>
+          <figcaption><b>Fig. 5</b> Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+          <div class="chart" id="fig-value"></div>
+        </figure>
+        <figure>
+          <figcaption><b>Fig. 6</b> The flip: when the belief gap lands on the side of the true gap</figcaption>
+          <div class="chart" id="fig-gap"></div>
+        </figure>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="reading">
+  <div class="reading-lead">
+    <h2>Reading the bench</h2>
+    <p class="callout"><mark>The more a wrong round costs, the sooner the human flips.</mark></p>
+    <p class="callout-sub">Time to flip moves inversely with the true gap <span class="math">|&Delta;u|</span>, and regret
+      per wrong round is <span class="math">|&Delta;u| &middot; E|x|</span>. The flip depends only on the ratio
+      <span class="math">|&Delta;h<sub>0</sub>| / |&Delta;u|</span>: for the hyperbolic learner it comes after
+      <span class="math">half-life &times; |&Delta;h<sub>0</sub>| / |&Delta;u|</span> rounds, exactly inversely proportional;
+      for the other curves it still shrinks as <span class="math">|&Delta;u|</span> grows. Regret does not drive the learning:
+      beliefs close the same share of their gap each round whatever the loss.</p>
+  </div>
+  <div class="reading-body notes">
+    <p>With one feature, the state <i>x</i> scales both actions alike, so the human is right exactly when
+      <span class="math">h<sub>1</sub> &minus; h<sub>2</sub></span> has the same sign as
+      <span class="math">u<sub>1</sub> &minus; u<sub>2</sub></span>, whatever <i>x</i> turns out to be. Fig. 6 follows that gap.</p>
+    <p>When both actions share one learning curve <span class="math">&phi;</span>, a human who starts on the wrong side flips as soon as</p>
+    <p class="formula">&phi;(t) &gt; |&Delta;h<sub>0</sub>| / (|&Delta;h<sub>0</sub>| + |&Delta;u|)</p>
+    <p>so the map in Fig. 4 is made of rays through the origin. Give each action its own speed and that picture
+      breaks: the map then depends on the levels too, and a human who starts right can go wrong before coming back.</p>
+    <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; (Ux)<sub>&ycirc;</sub></span>.
+      Here that is <span class="math">|&Delta;u| &middot; |x|</span> when the choice is wrong and zero when it is right;
+      Fig. 2 averages it over <span class="math">x ~ N(0, 1)</span> and weights round <i>t</i> by
+      <span class="math">&delta;<sup>t</sup></span>; the objective is the sum of those bars. For a negative state both the choice in Fig. 3
+      and the best move swap, so the regret is the same.</p>
+    <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>: what the best
+      move is truly worth minus what the human expects from the move they pick. Above zero the human expects too
+      little, below zero too much. Averaged over states it equals
+      <span class="math">(|&Delta;u| &minus; |h<sub>1</sub> &minus; h<sub>2</sub>|) &middot; E|x| / 2</span>,
+      so it can sit at zero while the human still picks the wrong action.</p>
+  </div>
+</footer>
+
+<script>
+  window.CURVE_SPECS = {{ curve_specs|tojson }};
+  window.PRESETS = {{ presets|tojson }};
+</script>
+<script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('lab.js') }}"></script>
+{% endblock %}

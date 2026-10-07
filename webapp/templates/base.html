@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ site_name }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ static_v('style.css') }}">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <p class="kicker">{{ site_kicker }}</p>
+      <h1>{{ site_name }}</h1>
+    </div>
+    <nav class="mast-nav" aria-label="Sections">
+      <a href="{{ url_for('lab') }}" {% if page == 'lab' %}aria-current="page"{% endif %}>1 feature, 2 actions</a>
+      <a href="{{ url_for('worlds') }}" {% if page == 'worlds' %}aria-current="page"{% endif %}>More actions and features</a>
+      <a href="{{ url_for('experiments') }}" {% if page == 'experiments' %}aria-current="page"{% endif %}>Experiment 1 figures</a>
+    </nav>
+  </header>
+  {% block body %}{% endblock %}
+</body>
+</html>

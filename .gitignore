@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+.impeccable/
+
+# one-off output of `python -m experiments.exp01_single_feature_flip --u ... --h0 ...`
+results/exp01/custom.png

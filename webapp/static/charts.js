@@ -1,0 +1,166 @@
+// Small SVG charts drawn in the browser, so a figure can follow a slider while it moves.
+// The numbers always come from Python; this file only places marks.
+window.Charts = (function () {
+  const SVG = "http://www.w3.org/2000/svg";
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+  const svgEl = (tag, attrs, text) => {
+    const e = document.createElementNS(SVG, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+
+  function niceTicks(lo, hi, target) {
+    const span = hi - lo || 1, raw = span / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => span / s <= target) || 10 * mag;
+    const ticks = [];
+    for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) ticks.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+    return { ticks, step };
+  }
+  const fmtTick = (v, step) => v.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2);
+
+  // series: [{v, cls, name, dash}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
+  // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare}
+  function line(host, T, series, hlines, shade, opts) {
+    const W = opts.width || 560, H = opts.height || 340, L = 54, R = 12, TOP = 10, B = opts.noXLabel ? 22 : 40, pw = W - L - R, ph = H - TOP - B;
+    let lo = opts.lo, hi = opts.hi;
+    if (lo === undefined || hi === undefined) {
+      let mn = Infinity, mx = -Infinity;
+      for (const s of series) for (const v of s.v) { if (v < mn) mn = v; if (v > mx) mx = v; }
+      for (const h of hlines) { mn = Math.min(mn, h.y); mx = Math.max(mx, h.y); }
+      const pad = 0.1 * ((mx - mn) || 1);
+      if (lo === undefined) lo = mn - pad;
+      if (hi === undefined) hi = mx + pad;
+    }
+    const X = (t) => L + (T === 1 ? 0 : (t / (T - 1)) * pw), Y = (v) => TOP + (1 - (v - lo) / (hi - lo)) * ph;
+    const edge = (t) => Math.min(Math.max(X(t), L), L + pw);
+    const text = (attrs, s) => { const t = svgEl("text", attrs); t.textContent = s; return t; };
+
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.alt });
+    for (const [a, b] of shade) {
+      const x0 = edge(a - 0.5), x1 = edge(b - 0.5);
+      svg.append(svgEl("rect", { class: "shade", x: x0, y: TOP, width: Math.max(0, x1 - x0), height: ph }));
+    }
+    if (opts.wrongShare) {
+      // grey behind the plot, darker where the human picks the wrong action in more of the states
+      const level = (t) => Math.round(opts.wrongShare[t] * 10) / 10;
+      for (let start = 0, t = 1; t <= T; t++) {
+        if (t < T && level(t) === level(start)) continue;
+        if (level(start) > 0) {
+          const x0 = edge(start - 0.5), x1 = edge(t - 0.5);
+          svg.append(svgEl("rect", { class: "shade-share", x: x0, y: TOP, width: Math.max(0, x1 - x0), height: ph, "fill-opacity": (0.2 * level(start)).toFixed(3) }));
+        }
+        start = t;
+      }
+    }
+    const auto = opts.pct ? { ticks: [0, 0.2, 0.4, 0.6, 0.8, 1], step: 0.2 } : niceTicks(lo, hi, H < 250 ? 4 : 6);
+    const yticks = opts.yticks || auto.ticks.map((v) => ({ v, label: opts.pct ? Math.round(v * 100) + "%" : fmtTick(v, auto.step) }));
+    for (const tick of yticks) {
+      svg.append(svgEl("line", { class: "grid", x1: L, x2: L + pw, y1: Y(tick.v), y2: Y(tick.v) }),
+        text({ x: L - 8, y: Y(tick.v) + 4, "text-anchor": "end", class: tick.faded ? "faded" : "" }, tick.label));
+    }
+    for (const v of niceTicks(0, T - 1, 8).ticks) {
+      svg.append(svgEl("line", { class: "grid", x1: X(v), x2: X(v), y1: TOP, y2: TOP + ph }),
+        text({ x: X(v), y: TOP + ph + 16, "text-anchor": "middle" }, v));
+    }
+    if (!opts.noXLabel) svg.append(text({ x: L + pw / 2, y: H - 4, "text-anchor": "middle" }, "round t"));
+    svg.append(text({ x: 12, y: TOP + ph / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${TOP + ph / 2})` }, opts.ylabel));
+    for (const h of hlines) {
+      svg.append(svgEl("line", { class: h.cls || "hline", x1: L, x2: L + pw, y1: Y(h.y), y2: Y(h.y) }));
+      if (h.label) {
+        // label above its line, unless that would leave the plot or sit on a nearby line's label
+        const crowded = hlines.some((o) => o !== h && o.label && Y(o.y) <= Y(h.y) && Y(h.y) - Y(o.y) < 15);
+        const above = Y(h.y) - TOP > 18 && !crowded;
+        svg.append(text({ x: L + pw - 2, y: Y(h.y) + (above ? -5 : 13), "text-anchor": "end" }, h.label));
+      }
+    }
+    for (const s of series) {
+      let d = "";
+      for (let t = 0; t < T; t++) {
+        const y = Y(s.v[t]).toFixed(1);
+        // a per-round value is a step: flat across its own round, jumping between rounds
+        d += opts.step ? `${t ? "L" : "M"}${edge(t - 0.5).toFixed(1)} ${y}L${edge(t + 0.5).toFixed(1)} ${y}`
+          : `${t ? "L" : "M"}${X(t).toFixed(1)} ${y}`;
+      }
+      svg.append(svgEl("path", { class: "line " + s.cls + (s.dash ? " dashed" : "") + (s.faded ? " faded" : ""), d }));
+    }
+    // a large dot on the value at round 0: the starting point the user sets
+    for (const s of series) if (s.dot) svg.append(svgEl("circle", { class: "dot " + s.cls + (s.faded ? " faded" : ""), cx: X(0), cy: Y(s.v[0]), r: opts.dotRadius || 6.5 }));
+    const cross = svgEl("line", { class: "cross", y1: TOP, y2: TOP + ph, visibility: "hidden" });
+    const hit = svgEl("rect", { x: L, y: TOP, width: pw, height: ph, fill: "transparent" });
+    svg.append(cross, hit);
+
+    const legend = el("div", "legend");
+    for (const s of series) {
+      const item = el("span");
+      item.append(el("i", s.cls.replace("c-", "bg-") + (s.dash ? " dash" : "")), s.name);
+      legend.append(item);
+    }
+    if (opts.dotLabel) { const item = el("span"); item.append(el("i", "start"), opts.dotLabel); legend.append(item); }
+    if (shade.length) { const item = el("span"); item.append(el("i", "box"), "human picks the wrong action"); legend.append(item); }
+    if (opts.wrongShare) { const item = el("span"); item.append(el("i", "box share"), "grey: share of states with the wrong action"); legend.append(item); }
+    const tip = el("div", "tip");
+    tip.hidden = true;
+    host.replaceChildren(...(opts.noLegend ? [] : [legend]), svg, tip);
+
+    const fmt = opts.fmt || ((v) => (opts.pct ? Math.round(v * 100) + "%" : v.toFixed(2)));
+    hit.addEventListener("pointermove", (e) => {
+      const box = svg.getBoundingClientRect(), sx = (e.clientX - box.left) * (W / box.width);
+      const t = Math.min(Math.max(Math.round(((sx - L) / pw) * (T - 1)), 0), T - 1);
+      cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("b", "", "round " + t));
+      for (const s of series) tip.append(document.createElement("br"), s.name + "  " + fmt(s.v[t]));
+      tip.hidden = false;
+      const left = (X(t) / W) * box.width, onLeft = left < box.width / 2;
+      tip.style.left = onLeft ? left + 12 + "px" : "";
+      tip.style.right = onLeft ? "" : box.width - left + 12 + "px";
+      tip.style.top = svg.offsetTop + 6 + "px";
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
+  }
+
+  // map: {lim, G, bins (G rows, top row = largest dh0), labels}; the ring marks (du, dh0)
+  function heat(host, keyHost, map, du, dh0, alt) {
+    const { lim, G, bins, labels } = map, W = 460, L = 54, TOP = 8, P = 380, cell = P / G, last = labels.length - 1;
+    const half = lim / (G - 1);   // grid points are cell centres, so the plot reaches half a cell past +-lim
+    const X = (v) => L + ((v + lim + half) / (2 * (lim + half))) * P, Y = (v) => TOP + ((lim + half - v) / (2 * (lim + half))) * P;
+    const cls = (b) => "hb" + (b === last ? 8 : b);
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${TOP + P + 44}`, role: "img", "aria-label": alt });
+    for (let r = 0; r < G; r++) {
+      let start = 0;
+      for (let c = 1; c <= G; c++) {
+        if (c < G && bins[r][c] === bins[r][start]) continue;   // merge a run of equal cells into one mark
+        const rect = svgEl("rect", { class: cls(bins[r][start]), x: L + start * cell, y: TOP + r * cell, width: (c - start) * cell + 0.5, height: cell + 0.5 });
+        rect.append(svgEl("title", {}, "right for good from round " + labels[bins[r][start]]));
+        svg.append(rect);
+        start = c;
+      }
+    }
+    svg.append(svgEl("line", { class: "zero", x1: X(0), x2: X(0), y1: TOP, y2: TOP + P }),
+      svgEl("line", { class: "zero", x1: L, x2: L + P, y1: Y(0), y2: Y(0) }));
+    for (let v = -lim; v <= lim; v += lim > 4 ? 2 : 1) {
+      svg.append(svgEl("text", { x: X(v), y: TOP + P + 16, "text-anchor": "middle" }, v),
+        svgEl("text", { x: L - 8, y: Y(v) + 4, "text-anchor": "end" }, v));
+    }
+    svg.append(svgEl("text", { x: L + P / 2, y: TOP + P + 36, "text-anchor": "middle" }, "true gap  Δu = u₁ − u₂"),
+      svgEl("text", { x: 12, y: TOP + P / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${TOP + P / 2})` }, "initial belief gap  Δh₀"));
+    const cx = X(clamp(du, -lim, lim)), cy = Y(clamp(dh0, -lim, lim));
+    svg.append(svgEl("circle", { class: "ring-halo", cx, cy, r: 8 }), svgEl("circle", { class: "ring", cx, cy, r: 8 }));
+    host.replaceChildren(svg);
+
+    keyHost.replaceChildren(el("span", "", "Right for good from round:"), ...labels.map((label, i) => {
+      const item = el("span"), swatch = svgEl("svg", { viewBox: "0 0 14 10" });
+      swatch.append(svgEl("rect", { class: cls(i), x: 0, y: 0, width: 14, height: 10 }));
+      item.append(swatch, label);
+      return item;
+    }));
+  }
+
+  return { line, heat };
+})();

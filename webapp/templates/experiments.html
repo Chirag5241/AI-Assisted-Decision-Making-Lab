@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Experiment 1 &middot; {{ site_name }}{% endblock %}
+
+{% block body %}
+<main class="report">
+  <header class="report-head">
+    <p class="kicker">Experiment 1</p>
+    <h2>One feature, two actions, feature always shown</h2>
+    <p>The human's beliefs are guaranteed to converge. These figures ask when the choice becomes right, and what
+      the wait costs. They are written by the batch script, which sweeps thousands of worlds at once:</p>
+    <pre><code>python -m experiments.exp01_single_feature_flip</code></pre>
+  </header>
+
+  {% for fig in figures %}
+  <figure class="plate">
+    <figcaption><b>Fig. {{ loop.index }}</b> {{ fig.title }}</figcaption>
+    {% if fig.exists %}
+    <img src="{{ url_for('results', filename=fig.file) }}" alt="{{ fig.title }}" loading="lazy">
+    {% else %}
+    <p class="missing">Not generated yet. Run the command above, then reload this page.</p>
+    {% endif %}
+    <p class="plate-text">{{ fig.text }}</p>
+  </figure>
+  {% endfor %}
+</main>
+{% endblock %}
