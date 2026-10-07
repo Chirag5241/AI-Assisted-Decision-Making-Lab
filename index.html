@@ -1,0 +1,1322 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- The browser-only copy of the lab, served by GitHub Pages. Built from share/decision-lab.html,
+     which is the same page without this document skeleton. -->
+<style>[hidden] { display: none !important; } img { max-width: 100%; }</style>
+<title>AI-Assisted Decision Making Lab</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap">
+<style>
+/* Layout: a lab notebook. Each bench puts the inputs on ruled graph paper and the
+   results on plain paper beside them; ink carries everything that is not data. */
+:root {
+  --paper: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e;
+  --rule: #e4e3de; --rule-strong: #c9c8c1; --wash: #f3f2ed;
+  --a1: #2a78d6; --a2: #eb6834; --a3: #1baf7a; --a4: #eda100; --a5: #e87ba4; --a6: #008300; --mark: #ffe27a;              /* action 1 / action 2, and chart series 1 / 2 */
+  --wrong: #e9e8e2; --ref: #a3a29b; --error: #b3261e;
+  --h0: #f6f5f1; --h1: #cde2fb; --h2: #9ec5f4; --h3: #6da7ec; --h4: #3987e5;
+  --h5: #256abf; --h6: #184f95; --h7: #0d366b; --never: #a3a29b; --bar: #cde2fb;
+  --display: "Fraunces", "Iowan Old Style", "Palatino Linotype", Georgia, serif;
+  --body: "Newsreader", "Iowan Old Style", Georgia, serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #1a1a19; --ink: #f4f3ef; --ink-2: #c3c2b7;
+    --rule: #2e2e2b; --rule-strong: #4a4944; --wash: #232321;
+    --a1: #3987e5; --a2: #d95926; --a3: #199e70; --a4: #c98500; --a5: #d55181; --a6: #1a9a1a; --mark: #7a6412;
+    --wrong: #2d2d2a; --ref: #7d7c75; --error: #f08a80;
+    --h0: #222220; --h1: #0d366b; --h2: #184f95; --h3: #256abf; --h4: #3987e5;
+    --h5: #6da7ec; --h6: #9ec5f4; --h7: #cde2fb; --never: #5d5c56; --bar: #184f95;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #1a1a19; --ink: #f4f3ef; --ink-2: #c3c2b7;
+  --rule: #2e2e2b; --rule-strong: #4a4944; --wash: #232321;
+  --a1: #3987e5; --a2: #d95926; --a3: #199e70; --a4: #c98500; --a5: #d55181; --a6: #1a9a1a; --mark: #7a6412;
+  --wrong: #2d2d2a; --ref: #7d7c75; --error: #f08a80;
+  --h0: #222220; --h1: #0d366b; --h2: #184f95; --h3: #256abf; --h4: #3987e5;
+  --h5: #6da7ec; --h6: #9ec5f4; --h7: #cde2fb; --never: #5d5c56; --bar: #184f95;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 17px/1.5 var(--body); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1360px; margin: 0 auto; padding-inline: clamp(16px, 3vw, 32px); padding-block: 0 56px; }
+
+/* masthead */
+.mast { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; padding-block: 22px 16px; border-bottom: 2px solid var(--ink); }
+.kicker { margin: 0 0 2px; font: 500 11px/1.4 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2); }
+.mast h1 { margin: 0; font: 600 clamp(26px, 3.4vw, 34px)/1.05 var(--display); letter-spacing: -.02em; text-wrap: balance; }
+.tabs { display: flex; flex-wrap: wrap; gap: 4px; }
+.tabs button { padding: 7px 14px; font: 500 12px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--ink-2); background: none; border: 1px solid transparent; border-radius: 999px; cursor: pointer; }
+.tabs button:hover { color: var(--ink); border-color: var(--rule-strong); }
+.tabs button[aria-selected="true"] { color: var(--paper); background: var(--ink); }
+:focus-visible { outline: 2px solid var(--a1); outline-offset: 2px; }
+
+/* instrument cards on graph paper */
+.paper { background-color: var(--wash); background-image: linear-gradient(var(--rule) 1px, transparent 1px), linear-gradient(90deg, var(--rule) 1px, transparent 1px); background-size: 18px 18px; }
+.card { margin: 0; padding: 16px 14px 12px; min-width: 0; background: var(--paper); border: 1px solid var(--ink); border-radius: 3px; box-shadow: 3px 3px 0 var(--rule-strong); }
+.card legend { padding: 2px 8px; margin-left: -4px; font: 500 11px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; background: var(--ink); color: var(--paper); border-radius: 2px; }
+.card legend i { font-family: var(--display); font-size: 13px; text-transform: none; letter-spacing: 0; }
+.row { display: grid; grid-template-columns: 62px minmax(0, 1fr) 68px; align-items: center; gap: 10px; padding: 4px 0; }
+.sym { display: inline-flex; align-items: baseline; gap: 7px; font: italic 500 18px/1.2 var(--display); white-space: nowrap; }
+.sym.a1::before, .sym.a2::before { content: ""; flex: none; align-self: center; width: 9px; height: 9px; border-radius: 50%; background: var(--a1); }
+.sym.a2::before { background: var(--a2); }
+.sym sub { font-size: .65em; font-style: normal; }
+.sym.plain { font: 500 12px/1.2 var(--mono); }
+input[type="range"] { width: 100%; margin: 0; accent-color: var(--ink); }
+.row.k1 input[type="range"] { accent-color: var(--a1); }
+.row.k2 input[type="range"] { accent-color: var(--a2); }
+input[type="number"] { width: 100%; padding: 4px 6px; font: 500 13px/1.3 var(--mono); text-align: right; color: var(--ink); background: var(--paper); border: 1px solid var(--rule-strong); border-radius: 2px; }
+.derived, .hint { margin: 8px 0 0; font: 400 12px/1.45 var(--mono); color: var(--ink-2); }
+.derived output { color: var(--ink); font-weight: 500; }
+.presets { display: grid; gap: 6px; }
+.preset { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: baseline; padding: 6px 8px; text-align: left; font: 400 14px/1.3 var(--body); color: var(--ink); background: none; border: 1px solid transparent; border-radius: 2px; cursor: pointer; }
+.preset b { font: 600 17px/1 var(--display); }
+.preset:hover, .preset.active { background: var(--wash); border-color: var(--rule-strong); }
+.preset.active { border-color: var(--ink); }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; margin: 2px 0 10px; border: 1px solid var(--ink); border-radius: 2px; overflow: hidden; }
+.segmented label { position: relative; cursor: pointer; }
+.segmented input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
+.segmented span { display: block; padding: 7px 4px; text-align: center; font: 500 11.5px/1.2 var(--mono); letter-spacing: .03em; border: 0 solid var(--rule-strong); }
+.segmented label:nth-child(odd) span { border-right-width: 1px; }
+.segmented label:nth-child(-n+2) span { border-bottom-width: 1px; }
+.segmented input:checked + span { background: var(--ink); color: var(--paper); }
+.segmented input:focus-visible + span { outline: 2px solid var(--a1); outline-offset: -2px; }
+.check { display: flex; align-items: center; gap: 8px; margin-top: 10px; font: 400 14.5px/1.3 var(--body); cursor: pointer; }
+.check input { accent-color: var(--ink); width: 15px; height: 15px; margin: 0; }
+
+/* bench A: rail + results */
+.bench-a { display: grid; grid-template-columns: 340px minmax(0, 1fr); }
+.rail { padding: 24px 20px 32px; border-right: 1px solid var(--rule-strong); display: grid; gap: 22px; align-content: start;
+  /* stays in view and scrolls on its own, so the figures can be read while changing parameters */
+  position: sticky; top: env(safe-area-inset-top, 0px); align-self: start; max-height: 100vh; overflow-y: auto; overscroll-behavior: contain; }
+.out { padding: 28px 0 0 34px; min-width: 0; }
+
+/* verdict, strip, tiles */
+.verdict { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 34px; align-items: center; padding-bottom: 24px; border-bottom: 1px solid var(--rule-strong); }
+.numeral { min-width: 2ch; font: 600 clamp(80px, 9vw, 124px)/.86 var(--display); letter-spacing: -.045em; font-variant-numeric: lining-nums; }
+.numeral.word { font-style: italic; font-weight: 500; font-size: clamp(64px, 7vw, 92px); letter-spacing: -.03em; }
+.numeral-label { margin-top: 10px; font: 500 11px/1.4 var(--mono); letter-spacing: .09em; text-transform: uppercase; color: var(--ink-2); }
+.sentence { margin: 0 0 18px; max-width: 44em; font: 400 20px/1.42 var(--body); text-wrap: pretty; }
+.strip { display: flex; height: 22px; border: 1px solid var(--ink); border-radius: 2px; overflow: hidden; background: var(--paper); }
+.strip i { display: block; min-width: 1px; }
+.strip i.w, .key.w { background: repeating-linear-gradient(135deg, var(--ink) 0 1.5px, transparent 1.5px 5px); }
+.strip i.r, .key.r { background: var(--wash); }
+.strip i + i { border-left: 1px solid var(--ink); }
+.strip-axis { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; font: 400 11px/1.4 var(--mono); color: var(--ink-2); }
+.key { display: inline-block; width: 16px; height: 10px; border: 1px solid var(--ink); margin: 0 5px 0 8px; vertical-align: -1px; }
+.tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--rule-strong); }
+.tile { padding: 18px 18px 18px 0; min-width: 0; }
+.tile + .tile { padding-left: 18px; border-left: 1px solid var(--rule); }
+.tile .label { font: 500 10.5px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.tile .value { margin: 4px 0 2px; font: 500 32px/1.1 var(--display); letter-spacing: -.02em; font-variant-numeric: lining-nums tabular-nums; }
+.tile .note { font: 400 14px/1.35 var(--body); color: var(--ink-2); }
+
+/* figures */
+.figs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 30px; padding: 26px 0 8px; }
+figure { margin: 0; min-width: 0; }
+figcaption { margin-bottom: 8px; font: 400 15.5px/1.35 var(--body); }
+figcaption b { margin-right: 6px; font: 500 11px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font: 400 11px var(--mono); fill: var(--ink-2); }
+.chart .grid { stroke: var(--rule); stroke-width: 1; }
+.chart .axis { stroke: var(--rule-strong); stroke-width: 1; fill: none; }
+.chart .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.c-a1 { stroke: var(--a1); } .c-a2 { stroke: var(--a2); } .c-ink { stroke: var(--ink); } .c-ref { stroke: var(--ref); }
+.bg-a1 { background: var(--a1); } .bg-a2 { background: var(--a2); } .bg-ink { background: var(--ink); } .bg-ref { background: var(--ref); }
+.c-a3 { stroke: var(--a3); } .c-a4 { stroke: var(--a4); } .c-a5 { stroke: var(--a5); } .c-a6 { stroke: var(--a6); }
+.bg-a3 { background: var(--a3); } .bg-a4 { background: var(--a4); } .bg-a5 { background: var(--a5); } .bg-a6 { background: var(--a6); }
+.chart .dot.c-a3 { fill: var(--a3); } .chart .dot.c-a4 { fill: var(--a4); } .chart .dot.c-a5 { fill: var(--a5); } .chart .dot.c-a6 { fill: var(--a6); }
+.chart .truth { stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+.chart .faded { opacity: 0.28; }
+.belief-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 30px; }
+.panel-title { margin: 0 0 2px; font: italic 500 17px/1.2 var(--display); }
+.panel-title small { margin-left: 8px; font: 400 11.5px/1.2 var(--mono); font-style: normal; color: var(--ink-2); }
+.legend i.truth-key { height: 0; background: none; border-top: 2px dashed var(--ink-2); }
+.legend i.faded-key { background: var(--ink-2); opacity: 0.28; }
+.figs.one { grid-template-columns: minmax(0, 1fr); }
+.chart .shade-share { fill: var(--ink); }
+.legend i.box.share { background: var(--ink); opacity: 0.2; }
+.strip.share { display: block; position: relative; height: 34px; background: var(--wash); }
+.strip.share i { position: absolute; inset: 0; min-width: 0; border: 0; }
+.chart .line.dashed { stroke-width: 1.5; stroke-dasharray: 5 4; }
+.side { display: grid; gap: 28px; align-content: start; min-width: 0; }
+.fig-stack { display: grid; gap: 18px; align-content: start; min-width: 0; }
+.chart .dot { stroke: var(--paper); stroke-width: 2; }
+.chart .dot.c-a1 { fill: var(--a1); } .chart .dot.c-a2 { fill: var(--a2); } .chart .dot.c-ink { fill: var(--ink); }
+.chart .shade { fill: var(--wrong); }
+.chart .hline { stroke: var(--ink); stroke-width: 1; stroke-dasharray: 4 3; fill: none; }
+.chart .zero { stroke: var(--ink-2); stroke-width: 1; fill: none; }
+.chart .cross { stroke: var(--ink-2); stroke-width: 1; fill: none; }
+.chart .ring { fill: none; stroke: var(--ink); stroke-width: 2; }
+.chart .ring-halo { fill: none; stroke: var(--paper); stroke-width: 5; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 4px; font: 400 12px/1.4 var(--mono); color: var(--ink-2); }
+.legend i { display: inline-block; width: 16px; height: 3px; margin-right: 6px; vertical-align: 3px; border-radius: 2px; }
+.legend i.dash { height: 0; background: none; border-top: 2px dashed var(--ink); }
+.legend i.start { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); vertical-align: -1px; }
+.legend i.box { height: 10px; vertical-align: -1px; background: var(--wrong); border-radius: 0; }
+.tip { position: absolute; top: 4px; padding: 6px 9px; pointer-events: none; font: 400 11.5px/1.5 var(--mono); color: var(--ink); background: var(--paper); border: 1px solid var(--ink); border-radius: 2px; white-space: nowrap; z-index: 2; }
+.tip b { font-weight: 500; }
+.hb0 { fill: var(--h0); } .hb1 { fill: var(--h1); } .hb2 { fill: var(--h2); } .hb3 { fill: var(--h3); } .hb4 { fill: var(--h4); }
+.hb5 { fill: var(--h5); } .hb6 { fill: var(--h6); } .hb7 { fill: var(--h7); } .hb8 { fill: var(--never); }
+.heat-key { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font: 400 11.5px/1.4 var(--mono); color: var(--ink-2); }
+.heat-key svg { width: 14px; height: 10px; margin-right: 5px; vertical-align: -1px; display: inline-block; }
+.heat-key rect { stroke: var(--rule-strong); stroke-width: 1; }
+
+.split { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, .9fr); gap: 40px; align-items: start; padding-top: 26px; margin-top: 18px; border-top: 1px solid var(--rule-strong); }
+.notes h2, .section-title { margin: 0 0 8px; font: 600 23px/1.15 var(--display); letter-spacing: -.01em; text-wrap: balance; }
+.notes p { margin: 0 0 12px; color: var(--ink-2); text-wrap: pretty; max-width: 65ch; }
+.notes .math, .notes i { color: var(--ink); font-style: italic; white-space: nowrap; }
+.formula { padding: 14px 0; text-align: center; font: italic 500 19px/1.3 var(--display); color: var(--ink) !important; border-top: 1px solid var(--ink); border-bottom: 1px solid var(--ink); }
+
+/* bench B */
+.group-label { margin: 12px 0 6px; font: 500 10.5px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-2); }
+.group-label.first { margin-top: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { min-width: 40px; padding: 5px 9px; font: italic 500 16px/1.1 var(--display); color: var(--ink-2); background: var(--paper); border: 1px dashed var(--rule-strong); border-radius: 999px; cursor: pointer; }
+.chip[aria-pressed="true"] { color: var(--paper); background: var(--ink); border: 1px solid var(--ink); }
+.section-sub { margin: 0 0 10px; color: var(--ink-2); font-size: 15.5px; }
+.table-scroll { overflow-x: auto; }
+.ranking { width: 100%; border-collapse: collapse; font: 400 13px/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+.ranking th { padding: 6px 10px 6px 0; text-align: left; vertical-align: bottom; font: 500 10.5px/1.35 var(--mono); letter-spacing: .07em; text-transform: uppercase; color: var(--ink-2); border-bottom: 1px solid var(--ink); }
+.ranking td { padding: 8px 10px 8px 0; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+.ranking .num { text-align: right; padding-right: 0; padding-left: 10px; }
+.ranking tbody tr { cursor: pointer; }
+.ranking tbody tr:hover, .ranking tr.current { background: var(--wash); }
+.ranking tr.current { font-weight: 500; }
+.ranking tr.current td { border-bottom-color: var(--ink); border-top: 1px solid var(--ink); }
+.feat { display: inline-block; margin-right: 5px; font: italic 500 15px/1 var(--display); color: var(--rule-strong); }
+.feat.on { color: var(--ink); }
+.bar-cell { position: relative; min-width: 120px; }
+.bar-cell span { position: relative; }
+.bar-cell .bar { position: absolute; left: 10px; top: 7px; bottom: 7px; max-width: calc(100% - 10px); background: var(--bar); border-radius: 0 3px 3px 0; }
+/* A weight's colour: its action's hue, in the shade of its feature (--shade is set on the group or chart panel). */
+.e-a1 { --c: color-mix(in oklab, var(--a1) var(--shade, 100%), var(--paper)); }
+.e-a2 { --c: color-mix(in oklab, var(--a2) var(--shade, 100%), var(--paper)); }
+.e-a3 { --c: color-mix(in oklab, var(--a3) var(--shade, 100%), var(--paper)); }
+.e-a4 { --c: color-mix(in oklab, var(--a4) var(--shade, 100%), var(--paper)); }
+.e-a5 { --c: color-mix(in oklab, var(--a5) var(--shade, 100%), var(--paper)); }
+.e-a6 { --c: color-mix(in oklab, var(--a6) var(--shade, 100%), var(--paper)); }
+.c-a1 { stroke: var(--a1); stroke: color-mix(in oklab, var(--a1) var(--shade, 100%), var(--paper)); }
+.c-a2 { stroke: var(--a2); stroke: color-mix(in oklab, var(--a2) var(--shade, 100%), var(--paper)); }
+.c-a3 { stroke: var(--a3); stroke: color-mix(in oklab, var(--a3) var(--shade, 100%), var(--paper)); }
+.c-a4 { stroke: var(--a4); stroke: color-mix(in oklab, var(--a4) var(--shade, 100%), var(--paper)); }
+.c-a5 { stroke: var(--a5); stroke: color-mix(in oklab, var(--a5) var(--shade, 100%), var(--paper)); }
+.c-a6 { stroke: var(--a6); stroke: color-mix(in oklab, var(--a6) var(--shade, 100%), var(--paper)); }
+.chart .dot.c-a1 { fill: var(--a1); fill: color-mix(in oklab, var(--a1) var(--shade, 100%), var(--paper)); }
+.chart .dot.c-a2 { fill: var(--a2); fill: color-mix(in oklab, var(--a2) var(--shade, 100%), var(--paper)); }
+.chart .dot.c-a3 { fill: var(--a3); fill: color-mix(in oklab, var(--a3) var(--shade, 100%), var(--paper)); }
+.chart .dot.c-a4 { fill: var(--a4); fill: color-mix(in oklab, var(--a4) var(--shade, 100%), var(--paper)); }
+.chart .dot.c-a5 { fill: var(--a5); fill: color-mix(in oklab, var(--a5) var(--shade, 100%), var(--paper)); }
+.chart .dot.c-a6 { fill: var(--a6); fill: color-mix(in oklab, var(--a6) var(--shade, 100%), var(--paper)); }
+/* the matrix at a glance, above its sliders; values follow the sliders as they move */
+.snapshot { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 3px 0; padding-bottom: 4px; font: 500 12.5px/1.3 var(--mono); font-variant-numeric: tabular-nums; }
+.snapshot.dense { font-size: 10.5px; letter-spacing: -0.02em; }
+.snapshot .cols, .snapshot .bracket { display: grid; padding: 0 6px; }
+.snapshot .sides, .snapshot .bracket { grid-auto-rows: 24px; align-items: center; padding-block: 3px; }
+.snapshot .sides { display: grid; }
+.snapshot .head { font: italic 500 14px/1.2 var(--display); text-align: center; color: var(--ink-2); }
+.snapshot .sides .head { text-align: left; }
+.snapshot .value { line-height: 22px; text-align: center; cursor: pointer; border-radius: 2px; }
+.snapshot .value:hover { background: var(--wash); }
+.snapshot .off { opacity: 0.35; }
+.snapshot .bracket { border: solid var(--ink); border-width: 0 1.5px;
+  background: linear-gradient(var(--ink), var(--ink)) left top / 6px 1.5px no-repeat, linear-gradient(var(--ink), var(--ink)) right top / 6px 1.5px no-repeat,
+    linear-gradient(var(--ink), var(--ink)) left bottom / 6px 1.5px no-repeat, linear-gradient(var(--ink), var(--ink)) right bottom / 6px 1.5px no-repeat; }
+.entries { display: grid; gap: 10px; }
+.entry-group { padding-top: 8px; border-top: 1px solid var(--rule); }
+.entry-group .group-label { margin: 0 0 2px; }
+.row.entry { grid-template-columns: 50px minmax(0, 1fr) 62px; gap: 8px; padding: 2px 0; }
+.entry .sym.dot::before { content: ""; flex: none; align-self: center; width: 9px; height: 9px; border-radius: 50%; background: var(--c); }
+.entry .sym sub { letter-spacing: 0.04em; }
+.entry input[type="range"] { accent-color: var(--c); }
+/* not shown or not offered: the weight keeps its value and stays editable, only fainter */
+.entry.off { opacity: 0.4; }
+.entry .cell { display: grid; grid-template: "in up" 1fr "in down" 1fr / minmax(0, 1fr) 14px; background: var(--paper); border: 1px solid var(--rule-strong); border-radius: 2px; overflow: hidden; }
+.entry .cell:focus-within { border-color: var(--ink); box-shadow: 0 0 0 2px var(--a1); }
+.entry .cell input { grid-area: in; min-width: 0; padding: 4px 0 4px 2px; font-size: 12.5px; text-align: center; border: 0; border-radius: 0; background: none; outline: none; -moz-appearance: textfield; appearance: textfield; }
+.entry .cell input::-webkit-outer-spin-button, .entry .cell input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.entry .cell button { position: relative; padding: 0; border: 0; border-left: 1px solid var(--rule); background: none; cursor: pointer; touch-action: manipulation; }
+.entry .cell .up { grid-area: up; }
+.entry .cell .down { grid-area: down; border-top: 1px solid var(--rule); }
+.entry .cell button::before { content: ""; position: absolute; left: 50%; top: 50%; border: 3.5px solid transparent; }
+.entry .cell .up::before { border-bottom-color: var(--ink-2); transform: translate(-50%, -75%); }
+.entry .cell .down::before { border-top-color: var(--ink-2); transform: translate(-50%, -25%); }
+.entry .cell button:hover { background: var(--wash); }
+.entry .cell button:active { background: var(--rule); }
+.rankings { transition: opacity 0.18s ease; }
+.rankings.stale { opacity: 0.45; }
+.btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.btns button { padding: 5px 10px; font: 500 11px/1.3 var(--mono); letter-spacing: .03em; color: var(--ink); background: var(--paper); border: 1px solid var(--ink); border-radius: 2px; cursor: pointer; }
+.btns button:hover { background: var(--ink); color: var(--paper); }
+.rankings { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 40px; padding-top: 26px; margin-top: 18px; border-top: 1px solid var(--rule-strong); }
+.rankings > div { min-width: 0; }
+/* "Reading the bench": a flat band at the foot of the page */
+.reading {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 2fr);
+  gap: 44px;
+  padding: 26px 24px 38px;
+  margin-top: 34px;
+  background: var(--wash);
+  border-top: 2px solid var(--ink);
+}
+.reading h2 { margin: 0 0 14px; font: 500 11px/1.4 var(--mono); letter-spacing: 0.09em; text-transform: uppercase; color: var(--ink-2); }
+.callout { margin: 0 0 14px; font: 600 27px/1.2 var(--display); letter-spacing: -0.01em; text-wrap: balance; }
+.callout mark { color: inherit; background: linear-gradient(transparent 58%, var(--mark) 58%); }
+.callout-sub { margin: 0; color: var(--ink-2); text-wrap: pretty; }
+.callout-sub .math { color: var(--ink); font-style: italic; white-space: nowrap; }
+.reading-body { columns: 2 300px; column-gap: 38px; }
+.reading-body p { max-width: none; break-inside: avoid; }
+.reading-body .formula { margin-bottom: 12px; }
+.foot { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--rule-strong); font: 400 12px/1.5 var(--mono); color: var(--ink-2); }
+
+@media (max-width: 1080px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tile:nth-child(3) { padding-left: 0; border-left: 0; }
+  .tile:nth-child(n+3) { border-top: 1px solid var(--rule); }
+  .split, .rankings { grid-template-columns: minmax(0, 1fr); gap: 32px; }
+  .belief-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 860px) {
+  .bench-a { grid-template-columns: minmax(0, 1fr); }
+  .rail { border-right: 0; border-bottom: 1px solid var(--rule-strong); padding: 20px 14px 26px; position: static; max-height: none; overflow: visible; }
+  .out { padding: 24px 0 0; }
+  .verdict { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .figs { grid-template-columns: minmax(0, 1fr); }
+  .reading { grid-template-columns: minmax(0, 1fr); gap: 22px; padding: 20px 14px 30px; }
+  .callout { font-size: 23px; }
+  .ranking th:nth-child(n+4), .ranking td:nth-child(n+4) { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="mast">
+    <div>
+      <p class="kicker">CS 598 &middot; Helping a learning human pick the best move</p>
+      <h1>AI-Assisted Decision Making Lab</h1>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Benches">
+      <button type="button" role="tab" id="tab-flip" aria-controls="panel-flip" aria-selected="true">1 feature, 2 actions</button>
+      <button type="button" role="tab" id="tab-worlds" aria-controls="panel-worlds" aria-selected="false">More actions and features</button>
+    </div>
+  </header>
+
+  <!-- ================= bench A: one feature, two actions ================= -->
+  <section id="panel-flip" role="tabpanel" aria-labelledby="tab-flip">
+    <div class="bench-a">
+      <form class="rail paper" id="form-flip" autocomplete="off">
+        <fieldset class="card">
+          <legend>Start from a scenario</legend>
+          <div class="presets" id="presets"></div>
+        </fieldset>
+        <fieldset class="card">
+          <legend>Truth <i>U</i></legend>
+          <div class="row k1"><label for="u1"><span class="sym a1"><span>u<sub>1</sub></span></span></label><input type="range" id="u1" data-k="u1" min="-3" max="3" step="0.05"><input type="number" id="u1n" data-k="u1" min="-3" max="3" step="0.05" aria-label="u1 value"></div>
+          <div class="row k2"><label for="u2"><span class="sym a2"><span>u<sub>2</sub></span></span></label><input type="range" id="u2" data-k="u2" min="-3" max="3" step="0.05"><input type="number" id="u2n" data-k="u2" min="-3" max="3" step="0.05" aria-label="u2 value"></div>
+          <p class="derived">true gap &Delta;u = <output id="du"></output></p>
+        </fieldset>
+        <fieldset class="card">
+          <legend>Human's first belief <i>H</i><sub>0</sub></legend>
+          <div class="row k1"><label for="h1"><span class="sym a1"><span>h<sub>1</sub></span></span></label><input type="range" id="h1" data-k="h1" min="-3" max="3" step="0.05"><input type="number" id="h1n" data-k="h1" min="-3" max="3" step="0.05" aria-label="h1 value"></div>
+          <div class="row k2"><label for="h2"><span class="sym a2"><span>h<sub>2</sub></span></span></label><input type="range" id="h2" data-k="h2" min="-3" max="3" step="0.05"><input type="number" id="h2n" data-k="h2" min="-3" max="3" step="0.05" aria-label="h2 value"></div>
+          <p class="derived">belief gap &Delta;h<sub>0</sub> = <output id="dh0"></output></p>
+        </fieldset>
+        <fieldset class="card">
+          <legend>How the human learns</legend>
+          <div class="segmented" role="radiogroup" aria-label="Learning curve" id="curves-a"></div>
+          <div class="row" id="p1-row"><label for="p1"><span class="sym plain" id="p1-label">rate</span></label><input type="range" id="p1" data-k="p1"><input type="number" id="p1n" data-k="p1" aria-label="learning speed"></div>
+          <div class="row k2" id="p2-row" hidden><label for="p2"><span class="sym plain a2" id="p2-label">rate 2</span></label><input type="range" id="p2" data-k="p2"><input type="number" id="p2n" data-k="p2" aria-label="learning speed for action 2"></div>
+          <p class="hint" id="hint-a"></p>
+          <label class="check"><input type="checkbox" id="split"> A separate speed for each action</label>
+        </fieldset>
+        <fieldset class="card">
+          <legend>Discount <i>&delta;</i> and horizon</legend>
+          <div class="row"><label for="delta"><span class="sym plain">&delta;</span></label><input type="range" id="delta" data-k="delta" min="0.01" max="0.99" step="0.01"><input type="number" id="deltan" data-k="delta" min="0.01" max="0.99" step="0.01" aria-label="discount"></div>
+          <p class="hint">&delta; is the algorithm's patience: one number in (0, 1), as in the proposal, Noti et al. and Guan et al. Near 0 only the first rounds count; near 1 later rounds count almost as much. It can also be read as the chance, &delta;<sup>t</sup>, that round t happens at all.</p>
+          <div class="row"><label for="T"><span class="sym plain">rounds</span></label><input type="range" id="T" data-k="T" min="10" max="400" step="10"><input type="number" id="Tn" data-k="T" min="10" max="400" step="10" aria-label="rounds"></div>
+        </fieldset>
+      </form>
+
+      <div class="out">
+        <div class="verdict" aria-live="polite">
+          <div><div class="numeral" id="a-numeral"></div><div class="numeral-label" id="a-numeral-label"></div></div>
+          <div>
+            <p class="sentence" id="a-sentence"></p>
+            <div class="strip" id="strip" role="img" aria-label="Timeline of right and wrong rounds"></div>
+            <div class="strip-axis"><span>round 0</span><span><i class="key w"></i>wrong action<i class="key r"></i>right action</span><span id="strip-end"></span></div>
+          </div>
+        </div>
+        <div class="tiles" id="a-tiles"></div>
+        <div class="figs">
+          <figure><figcaption><b>Fig. 1</b> What the human believes each action is worth</figcaption><div class="chart" id="a-beliefs"></div></figure>
+          <div class="fig-stack">
+            <figure><figcaption><b>Fig. 2</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;</figcaption><div class="chart" id="a-regret"></div></figure>
+            <figure><figcaption><b>Fig. 3</b> The human's choice &ycirc; for a positive state</figcaption><div class="chart" id="a-choice"></div></figure>
+          </div>
+        </div>
+        <div class="split">
+          <figure><figcaption><b>Fig. 4</b> Every nearby world at once; the ring is the one on the bench</figcaption><div class="chart" id="a-map"></div><div class="heat-key" id="a-map-key"></div></figure>
+          <div class="side">
+        <figure>
+          <figcaption><b>Fig. 5</b> Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+          <div class="chart" id="a-value"></div>
+        </figure>
+        <figure>
+          <figcaption><b>Fig. 6</b> The flip: when the belief gap lands on the side of the true gap</figcaption>
+          <div class="chart" id="a-gap"></div>
+        </figure>
+      </div>
+        </div>
+      </div>
+    </div>
+<footer class="reading">
+  <div class="reading-lead">
+    <h2>Reading the bench</h2>
+    <p class="callout"><mark>The more a wrong round costs, the sooner the human flips.</mark></p>
+    <p class="callout-sub">Time to flip moves inversely with the true gap <span class="math">|&Delta;u|</span>, and regret
+      per wrong round is <span class="math">|&Delta;u| &middot; E|x|</span>. The flip depends only on the ratio
+      <span class="math">|&Delta;h<sub>0</sub>| / |&Delta;u|</span>: for the hyperbolic learner it comes after
+      <span class="math">half-life &times; |&Delta;h<sub>0</sub>| / |&Delta;u|</span> rounds, exactly inversely proportional;
+      for the other curves it still shrinks as <span class="math">|&Delta;u|</span> grows. Regret does not drive the learning:
+      beliefs close the same share of their gap each round whatever the loss.</p>
+  </div>
+  <div class="reading-body notes">
+    <p>With one feature, the state <i>x</i> scales both actions alike, so the human is right exactly when
+      <span class="math">h<sub>1</sub> &minus; h<sub>2</sub></span> has the same sign as
+      <span class="math">u<sub>1</sub> &minus; u<sub>2</sub></span>, whatever <i>x</i> turns out to be. Fig. 6 follows that gap.</p>
+    <p>When both actions share one learning curve <span class="math">&phi;</span>, a human who starts on the wrong side flips as soon as</p>
+    <p class="formula">&phi;(t) &gt; |&Delta;h<sub>0</sub>| / (|&Delta;h<sub>0</sub>| + |&Delta;u|)</p>
+    <p>so the map in Fig. 4 is made of rays through the origin. Give each action its own speed and that picture
+      breaks: the map then depends on the levels too, and a human who starts right can go wrong before coming back.</p>
+    <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; (Ux)<sub>&ycirc;</sub></span>.
+      Here that is <span class="math">|&Delta;u| &middot; |x|</span> when the choice is wrong and zero when it is right;
+      Fig. 2 averages it over <span class="math">x ~ N(0, 1)</span> and weights round <i>t</i> by
+      <span class="math">&delta;<sup>t</sup></span>; the objective is the sum of those bars. For a negative state both the choice in Fig. 3
+      and the best move swap, so the regret is the same.</p>
+    <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>: what the best
+      move is truly worth minus what the human expects from the move they pick. Above zero the human expects too
+      little, below zero too much. Averaged over states it equals
+      <span class="math">(|&Delta;u| &minus; |h<sub>1</sub> &minus; h<sub>2</sub>|) &middot; E|x| / 2</span>,
+      so it can sit at zero while the human still picks the wrong action.</p>
+  </div>
+</footer>
+  </section>
+
+  <!-- ================= bench B: K actions, n features ================= -->
+  <section id="panel-worlds" role="tabpanel" aria-labelledby="tab-worlds" hidden>
+    <div class="bench-a">
+      <form class="rail paper" id="form-world" autocomplete="off">
+      <fieldset class="card">
+        <legend>The algorithm's choice</legend>
+        <p class="group-label first">Features it shows</p>
+        <div class="chips" id="feature-chips"></div>
+        <p class="group-label">Actions it offers</p>
+        <div class="chips" id="action-chips"></div>
+        <p class="hint">The same subsets are shown every round. Regret is always measured against the best of all actions.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>World size</legend>
+        <div class="row">
+          <label for="K"><span class="sym plain">actions</span></label>
+          <input type="range" id="K" data-size="K" min="2" max="6" step="1">
+          <input type="number" id="Kn" data-size="K" min="2" max="6" step="1" aria-label="number of actions">
+        </div>
+        <div class="row">
+          <label for="n"><span class="sym plain">features</span></label>
+          <input type="range" id="n" data-size="n" min="1" max="6" step="1">
+          <input type="number" id="nn" data-size="n" min="1" max="6" step="1" aria-label="number of features">
+        </div>
+        <p class="hint">Growing the world adds random truth weights and zero beliefs; new features and actions start switched on.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Truth <i>U</i></legend>
+        <div class="entries" id="matrix-U" role="group" aria-label="True utility weights, grouped by feature"></div>
+        <div class="btns"><button type="button" data-fill="U:random">Randomize</button></div>
+        <p class="hint">u<sub>kj</sub> is the weight of feature j in the value of action k. Each slider's dot is the colour of its line in Fig. 2.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Human's first belief <i>H</i><sub>0</sub></legend>
+        <div class="entries" id="matrix-H" role="group" aria-label="The human's initial weights, grouped by feature"></div>
+        <div class="btns"><button type="button" data-fill="H:random">Randomize</button><button type="button" data-fill="H:zeros">All zeros</button><button type="button" data-fill="H:truth">Copy the truth</button></div>
+        <p class="hint">Faded weights belong to a hidden feature or an action that is not offered. They keep their values.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>How the human learns</legend>
+        <div class="segmented" role="radiogroup" aria-label="Learning curve" id="curves-b"></div>
+        <div class="row">
+          <label for="bp"><span class="sym plain" id="bp-label">rate</span></label>
+          <input type="range" id="bp" data-b="bp">
+          <input type="number" id="bpn" data-b="bp" aria-label="learning speed">
+        </div>
+        <p class="hint" id="hint-b"></p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Discount <i>&delta;</i> and horizon</legend>
+        <div class="row">
+          <label for="bd"><span class="sym plain">&delta;</span></label>
+          <input type="range" id="bd" data-b="bd" min="0.01" max="0.99" step="0.01">
+          <input type="number" id="bdn" data-b="bd" min="0.01" max="0.99" step="0.01" aria-label="discount factor">
+        </div>
+        <p class="hint">&delta; is the algorithm's patience: one number in (0, 1), as in the proposal, Noti et al. and Guan et al. Near 0 only the first rounds count; near 1 later rounds count almost as much.</p>
+        <div class="row">
+          <label for="bT"><span class="sym plain">rounds</span></label>
+          <input type="range" id="bT" data-b="bT" min="10" max="300" step="10">
+          <input type="number" id="bTn" data-b="bT" min="10" max="300" step="10" aria-label="number of rounds">
+        </div>
+      </fieldset>
+      </form>
+
+      <div class="out">
+    <section class="verdict" aria-live="polite">
+      <div class="numeral-block">
+        <div class="numeral" id="b-numeral">&nbsp;</div>
+        <div class="numeral-label" id="b-numeral-label">expected discounted regret</div>
+      </div>
+      <div class="verdict-text">
+        <p class="sentence" id="b-sentence">Running the first world&hellip;</p>
+        <div class="strip-wrap">
+          <div class="strip share" id="b-strip" role="img" aria-label="Share of states in which the human picks the wrong action, round by round"><i class="w" id="b-strip-wrong"></i></div>
+          <div class="strip-axis"><span>round 0</span><span><i class="key w"></i>share of states with the wrong action <i class="key r"></i>with the right action</span><span id="b-strip-end"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tiles" id="b-tiles"></section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 1</b> The human's choice &ycirc; for the state with every feature at +1</figcaption>
+        <div class="chart" id="b-choice"></div>
+      </figure>
+    </section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 2</b> What the human believes: the weight of each feature in each action's value, one panel per feature</figcaption>
+        <div class="legend" id="b-beliefs-legend"></div>
+        <div class="belief-grid" id="b-beliefs"></div>
+      </figure>
+    </section>
+
+    <section class="figs">
+      <figure>
+        <figcaption><b>Fig. 3</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;</figcaption>
+        <div class="chart" id="b-reg"></div>
+      </figure>
+      <figure>
+        <figcaption><b>Fig. 4</b> Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+        <div class="chart" id="b-value"></div>
+      </figure>
+    </section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 5</b> How often the human picks the best move</figcaption>
+        <div class="chart" id="b-acc"></div>
+      </figure>
+    </section>
+
+    <section class="rankings">
+      <div>
+        <h2 class="section-title">Which features should it show?</h2>
+        <p class="section-sub" id="rank-features-sub"></p>
+        <div class="table-scroll"><table class="ranking">
+          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th><th scope="col" class="num">Discounted regret</th>
+            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <tbody id="rank-features"></tbody>
+        </table></div>
+      </div>
+      <div>
+        <h2 class="section-title">Which actions should it offer?</h2>
+        <p class="section-sub" id="rank-actions-sub"></p>
+        <div class="table-scroll"><table class="ranking">
+          <thead><tr><th scope="col">Rank</th><th scope="col">Actions offered</th><th scope="col" class="num">Discounted regret</th>
+            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <tbody id="rank-actions"></tbody>
+        </table></div>
+      </div>
+    </section>
+      </div>
+    </div>
+<footer class="reading">
+  <div class="reading-lead">
+    <h2>Reading this bench</h2>
+    <p class="callout"><mark>Hiding what the human misjudges trades early mistakes for a loss that never goes away.</mark></p>
+    <p class="callout-sub">Showing a misjudged feature costs regret now but lets the human learn it. The tables rank every
+      subset by the proposal's objective, the discounted regret, so you can see which side of that trade wins for this
+      world, learner and discount.</p>
+  </div>
+  <div class="reading-body notes">
+    <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
+      state. So instead of one flip round, each round is scored over 1,000 probe states drawn from
+      <span class="math">N(0, I)</span>.</p>
+    <p>Actions work like features: dropping one the human misjudges removes those mistakes, but it can never be picked
+      when it is the best move, and it is never learned.</p>
+    <p>Each table runs every subset as a fixed policy. The first varies the features and keeps the chosen actions; the
+      second varies the actions and keeps the chosen features. Click a row to put that subset on the bench.</p>
+    <p>Fig. 2 is the one-feature beliefs chart, once per feature: each line is one action's weight on that feature,
+      heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: they show
+      how the weight would be learned if it were in use, while the regret figures treat it as never learned.</p>
+    <p>The value gap in Fig. 4 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>, averaged
+      over the probe states: above zero the human expects too little from their pick, below zero too much.</p>
+    <p>Fig. 1 follows one state, every feature at +1: the action the human picks there each round against the best
+      move, with a grey box over the rounds where they differ. Other states can flip at other times, which is what
+      the bar at the top and the lighter grey in the other figures add up.</p>
+    <p>Features here are independent, and every weight follows the chosen learning curve on the rounds it is shown.</p>
+  </div>
+</footer>
+  </section>
+
+  <p class="foot">This shared copy runs the model in your browser. Features are independent, policies are fixed subsets, and every weight follows the chosen learning curve on the rounds it is shown.</p>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const SVG = "http://www.w3.org/2000/svg";
+  const SUB = ["₁", "₂", "₃", "₄", "₅", "₆"];
+  const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
+  const signed = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
+  const pct = (v) => Math.round(v * 100) + "%";
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const svgEl = (tag, attrs) => { const e = document.createElementNS(SVG, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+
+  // ---- learning curves: phi(p, m) = share of the belief-to-truth gap closed after m observations
+  const CURVES = {
+    "exponential": { label: "Exponential", param: "rate", min: 0.01, max: 0.5, step: 0.01, def: 0.1,
+      hint: "closes this fraction of the remaining gap every round", phi: (p, m) => 1 - Math.pow(1 - p, m) },
+    "hyperbolic": { label: "Hyperbolic", param: "half-life", min: 1, max: 50, step: 0.5, def: 5,
+      hint: "rounds needed to close half of the gap", phi: (p, m) => m / (m + p) },
+    "power law": { label: "Power law", param: "exponent", min: 0.1, max: 2, step: 0.05, def: 0.5,
+      hint: "remaining gap decays as (1 + t) to minus this power", phi: (p, m) => 1 - Math.pow(1 + m, -p) },
+    "sigmoid": { label: "Sigmoid", param: "midpoint", min: 2, max: 80, step: 1, def: 20,
+      hint: "round of the sudden 'aha'; little is learned before it",
+      phi: (p, m) => { const w = p / 5, s = 1 / (1 + Math.exp(-(m - p) / w)), s0 = 1 / (1 + Math.exp(p / w)); return (s - s0) / (1 - s0); } },
+  };
+
+  // ---- charts -------------------------------------------------------------
+  function niceTicks(lo, hi, target) {
+    const span = hi - lo || 1, raw = span / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => span / s <= target) || 10 * mag;
+    const out = [];
+    for (let v = Math.ceil(lo / step - 1e-9) * step; v <= hi + 1e-9; v += step) out.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+    return { ticks: out, step };
+  }
+  const fmtTick = (v, step) => v.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2);
+
+  // series: [{v, cls, name, dash}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
+  // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare}
+  function lineChart(host, T, series, hlines, shade, opts) {
+    const W = opts.width || 560, H = opts.height || 340, L = 54, R = 12, TOP = 10, B = opts.noXLabel ? 22 : 40, pw = W - L - R, ph = H - TOP - B;
+    let lo = opts.lo, hi = opts.hi;
+    if (lo === undefined || hi === undefined) {
+      let mn = Infinity, mx = -Infinity;
+      for (const s of series) for (const v of s.v) { if (v < mn) mn = v; if (v > mx) mx = v; }
+      for (const h of hlines) { mn = Math.min(mn, h.y); mx = Math.max(mx, h.y); }
+      const pad = 0.1 * ((mx - mn) || 1);
+      if (lo === undefined) lo = mn - pad;
+      if (hi === undefined) hi = mx + pad;
+    }
+    const X = (t) => L + (T === 1 ? 0 : (t / (T - 1)) * pw), Y = (v) => TOP + (1 - (v - lo) / (hi - lo)) * ph;
+    const edge = (t) => Math.min(Math.max(X(t), L), L + pw);
+    const text = (attrs, s) => { const t = svgEl("text", attrs); t.textContent = s; return t; };
+
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img", "aria-label": opts.alt });
+    for (const [a, b] of shade) {
+      const x0 = edge(a - 0.5), x1 = edge(b - 0.5);
+      svg.append(svgEl("rect", { class: "shade", x: x0, y: TOP, width: Math.max(0, x1 - x0), height: ph }));
+    }
+    if (opts.wrongShare) {
+      // grey behind the plot, darker where the human picks the wrong action in more of the states
+      const level = (t) => Math.round(opts.wrongShare[t] * 10) / 10;
+      for (let start = 0, t = 1; t <= T; t++) {
+        if (t < T && level(t) === level(start)) continue;
+        if (level(start) > 0) {
+          const x0 = edge(start - 0.5), x1 = edge(t - 0.5);
+          svg.append(svgEl("rect", { class: "shade-share", x: x0, y: TOP, width: Math.max(0, x1 - x0), height: ph, "fill-opacity": (0.2 * level(start)).toFixed(3) }));
+        }
+        start = t;
+      }
+    }
+    const auto = opts.pct ? { ticks: [0, 0.2, 0.4, 0.6, 0.8, 1], step: 0.2 } : niceTicks(lo, hi, H < 250 ? 4 : 6);
+    const yticks = opts.yticks || auto.ticks.map((v) => ({ v, label: opts.pct ? Math.round(v * 100) + "%" : fmtTick(v, auto.step) }));
+    for (const tick of yticks) {
+      svg.append(svgEl("line", { class: "grid", x1: L, x2: L + pw, y1: Y(tick.v), y2: Y(tick.v) }),
+        text({ x: L - 8, y: Y(tick.v) + 4, "text-anchor": "end", class: tick.faded ? "faded" : "" }, tick.label));
+    }
+    for (const v of niceTicks(0, T - 1, 8).ticks) {
+      svg.append(svgEl("line", { class: "grid", x1: X(v), x2: X(v), y1: TOP, y2: TOP + ph }),
+        text({ x: X(v), y: TOP + ph + 16, "text-anchor": "middle" }, v));
+    }
+    if (!opts.noXLabel) svg.append(text({ x: L + pw / 2, y: H - 4, "text-anchor": "middle" }, "round t"));
+    svg.append(text({ x: 12, y: TOP + ph / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${TOP + ph / 2})` }, opts.ylabel));
+    for (const h of hlines) {
+      svg.append(svgEl("line", { class: h.cls || "hline", x1: L, x2: L + pw, y1: Y(h.y), y2: Y(h.y) }));
+      if (h.label) {
+        // label above its line, unless that would leave the plot or sit on a nearby line's label
+        const crowded = hlines.some((o) => o !== h && o.label && Y(o.y) <= Y(h.y) && Y(h.y) - Y(o.y) < 15);
+        const above = Y(h.y) - TOP > 18 && !crowded;
+        svg.append(text({ x: L + pw - 2, y: Y(h.y) + (above ? -5 : 13), "text-anchor": "end" }, h.label));
+      }
+    }
+    for (const s of series) {
+      let d = "";
+      for (let t = 0; t < T; t++) {
+        const y = Y(s.v[t]).toFixed(1);
+        // a per-round value is a step: flat across its own round, jumping between rounds
+        d += opts.step ? `${t ? "L" : "M"}${edge(t - 0.5).toFixed(1)} ${y}L${edge(t + 0.5).toFixed(1)} ${y}`
+          : `${t ? "L" : "M"}${X(t).toFixed(1)} ${y}`;
+      }
+      svg.append(svgEl("path", { class: "line " + s.cls + (s.dash ? " dashed" : "") + (s.faded ? " faded" : ""), d }));
+    }
+    // a large dot on the value at round 0: the starting point the user sets
+    for (const s of series) if (s.dot) svg.append(svgEl("circle", { class: "dot " + s.cls + (s.faded ? " faded" : ""), cx: X(0), cy: Y(s.v[0]), r: opts.dotRadius || 6.5 }));
+    const cross = svgEl("line", { class: "cross", y1: TOP, y2: TOP + ph, visibility: "hidden" });
+    const hit = svgEl("rect", { x: L, y: TOP, width: pw, height: ph, fill: "transparent" });
+    svg.append(cross, hit);
+
+    const legend = el("div", "legend");
+    for (const s of series) {
+      const item = el("span");
+      item.append(el("i", s.cls.replace("c-", "bg-") + (s.dash ? " dash" : "")), s.name);
+      legend.append(item);
+    }
+    if (opts.dotLabel) { const item = el("span"); item.append(el("i", "start"), opts.dotLabel); legend.append(item); }
+    if (shade.length) { const item = el("span"); item.append(el("i", "box"), "human picks the wrong action"); legend.append(item); }
+    if (opts.wrongShare) { const item = el("span"); item.append(el("i", "box share"), "grey: share of states with the wrong action"); legend.append(item); }
+    const tip = el("div", "tip");
+    tip.hidden = true;
+    host.replaceChildren(...(opts.noLegend ? [] : [legend]), svg, tip);
+
+    const fmt = opts.fmt || ((v) => (opts.pct ? Math.round(v * 100) + "%" : v.toFixed(2)));
+    hit.addEventListener("pointermove", (e) => {
+      const box = svg.getBoundingClientRect(), sx = (e.clientX - box.left) * (W / box.width);
+      const t = Math.min(Math.max(Math.round(((sx - L) / pw) * (T - 1)), 0), T - 1);
+      cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
+      tip.replaceChildren(el("b", "", "round " + t));
+      for (const s of series) tip.append(document.createElement("br"), s.name + "  " + fmt(s.v[t]));
+      tip.hidden = false;
+      const left = (X(t) / W) * box.width, onLeft = left < box.width / 2;
+      tip.style.left = onLeft ? left + 12 + "px" : "";
+      tip.style.right = onLeft ? "" : box.width - left + 12 + "px";
+      tip.style.top = svg.offsetTop + 6 + "px";
+    });
+    hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); tip.hidden = true; });
+  }
+
+  // =================== bench A: one feature, two actions ===================
+  const PRESETS = [
+    { name: "A", title: "Wrong start, large true gap", u1: 2, u2: 0, h1: 0, h2: 1, curve: "exponential", p1: 0.1, p2: 0.1, split: false },
+    { name: "B", title: "Wrong start, small true gap", u1: 1.2, u2: 1, h1: 0, h2: 1.5, curve: "exponential", p1: 0.1, p2: 0.1, split: false },
+    { name: "C", title: "Right from the start", u1: 2, u2: 0, h1: 0.5, h2: 0, curve: "exponential", p1: 0.1, p2: 0.1, split: false },
+    { name: "D", title: "Action 1 learned 10x faster: right, wrong, right", u1: 1, u2: 0.5, h1: 3, h2: 2.8, curve: "exponential", p1: 0.3, p2: 0.03, split: true },
+  ];
+  const aKeys = ["u1", "u2", "h1", "h2", "p1", "p2", "T", "delta"];
+  const aInputs = (k) => document.querySelectorAll(`[data-k="${k}"]`);
+  const aGet = (k) => parseFloat(aInputs(k)[0].value);
+  const aSet = (k, v) => aInputs(k).forEach((i) => { i.value = v; });
+  const curveOf = (group) => document.querySelector(`input[name="${group}"]:checked`).value;
+
+  function buildCurveButtons(hostId, group) {
+    $(hostId).replaceChildren(...Object.entries(CURVES).map(([key, c], i) => {
+      const label = el("label"), input = el("input");
+      input.type = "radio"; input.name = group; input.value = key; input.id = group + "-" + i; input.checked = i === 0;
+      label.append(input, el("span", "", c.label));
+      return label;
+    }));
+  }
+
+  function applyCurveA(reset) {
+    const c = CURVES[curveOf("curve-a")], split = $("split").checked;
+    for (const k of ["p1", "p2"]) aInputs(k).forEach((i) => { i.min = c.min; i.max = c.max; i.step = c.step; if (reset) i.value = c.def; });
+    $("p1-label").textContent = split ? c.param + " 1" : c.param;
+    $("p1-label").classList.toggle("a1", split);
+    $("p1-row").classList.toggle("k1", split);
+    $("p2-label").textContent = c.param + " 2";
+    $("p2-row").hidden = !split;
+    $("hint-a").textContent = c.param + ": " + c.hint;
+  }
+
+  function heatBins(T) {
+    const bounds = [0, 1, 2, 5, 10, 20, 50, 100].filter((b) => b < T).concat([T]);
+    const labels = ["0 (always right)"];
+    for (let i = 1; i < bounds.length - 1; i++) labels.push(bounds[i + 1] - bounds[i] === 1 ? "" + bounds[i] : bounds[i] + "–" + (bounds[i + 1] - 1));
+    labels.push("never (≥" + T + ")");
+    const bin = (s) => { if (!isFinite(s)) return bounds.length - 1; let b = 0; while (b + 1 < bounds.length - 1 && s >= bounds[b + 1]) b++; return b; };
+    return { labels, bin, last: bounds.length - 1 };
+  }
+
+  function drawMap(s, a1, a2) {
+    // settle round over a grid of (du, dh0) worlds that keep this world's mean levels
+    const G = 60, W = 460, L = 54, TOP = 8, P = 380, T = s.T;
+    const lim = Math.ceil(Math.max(3, 1.15 * Math.abs(s.u1 - s.u2), 1.15 * Math.abs(s.h1 - s.h2)));
+    const level = (s.h1 + s.h2) / 2 - (s.u1 + s.u2) / 2, bins = heatBins(T), cell = P / G;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${TOP + P + 44}`, role: "img", "aria-label": "Map of the round from which the human is right for good, over the true gap and the initial belief gap" });
+    for (let r = 0; r < G; r++) {
+      const gh = lim - ((r + 0.5) / G) * 2 * lim;
+      let runStart = 0, runBin = -1;
+      for (let c = 0; c <= G; c++) {
+        let b = -2;
+        if (c < G) {
+          const gu = -lim + ((c + 0.5) / G) * 2 * lim, e1 = level + (gh - gu) / 2, e2 = level - (gh - gu) / 2;
+          let lastWrong = -1;
+          for (let t = 0; t < T; t++) if (!((gu + e1 * a1[t] - e2 * a2[t]) * gu > 0)) lastWrong = t;
+          b = lastWrong === T - 1 ? bins.last : bins.bin(lastWrong + 1);
+        }
+        if (b !== runBin) {
+          if (runBin >= 0) {
+            const rect = svgEl("rect", { class: "hb" + (runBin === bins.last ? 8 : runBin), x: L + runStart * cell, y: TOP + r * cell, width: (c - runStart) * cell + 0.5, height: cell + 0.5 });
+            const title = svgEl("title", {}); title.textContent = "right for good from round " + bins.labels[runBin]; rect.append(title);
+            svg.append(rect);
+          }
+          runStart = c; runBin = b;
+        }
+      }
+    }
+    const X = (v) => L + ((v + lim) / (2 * lim)) * P, Y = (v) => TOP + ((lim - v) / (2 * lim)) * P;
+    svg.append(svgEl("line", { class: "zero", x1: X(0), x2: X(0), y1: TOP, y2: TOP + P }), svgEl("line", { class: "zero", x1: L, x2: L + P, y1: Y(0), y2: Y(0) }));
+    for (let v = -lim; v <= lim; v += lim > 4 ? 2 : 1) {
+      const tx = svgEl("text", { x: X(v), y: TOP + P + 16, "text-anchor": "middle" }); tx.textContent = v; svg.append(tx);
+      const ty = svgEl("text", { x: L - 8, y: Y(v) + 4, "text-anchor": "end" }); ty.textContent = v; svg.append(ty);
+    }
+    const xl = svgEl("text", { x: L + P / 2, y: TOP + P + 36, "text-anchor": "middle" }); xl.textContent = "true gap  Δu = u₁ − u₂"; svg.append(xl);
+    const yl = svgEl("text", { x: 12, y: TOP + P / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${TOP + P / 2})` }); yl.textContent = "initial belief gap  Δh₀"; svg.append(yl);
+    const cx = X(clamp(s.u1 - s.u2, -lim, lim)), cy = Y(clamp(s.h1 - s.h2, -lim, lim));
+    svg.append(svgEl("circle", { class: "ring-halo", cx, cy, r: 8 }), svgEl("circle", { class: "ring", cx, cy, r: 8 }));
+    $("a-map").replaceChildren(svg);
+    $("a-map-key").replaceChildren(el("span", "", "Right for good from round:"), ...bins.labels.map((label, i) => {
+      const item = el("span"), sw = svgEl("svg", { viewBox: "0 0 14 10" });
+      sw.append(svgEl("rect", { class: "hb" + (i === bins.last ? 8 : i), x: 0, y: 0, width: 14, height: 10 }));
+      item.append(sw, label); return item;
+    }));
+  }
+
+  function tiles(hostId, stats) {
+    $(hostId).replaceChildren(...stats.map(([label, value, note]) => {
+      const tile = el("div", "tile"); tile.append(el("div", "label", label), el("div", "value", value), el("div", "note", note)); return tile;
+    }));
+  }
+
+  function runA() {
+    const s = { curve: curveOf("curve-a"), split: $("split").checked };
+    for (const k of aKeys) s[k] = aGet(k);
+    if (!s.split) s.p2 = s.p1;
+    const shared = !s.split || s.p1 === s.p2, phi = CURVES[s.curve].phi, T = s.T;
+    const du = s.u1 - s.u2, dh0 = s.h1 - s.h2;
+    $("du").textContent = signed(du); $("dh0").textContent = signed(dh0);
+    document.querySelectorAll(".preset").forEach((b, i) => {
+      const p = PRESETS[i];
+      b.classList.toggle("active", ["u1", "u2", "h1", "h2", "p1"].every((k) => p[k] === s[k]) && p.curve === s.curve && p.split === s.split && (!p.split || p.p2 === s.p2));
+    });
+
+    const a1 = new Float64Array(T), a2 = new Float64Array(T), b1 = [], b2 = [], gap = [], wrong = [];
+    for (let t = 0; t < T; t++) {
+      a1[t] = 1 - phi(s.p1, t); a2[t] = 1 - phi(s.p2, t);
+      b1.push(s.u1 + (s.h1 - s.u1) * a1[t]); b2.push(s.u2 + (s.h2 - s.u2) * a2[t]);
+      gap.push(b1[t] - b2[t]);
+      wrong.push(du !== 0 && !(gap[t] * du > 0));
+    }
+    const runs = []; let start = 0;
+    for (let t = 1; t <= T; t++) if (t === T || wrong[t] !== wrong[start]) { runs.push([start, t, wrong[start]]); start = t; }
+    const nWrong = wrong.filter(Boolean).length, switches = runs.length - 1;
+    const settle = wrong[T - 1] ? Infinity : (runs.length && runs[runs.length - 1][2] === false ? runs[runs.length - 1][0] : 0);
+    let regret = 0; for (let t = 0; t < T; t++) if (wrong[t]) regret += Math.pow(s.delta, t);
+    regret *= Math.abs(du) * Math.sqrt(2 / Math.PI);
+
+    const gaps = `belief gap ${signed(dh0)} against a true gap of ${signed(du)}`;
+    let numeral, label, sentence;
+    if (du === 0) { numeral = "0"; label = "no flip needed"; sentence = "Both actions are worth exactly the same, so whatever the human picks is right."; }
+    else if (nWrong === 0) { numeral = "0"; label = "no flip needed"; sentence = `The human starts with the right sign (${gaps}) and never picks the wrong action.`; }
+    else if (!isFinite(settle)) { numeral = "never"; label = `within ${T} rounds`; sentence = `With a ${gaps}, the human is still picking the wrong action at the end of the horizon. Lengthen the horizon or speed up the learner to see the flip.`; }
+    else if (switches <= 1) { numeral = "" + settle; label = "round of the flip"; sentence = `The human starts with the wrong sign (${gaps}), picks the wrong action for ${nWrong} round${nWrong !== 1 ? "s" : ""}, and is right from round ${settle} on.`; }
+    else { numeral = "" + settle; label = "round of the final flip"; sentence = `The choice changes ${switches} times. The human ${wrong[0] ? "" : "starts right, "}goes wrong at round ${wrong.indexOf(true)}, is wrong on ${nWrong} rounds in total, and is right for good from round ${settle}.`; }
+    $("a-numeral").textContent = numeral; $("a-numeral").classList.toggle("word", numeral === "never");
+    $("a-numeral-label").textContent = label; $("a-sentence").textContent = sentence;
+    $("strip").replaceChildren(...runs.map(([a, b, w]) => { const i = el("i", w ? "w" : "r"); i.style.flexGrow = b - a; i.title = `rounds ${a}–${b - 1}: ${w ? "wrong" : "right"} action`; return i; }));
+    $("strip-end").textContent = "round " + (T - 1);
+
+    const needed = !shared ? ["varies", "each action has its own curve, so no single threshold"]
+      : du === 0 ? ["—", "the actions are equally good"]
+      : [pct(du * dh0 > 0 ? 0 : Math.abs(dh0) / (Math.abs(dh0) + Math.abs(du))), "of the belief-to-truth gap must close before the sign is right"];
+    tiles("a-tiles", [
+      ["Learning needed", needed[0], needed[1]],
+      ["Rounds wrong", "" + nWrong, `out of ${T} simulated`],
+      ["Choice changes", "" + switches, switches > 1 ? "more than one means the choice un-flipped" : "right/wrong switches"],
+      ["Expected discounted regret", regret.toFixed(2), wrong[T - 1] ? `lower bound: still wrong at round ${T}` : `δ = ${s.delta}, states x ~ N(0, 1)`],
+    ]);
+
+    const shade = runs.filter((r) => r[2]).map((r) => [r[0], r[1]]);
+    lineChart($("a-beliefs"), T, [{ v: b1, cls: "c-a1", dot: true, name: "h₁" }, { v: b2, cls: "c-a2", dot: true, name: "h₂" }],
+      [{ y: s.u1, label: "u₁ = " + s.u1.toFixed(2) }, { y: s.u2, label: "u₂ = " + s.u2.toFixed(2) }], shade,
+      // fixed to the sliders' range (plus a little room for the dots), so the axis never jumps
+      { ylabel: "utility weight", lo: -3.25, hi: 3.25, yticks: [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v })), dotLabel: "starting belief (the h sliders)", alt: "Beliefs h1 and h2 over the rounds, converging to the true weights u1 and u2" });
+    // regret loss  max_k (U x)_k - (U x)_yhat  is |du| |x| on a wrong round; averaged over x ~ N(0, 1)
+    const wrongCost = Math.abs(du) * Math.sqrt(2 / Math.PI);
+    const perRound = wrong.map((w) => (w ? wrongCost : 0));
+    // the objective weights round t by delta^t, with delta one constant in (0, 1) as in the cited papers
+    lineChart($("a-regret"), T,
+      [{ v: perRound, cls: "c-ref", name: "before discounting" },
+        { v: perRound.map((r, t) => r * Math.pow(s.delta, t)), cls: "c-ink", name: "discounted, \u03b4 = " + s.delta }],
+      [], shade, { ylabel: "regret per round", height: 205, step: true, noXLabel: true, lo: -0.2, hi: 5.2, yticks: [0, 1, 2, 3, 4, 5].map((v) => ({ v, label: v })), alt: "Expected regret loss in each round, before and after discounting" });
+    // the choice for a positive state; for x < 0 both it and the best move swap
+    const best = du === 0 ? 0 : du > 0 ? 1 : 2;
+    const choice = wrong.map((w, t) => (best ? (w ? 3 - best : best) : (b1[t] >= b2[t] ? 1 : 2)));
+    lineChart($("a-choice"), T,
+      (best ? [{ v: choice.map(() => best), cls: "c-ink", dash: true, name: "y* best move" }] : []).concat([{ v: choice, cls: "c-ink", name: "\u0177 human's choice" }]),
+      [], shade, { ylabel: "action chosen", height: 150, step: true, lo: 0.5, hi: 2.5, fmt: (v) => "action " + v,
+        yticks: [{ v: 1, label: "a\u2081" }, { v: 2, label: "a\u2082" }], alt: "Which of the two actions the human chooses in each round, against the best move" });
+    lineChart($("a-gap"), T, [{ v: gap, cls: "c-ink", name: "h\u2081 \u2212 h\u2082" }],
+      [{ y: 0, cls: "zero", label: "zero: indifferent" }, { y: du, label: "true gap \u0394u = " + signed(du) }], shade,
+      { ylabel: "belief gap  h\u2081 \u2212 h\u2082", height: 230, lo: -6.4, hi: 6.4, yticks: [-6, -4, -2, 0, 2, 4, 6].map((v) => ({ v, label: v })), alt: "The belief gap h1 minus h2 over the rounds, against zero and the true gap" });
+    // value gap  max_k (U x)_k - u_hat(y_hat), averaged over x ~ N(0, 1): (|du| - |h1 - h2|) E|x| / 2
+    lineChart($("a-value"), T, [{ v: gap.map((g) => ((Math.abs(du) - Math.abs(g)) * Math.sqrt(2 / Math.PI)) / 2), cls: "c-ink", name: "expected value gap" }],
+      [{ y: 0, cls: "zero", label: "zero: expects exactly what the best move is worth" }], shade, { ylabel: "value gap per round", lo: -2.6, hi: 2.6, yticks: [-2, -1, 0, 1, 2].map((v) => ({ v, label: v })), alt: "True best value minus the value the human expects from the chosen action, per round" });
+    drawMap(s, a1, a2);
+  }
+
+  function loadPreset(p) {
+    document.querySelector(`input[name="curve-a"][value="${p.curve}"]`).checked = true;
+    $("split").checked = p.split;
+    applyCurveA(true);
+    for (const k of ["u1", "u2", "h1", "h2", "p1", "p2"]) aSet(k, p[k]);
+  }
+
+  // =================== bench B: K actions, n features ===================
+  const world = { K: 3, n: 3, F: [true, true, true], A: [true, true, true],
+    U: [[1, 0.5, 0], [0, 1, 0.5], [-0.5, 0, 1]],           // the human is right about features 1 and 2
+    H: [[1, 0.5, 1.5], [0, 1, 0], [-0.5, 0, -1.5]] };      // and badly wrong about feature 3
+  const N_PROBES = 1000;
+  const randomWeight = () => Math.round((Math.random() * 4 - 2) * 10) / 10;
+  const bInputs = (k) => document.querySelectorAll(`[data-b="${k}"]`);
+  const bGet = (k) => parseFloat(bInputs(k)[0].value);
+
+  function resize(K, n) {
+    const grow = (M, fresh) => Array.from({ length: K }, (_, k) => Array.from({ length: n }, (_, j) => (M[k] && M[k][j] !== undefined ? M[k][j] : fresh())));
+    world.U = grow(world.U, randomWeight); world.H = grow(world.H, () => 0);
+    world.F = Array.from({ length: n }, (_, j) => (world.F[j] !== undefined ? world.F[j] : true));
+    world.A = Array.from({ length: K }, (_, k) => (world.A[k] !== undefined ? world.A[k] : true));
+    if (!world.F.some(Boolean)) world.F[0] = true;
+    if (!world.A.some(Boolean)) world.A[0] = true;
+    world.K = K; world.n = n;
+  }
+
+  // Each feature's panel and sliders use a slightly lighter shade of the action colours than the one before.
+  const SHADES = ["100%", "88%", "76%", "66%", "57%", "50%"];
+
+  // One weight: its symbol, a slider, and a number box with up and down arrows (hold to repeat).
+  function entryRow(name, k, j) {
+    const make = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
+    const what = `${name === "U" ? "true" : "believed"} weight of feature ${j + 1} for action ${k + 1}`;
+    const row = make("div", "row entry e-a" + (k + 1) + (world.F[j] && world.A[k] ? "" : " off"));
+
+    const label = make("label"), sym = make("span", "sym dot"), letter = make("span"), index = make("sub");
+    index.textContent = `${k + 1}${j + 1}`;
+    letter.append(name === "U" ? "u" : "h", index);
+    sym.append(letter);
+    label.append(sym);
+
+    const slider = make("input");
+    slider.type = "range"; slider.min = "-3"; slider.max = "3"; slider.step = "0.1";
+    slider.id = `s${name}-${k}-${j}`;
+    slider.value = world[name][k][j];
+    slider.setAttribute("aria-label", what);
+    label.htmlFor = slider.id;
+
+    const cell = make("div", "cell"), input = make("input");
+    input.type = "number"; input.step = "0.1"; input.min = "-3"; input.max = "3";
+    input.id = `m${name}-${k}-${j}`;
+    input.value = world[name][k][j];
+    input.setAttribute("aria-label", what + ", exact value");
+    cell.append(input);
+
+    const set = (value, from) => {
+      world[name][k][j] = clamp(value, -3, 3);
+      if (from !== slider) slider.value = world[name][k][j];
+      if (from !== input) input.value = world[name][k][j];
+      $(`v${name}-${k}-${j}`).textContent = shortNumber(world[name][k][j]);   // the snapshot follows the slider
+      scheduleB();
+    };
+    slider.addEventListener("input", () => set(parseFloat(slider.value), slider));
+    input.addEventListener("input", () => { const v = parseFloat(input.value); if (!isNaN(v)) set(v, input); });
+    input.addEventListener("change", () => { input.value = world[name][k][j]; });
+    for (const dir of [1, -1]) {
+      const arrow = make("button", dir > 0 ? "up" : "down");
+      arrow.type = "button";
+      arrow.tabIndex = -1;   // the arrow keys already step the focused slider or box
+      arrow.setAttribute("aria-label", (dir > 0 ? "Raise the " : "Lower the ") + what);
+      const step = () => set(Math.round((world[name][k][j] + 0.1 * dir) * 10) / 10, null);
+      let wait = null, repeat = null;
+      const stop = () => { clearTimeout(wait); clearInterval(repeat); };
+      arrow.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+        stop();
+        step();
+        wait = setTimeout(() => { repeat = setInterval(step, 70); }, 350);
+      });
+      for (const end of ["pointerup", "pointerleave", "pointercancel"]) arrow.addEventListener(end, stop);
+      cell.append(arrow);
+    }
+    row.append(label, slider, cell);
+    return row;
+  }
+
+  const shortNumber = (v) => String(Math.round(v * 100) / 100);
+
+  // The whole matrix at a glance: one row per action, one column per feature. Clicking a value jumps to its slider.
+  function snapshot(name) {
+    const make = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+    const columns = `repeat(${world.n}, minmax(0, 1fr))`;
+    const grid = make("div", "snapshot"), cols = make("div", "cols"), sides = make("div", "sides"), bracket = make("div", "bracket");
+    grid.classList.toggle("dense", world.n >= 5);   // five or six columns: smaller figures so neighbours stay apart
+    grid.setAttribute("role", "group");
+    grid.setAttribute("aria-label", (name === "U" ? "The truth matrix U" : "The first-belief matrix H0") + ", rows are actions and columns are features");
+    cols.style.gridTemplateColumns = columns;
+    bracket.style.gridTemplateColumns = columns;
+    world.F.forEach((shown, j) => cols.append(make("span", "head" + (shown ? "" : " off"), "x" + SUB[j])));
+    world.A.forEach((offered, k) => {
+      sides.append(make("span", "head" + (offered ? "" : " off"), "a" + SUB[k]));
+      world.F.forEach((shown, j) => {
+        const value = make("span", "value" + (shown && offered ? "" : " off"), shortNumber(world[name][k][j]));
+        value.id = `v${name}-${k}-${j}`;
+        value.title = "Go to this weight's slider";
+        value.addEventListener("click", () => { const slider = $(`s${name}-${k}-${j}`); slider.scrollIntoView({ block: "center" }); slider.focus(); });
+        bracket.append(value);
+      });
+    });
+    grid.append(make("span", ""), cols, sides, bracket);
+    return grid;
+  }
+
+  // One matrix: its snapshot, then its weights as sliders grouped by feature like the panels of the beliefs figure.
+  function drawMatrix(name) {
+    $("matrix-" + name).replaceChildren(snapshot(name), ...world.F.map((shown, j) => {
+      const group = document.createElement("div"), head = document.createElement("p");
+      group.className = "entry-group";
+      group.style.setProperty("--shade", SHADES[j]);
+      head.className = "group-label";
+      head.textContent = "weights on x" + SUB[j] + (shown ? "" : "  (hidden)");
+      group.append(head, ...world.A.map((_, k) => entryRow(name, k, j)));
+      return group;
+    }));
+  }
+
+  function drawChips(id, mask, prefix, noun) {
+    $(id).replaceChildren(...mask.map((on, i) => {
+      const chip = el("button", "chip", prefix + SUB[i]);
+      chip.type = "button"; chip.setAttribute("aria-pressed", String(on)); chip.title = `${noun} ${i + 1}: ${on ? "on" : "off"}`;
+      chip.addEventListener("click", () => { if (on && mask.filter(Boolean).length === 1) return; mask[i] = !on; drawWorld(); runB(); });
+      return chip;
+    }));
+  }
+
+  function drawWorld() {
+    document.querySelectorAll("[data-size]").forEach((i) => { i.value = world[i.dataset.size]; });
+    drawChips("feature-chips", world.F, "x", "feature"); drawChips("action-chips", world.A, "a", "action");
+    drawMatrix("U"); drawMatrix("H");
+  }
+
+  function applyCurveB(reset) {
+    const c = CURVES[curveOf("curve-b")];
+    bInputs("bp").forEach((i) => { i.min = c.min; i.max = c.max; i.step = c.step; if (reset) i.value = c.def; });
+    $("bp-label").textContent = c.param; $("hint-b").textContent = c.param + ": " + c.hint;
+  }
+
+  // fixed, seeded probe states so the same world always gives the same numbers
+  const probeCache = {};
+  function probes(n) {
+    if (probeCache[n]) return probeCache[n];
+    let seed = 20261006 + n;
+    const rand = () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const X = new Float64Array(N_PROBES * n);
+    for (let i = 0; i < X.length; i++) X[i] = Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(2 * Math.PI * rand());
+    return (probeCache[n] = X);
+  }
+  const subsets = (size) => Array.from({ length: (1 << size) - 1 }, (_, m) => Array.from({ length: size }, (_, j) => Boolean(((m + 1) >> (size - 1 - j)) & 1)));
+  const humanList = (items) => (items.length === 1 ? "" + items[0] : items.slice(0, -1).join(", ") + " and " + items[items.length - 1]);
+  function describe(mask, noun) {
+    const chosen = mask.map((on, i) => (on ? i + 1 : 0)).filter(Boolean);
+    if (chosen.length === mask.length) return mask.length > 1 ? `all ${mask.length} ${noun}s` : `the only ${noun}`;
+    return `${noun}${chosen.length > 1 ? "s" : ""} ${humanList(chosen)}`;
+  }
+
+  function scoreWorlds(T, delta, phi, speed) {
+    const { K, n, U, H } = world, X = probes(n), P = N_PROBES;
+    const regretOf = new Float64Array(P * K);          // regret of each action in each probe state (all features)
+    const bestTrue = new Float64Array(P);              // value of the best move in each probe state
+    for (let p = 0; p < P; p++) {
+      let best = -Infinity;
+      for (let k = 0; k < K; k++) { let v = 0; for (let j = 0; j < n; j++) v += U[k][j] * X[p * n + j]; regretOf[p * K + k] = v; if (v > best) best = v; }
+      for (let k = 0; k < K; k++) regretOf[p * K + k] = best - regretOf[p * K + k];
+      bestTrue[p] = best;
+    }
+    // ceiling for the regret axis: the expected regret of always picking the worst action
+    let worst = 0;
+    for (let p = 0; p < P; p++) { let m = 0; for (let k = 0; k < K; k++) m = Math.max(m, regretOf[p * K + k]); worst += m / P; }
+    const phis = Array.from({ length: T }, (_, t) => phi(speed, t));
+    // Shown weights move from H0 to U along phi, so the human's score is a blend of two fixed scores.
+    const score = function (F, A) {
+      const ks = []; for (let k = 0; k < K; k++) if (A[k]) ks.push(k);
+      const e0 = new Float64Array(P * K), e1 = new Float64Array(P * K);
+      for (let p = 0; p < P; p++) for (const k of ks) {
+        let s0 = 0, s1 = 0;
+        for (let j = 0; j < n; j++) if (F[j]) { const x = X[p * n + j]; s0 += H[k][j] * x; s1 += U[k][j] * x; }
+        e0[p * K + k] = s0; e1[p * K + k] = s1;
+      }
+      const at = (f) => {
+        let acc = 0, reg = 0, gap = 0;
+        for (let p = 0; p < P; p++) {
+          let best = -Infinity, sumR = 0, sumOk = 0, count = 0;
+          for (const k of ks) {
+            const i = p * K + k, v = e0[i] + f * (e1[i] - e0[i]), r = regretOf[i];
+            if (v > best) { best = v; sumR = r; sumOk = r <= 1e-12 ? 1 : 0; count = 1; }
+            else if (v === best) { sumR += r; sumOk += r <= 1e-12 ? 1 : 0; count++; }   // ties are a coin toss
+          }
+          acc += sumOk / count; reg += sumR / count;
+          gap += bestTrue[p] - best;   // true best value minus the value the human expects from their pick
+        }
+        return [acc / P, reg / P, gap / P];
+      };
+      const acc = [], reg = [], vgap = []; let disc = 0;
+      for (let t = 0; t < T; t++) { const [a, r, g] = at(phis[t]); acc.push(a); reg.push(r); vgap.push(g); disc += Math.pow(delta, t) * r; }
+      const [accLim, regLim] = at(1);
+      return { acc, reg, vgap, disc, accLim, regLim };
+    };
+    score.worst = worst;
+    // value-gap axis: the largest value the human can expect (first beliefs or truth, everything shown) or the true best value
+    let vTrue = 0, vBelief = 0;
+    for (let p = 0; p < P; p++) {
+      let m = -Infinity;
+      for (let k = 0; k < K; k++) { let v = 0; for (let j = 0; j < n; j++) v += H[k][j] * X[p * n + j]; if (v > m) m = v; }
+      vTrue += bestTrue[p] / P; vBelief += m / P;
+    }
+    score.valueBound = Math.max(vTrue, vBelief);
+    score.phis = phis;
+    return score;
+  }
+
+  function renderRanking(key, sets, results, nowIdx, prefix, noun, choose) {
+    const order = sets.map((_, i) => i).sort((a, b) => results[a].disc - results[b].disc || a - b);
+    const rank = {}; order.forEach((i, r) => { rank[i] = r + 1; });
+    const listed = [...new Set(order.slice(0, 8).concat([nowIdx]))].sort((a, b) => rank[a] - rank[b]);
+    const other = noun === "feature" ? "actions" : "features";
+    $("rank-" + key + "-sub").textContent = sets.length === 1 ? `With one ${noun} there is only one subset.`
+      : `All ${sets.length} ${noun} subsets, each run with the chosen ${other}.` + (listed.length < sets.length ? ` The best 8 and the one on the bench are listed.` : "");
+    const worst = Math.max(...listed.map((i) => results[i].disc), 1e-9);
+    $("rank-" + key).replaceChildren(...listed.map((i) => {
+      const r = results[i], tr = el("tr", i === nowIdx ? "current" : "");
+      tr.tabIndex = 0; tr.title = i === nowIdx ? "On the bench now" : "Put this subset on the bench";
+      const members = el("td"); sets[i].forEach((on, j) => members.append(el("span", "feat" + (on ? " on" : ""), prefix + SUB[j])));
+      const bar = el("td", "num bar-cell"), fill = el("span", "bar"); fill.style.width = (r.disc / worst) * 100 + "%";
+      bar.append(fill, el("span", "", r.disc.toFixed(2)));
+      tr.append(el("td", "", rank[i] + (i === nowIdx ? "  ← now" : "")), members, bar,
+        el("td", "num", `${pct(r.acc[0])} → ${pct(r.acc[r.acc.length - 1])}`), el("td", "num", r.regLim.toFixed(2)));
+      const apply = () => { choose(sets[i].slice()); drawWorld(); runB(); };
+      tr.addEventListener("click", apply);
+      tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apply(); } });
+      return tr;
+    }));
+    return order[0];
+  }
+
+  // `full` also ranks every feature subset and every action subset; without it only the chosen
+  // policy and the show-everything reference are scored, which is quick enough to redraw every frame.
+  // CSS polygon for a step area: the hatched part of each round's column is that round's share
+  const stepArea = (share) => "polygon(0% 100%, " + share.map((w, t) => {
+    const y = (100 * (1 - w)).toFixed(1);
+    return `${((100 * t) / share.length).toFixed(2)}% ${y}%, ${((100 * (t + 1)) / share.length).toFixed(2)}% ${y}%`;
+  }).join(", ") + ", 100% 100%)";
+
+  function runB(full = true) {
+    if (full) clearTimeout(restB);
+    const T = bGet("bT"), delta = bGet("bd"), { K, n, F, A } = world;
+    const score = scoreWorlds(T, delta, CURVES[curveOf("curve-b")].phi, bGet("bp"));
+    const fSets = subsets(n), aSets = subsets(K);
+    const now = score(F, A), all = score(fSets[fSets.length - 1], aSets[aSets.length - 1]);
+
+    const hidden = [], offF = F.map((v) => !v), offA = A.map((v) => !v);
+    if (offF.some(Boolean)) hidden.push(describe(offF, "feature") + (offF.filter(Boolean).length === 1 ? " stays" : " stay") + " hidden");
+    if (offA.some(Boolean)) hidden.push(describe(offA, "action") + (offA.filter(Boolean).length === 1 ? " is" : " are") + " never offered");
+    let sentence = `Showing ${describe(F, "feature")} and offering ${describe(A, "action")}, the human picks the best move ${pct(now.acc[0])} of the time at round 0 and ${pct(now.acc[T - 1])} by round ${T - 1}. `;
+    sentence += now.regLim > 1e-9 ? `Even after learning everything shown, ${now.regLim.toFixed(2)} of utility is lost per round${hidden.length ? " because " + humanList(hidden) : ""}. `
+      : "Once everything shown is learned, the human always picks the best move. ";
+    if (full) {
+      const byF = fSets.map((f) => score(f, A)), byA = aSets.map((a) => score(F, a));
+      const same = (m, x) => m.every((v, i) => v === x[i]);
+      const bestF = renderRanking("features", fSets, byF, fSets.findIndex((f) => same(f, F)), "x", "feature", (m) => { world.F = m; });
+      const bestA = renderRanking("actions", aSets, byA, aSets.findIndex((a) => same(a, A)), "a", "action", (m) => { world.A = m; });
+      const fHelps = byF[bestF].disc < now.disc - 1e-9, aHelps = byA[bestA].disc < now.disc - 1e-9;
+      if (fHelps) sentence += `Showing ${describe(fSets[bestF], "feature")} instead would cut the discounted regret to ${byF[bestF].disc.toFixed(2)}. `;
+      if (aHelps) sentence += (fHelps ? "Separately, offering " : "Offering ") + `${describe(aSets[bestA], "action")} instead would cut ${fHelps ? "it" : "the discounted regret"} to ${byA[bestA].disc.toFixed(2)}.`;
+      if (!fHelps && !aHelps) sentence += "Changing only the features, or only the actions, does no better over this horizon.";
+      rankingsB.classList.remove("stale");
+    }
+    $("b-numeral").textContent = now.disc.toFixed(2); $("b-sentence").textContent = sentence.trim();
+
+    const heldBack = offF.some(Boolean) || offA.some(Boolean), diff = now.disc - all.disc;
+    tiles("b-tiles", [
+      ["Best move picked at round 0", pct(now.acc[0]), "with the human's first beliefs"],
+      [`Best move picked at round ${T - 1}`, pct(now.acc[T - 1]), `heading for ${pct(now.accLim)} once fully learned`],
+      ["Regret per round once learned", now.regLim.toFixed(2), now.regLim > 1e-9 ? "the lasting price of what is held back" : "nothing held back matters"],
+      ["Against showing everything", (diff >= 0 ? "+" : "−") + Math.abs(diff).toFixed(2), heldBack ? `discounted regret; showing and offering everything costs ${all.disc.toFixed(2)}` : "this is the show-everything policy"],
+    ]);
+    // the bar at the top and the grey in every figure: the share of states with the wrong action each round
+    const wrongShare = now.acc.map((a) => 1 - a);
+    $("b-strip-wrong").style.clipPath = stepArea(wrongShare);
+    $("b-strip-end").textContent = "round " + (T - 1);
+
+    // Fig. 1: the one-feature beliefs chart, once per feature; one line per action, heading for its dashed truth
+    const key = (cls, text) => { const item = el("span"); item.append(el("i", cls), text); return item; };
+    $("b-beliefs-legend").replaceChildren(...world.U.map((_, k) => key("bg-a" + (k + 1), "a" + SUB[k])),
+      key("truth-key", "truth u"), key("start", "starting belief"), key("faded-key", "hidden or not offered"),
+      key("box share", "grey: share of states with the wrong action"));
+    $("b-beliefs").replaceChildren(...F.map((shownF, j) => {
+      const panel = el("div"), title = el("p", "panel-title", "x" + SUB[j]), host = el("div", "chart");
+      if (!shownF) title.append(el("small", "", "hidden"));
+      host.style.setProperty("--shade", SHADES[j]);   // same action colours, a shade per feature
+      panel.append(title, host);
+      const shown = (k) => shownF && A[k];
+      lineChart(host, T,
+        world.U.map((row, k) => ({ cls: "c-a" + (k + 1), name: "a" + SUB[k], dot: true, faded: !shown(k),
+          v: score.phis.map((f) => row[j] + (world.H[k][j] - row[j]) * (1 - f)) })),
+        world.U.map((row, k) => ({ y: row[j], cls: "truth c-a" + (k + 1) + (shown(k) ? "" : " faded") })), [],
+        { ylabel: "weight on x" + SUB[j], height: 250, lo: -3.25, hi: 3.25, noLegend: true, dotRadius: 5, wrongShare,
+          yticks: [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v })),
+          alt: "Each action's believed weight on feature " + (j + 1) + " over the rounds, against the true weights" });
+      return panel;
+    }));
+
+    // Fig. 2: regret weighted by delta^t; its axis is fixed by the truth alone
+    const top = score.worst || 1;
+    lineChart($("b-reg"), T,
+      [{ v: now.reg, cls: "c-ref", name: "before discounting" },
+        { v: now.reg.map((r, t) => r * Math.pow(delta, t)), cls: "c-ink", name: "discounted, \u03b4 = " + delta }],
+      [{ y: now.regLim, label: "before discounting, once fully learned: " + now.regLim.toFixed(2) }], [],
+      { ylabel: "regret per round", step: true, lo: -0.04 * top, hi: 1.04 * top, wrongShare, alt: "Expected regret loss in each round, before and after discounting" });
+
+    // Fig. 3: value gap; its axis is fixed by the truth and the first beliefs
+    const bound = 1.1 * (score.valueBound || 1);
+    lineChart($("b-value"), T, [{ v: now.vgap, cls: "c-ink", name: "expected value gap" }],
+      [{ y: 0, cls: "zero", label: "zero: expects exactly what the best move is worth" }], [],
+      { ylabel: "value gap per round", lo: -bound, hi: bound, wrongShare, alt: "True best value minus the value the human expects from the chosen action, per round" });
+
+    // Fig. 4: share of states with the best move picked, against showing and offering everything
+    lineChart($("b-acc"), T,
+      (heldBack ? [{ v: all.acc, cls: "c-ref", name: "everything shown and offered" }] : []).concat([{ v: now.acc, cls: "c-a1", name: "what is shown now" }]),
+      [{ y: now.accLim, label: "once fully learned: " + pct(now.accLim) }], [],
+      { ylabel: "states with the best move picked", pct: true, lo: -0.03, hi: 1.08, width: 1120, height: 300, wrongShare, alt: "Share of states in which the human picks the best move, per round" });
+
+    // the choice for the state with every feature at +1: shown beliefs summed per offered action; ties go to the lowest number
+    const refPicks = score.phis.map((f) => {
+      let pick = 0, top = -Infinity;
+      for (let k = 0; k < K; k++) {
+        if (!A[k]) continue;
+        let v = 0;
+        for (let j = 0; j < n; j++) if (F[j]) v += world.U[k][j] + (world.H[k][j] - world.U[k][j]) * (1 - f);
+        if (v > top) { top = v; pick = k + 1; }
+      }
+      return pick;
+    });
+    const worth = world.U.map((row) => row.reduce((sum, w) => sum + w, 0));
+    const refTop = Math.max(...worth), refBest = worth.indexOf(refTop) + 1;
+    const missed = refPicks.map((pick) => worth[pick - 1] < refTop - 1e-9);   // a pick that ties with the best move is not a miss
+
+    // Fig. 5: the choice for one reference state (every feature at +1) against the best move there
+    const picks = refPicks, bestMove = refBest, misses = [];
+    for (let start = 0, t = 1; t <= T; t++) {
+      if (t < T && missed[t] === missed[start]) continue;
+      if (missed[start]) misses.push([start, t]);
+      start = t;
+    }
+    lineChart($("b-choice"), T,
+      [{ v: picks.map(() => bestMove), cls: "c-ink", dash: true, name: "y* best move" }, { v: picks, cls: "c-ink", name: "\u0177 human's choice" }],
+      [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * K, lo: 0.5, hi: K + 0.5,
+        yticks: Array.from({ length: K }, (_, k) => ({ v: k + 1, label: "a" + SUB[k], faded: !A[k] })), fmt: (v) => "action " + v,
+        alt: "Which action the human chooses each round for the state with every feature at +1, against the best move" });
+  }
+
+  // =================== wiring ===================
+  let timerA = null, timerB = null, restB = null;
+  const rankingsB = document.querySelector("#panel-worlds .rankings");
+  // redraw on the next frame, so the three figures follow a slider while it is moving
+  const scheduleA = () => { if (!timerA) timerA = requestAnimationFrame(() => { timerA = null; runA(); }); };
+  // live: redraw the chosen policy on the next frame while a control moves, then rank every subset once it rests
+  const scheduleB = () => {
+    rankingsB.classList.add("stale");
+    clearTimeout(restB);
+    restB = setTimeout(() => runB(true), 220);
+    if (!timerB) timerB = requestAnimationFrame(() => { timerB = null; runB(false); });
+  };
+
+  function pairInputs(selector, attr, schedule) {
+    document.querySelectorAll(selector).forEach((input) => {
+      const group = () => document.querySelectorAll(`[${attr}="${input.getAttribute(attr)}"]`);
+      input.addEventListener("input", () => {
+        const v = parseFloat(input.value); if (isNaN(v)) return;
+        const c = clamp(v, parseFloat(input.min), parseFloat(input.max));
+        group().forEach((o) => { if (o !== input) o.value = c; });
+        schedule();
+      });
+      input.addEventListener("change", () => {
+        const v = parseFloat(input.value), other = [...group()].find((o) => o !== input);
+        const c = isNaN(v) ? other.value : clamp(v, parseFloat(input.min), parseFloat(input.max));
+        group().forEach((o) => { o.value = c; }); schedule();
+      });
+    });
+  }
+
+  buildCurveButtons("curves-a", "curve-a"); buildCurveButtons("curves-b", "curve-b");
+  $("presets").replaceChildren(...PRESETS.map((p) => {
+    const b = el("button", "preset"); b.type = "button"; b.title = p.title; b.append(el("b", "", p.name), el("span", "", p.title));
+    b.addEventListener("click", () => { loadPreset(p); runA(); }); return b;
+  }));
+  pairInputs("[data-k]", "data-k", scheduleA);
+  pairInputs("[data-b]", "data-b", scheduleB);
+  document.querySelectorAll('input[name="curve-a"]').forEach((i) => i.addEventListener("change", () => { applyCurveA(true); runA(); }));
+  document.querySelectorAll('input[name="curve-b"]').forEach((i) => i.addEventListener("change", () => { applyCurveB(true); runB(); }));
+  $("split").addEventListener("change", () => { if ($("split").checked) aSet("p2", aGet("p1")); applyCurveA(false); runA(); });
+  document.querySelectorAll("[data-size]").forEach((input) => input.addEventListener("input", () => {
+    const v = parseInt(input.value, 10); if (isNaN(v)) return;
+    const size = clamp(v, parseInt(input.min, 10), parseInt(input.max, 10));
+    resize(input.dataset.size === "K" ? size : world.K, input.dataset.size === "n" ? size : world.n);
+    drawWorld(); scheduleB();
+  }));
+  document.querySelectorAll("[data-fill]").forEach((b) => b.addEventListener("click", () => {
+    const [name, how] = b.dataset.fill.split(":");
+    world[name] = world[name].map((row, k) => row.map((_, j) => (how === "random" ? randomWeight() : how === "zeros" ? 0 : world.U[k][j])));
+    drawWorld(); runB();
+  }));
+  for (const f of ["form-flip", "form-world"]) $(f).addEventListener("submit", (e) => e.preventDefault());
+
+  // tabs; a bare #worlds in the link opens the second bench
+  let worldsDrawn = false;
+  function show(which) {
+    for (const k of ["flip", "worlds"]) { $("panel-" + k).hidden = k !== which; $("tab-" + k).setAttribute("aria-selected", String(k === which)); }
+    if (which === "worlds" && !worldsDrawn) { worldsDrawn = true; runB(); }
+  }
+  $("tab-flip").addEventListener("click", () => show("flip"));
+  $("tab-worlds").addEventListener("click", () => show("worlds"));
+
+  aSet("T", 80); aSet("delta", 0.95); loadPreset(PRESETS[1]);
+  bInputs("bT").forEach((i) => { i.value = 100; }); bInputs("bd").forEach((i) => { i.value = 0.95; });
+  applyCurveB(true); bInputs("bp").forEach((i) => { i.value = 0.05; });
+  drawWorld(); runA();
+  show(location.hash === "#worlds" ? "worlds" : "flip");
+})();
+</script>
+</body>
+</html>
