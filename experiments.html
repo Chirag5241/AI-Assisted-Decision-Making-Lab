@@ -1,0 +1,63 @@
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Experiment 1 &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791356344">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <p class="kicker">CS 598 · Helping a learning human pick the best move</p>
+      <h1>AI-Assisted Decision Making Lab</h1>
+    </div>
+    <nav class="mast-nav" aria-label="Sections">
+      <a href="index.html" >1 feature, 2 actions</a>
+      <a href="worlds.html" >More actions and features</a>
+      <a href="experiments.html" aria-current="page">Experiment 1 figures</a>
+    </nav>
+  </header>
+  
+<main class="report">
+  <header class="report-head">
+    <p class="kicker">Experiment 1</p>
+    <h2>One feature, two actions, feature always shown</h2>
+    <p>The human's beliefs are guaranteed to converge. These figures ask when the choice becomes right, and what
+      the wait costs. They are written by the batch script, which sweeps thousands of worlds at once:</p>
+    <pre><code>python -m experiments.exp01_single_feature_flip</code></pre>
+  </header>
+
+  
+  <figure class="plate">
+    <figcaption><b>Fig. 1</b> What a flip looks like</figcaption>
+    
+    <img src="results/exp01/fig1_trajectories.png" alt="What a flip looks like" loading="lazy">
+    
+    <p class="plate-text">Four worlds under an exponential learner. Beliefs always converge, but the choice is right only while h1 - h2 has the sign of u1 - u2. In D each action has its own speed, so a human who starts right goes wrong for 50 rounds before coming back.</p>
+  </figure>
+  
+  <figure class="plate">
+    <figcaption><b>Fig. 2</b> Flip time over every (true gap, belief gap) pair</figcaption>
+    
+    <img src="results/exp01/fig2_flip_time_heatmap.png" alt="Flip time over every (true gap, belief gap) pair" loading="lazy">
+    
+    <p class="plate-text">With one shared learning curve the flip time depends only on the ratio of the two gaps, so it is constant along rays through the origin. Grey cells never flip within 200 rounds.</p>
+  </figure>
+  
+  <figure class="plate">
+    <figcaption><b>Fig. 3</b> How the learning curve sets the flip time and its cost</figcaption>
+    
+    <img src="results/exp01/fig3_ratio_and_regret.png" alt="How the learning curve sets the flip time and its cost" loading="lazy">
+    
+    <p class="plate-text">Left: flip time against the ratio of the gaps, closed form against simulation. Right: expected discounted regret for a fixed wrong belief as the true gap grows.</p>
+  </figure>
+  
+</main>
+
+</body>
+</html>

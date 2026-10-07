@@ -4,8 +4,21 @@
     {
       "name": "decision-lab",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "webapp.app"],
+      "runtimeArgs": [
+        "-m",
+        "webapp.app"
+      ],
       "port": 5050
+    },
+    {
+      "name": "pages-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5051"
+      ],
+      "port": 5051
     }
   ]
 }
