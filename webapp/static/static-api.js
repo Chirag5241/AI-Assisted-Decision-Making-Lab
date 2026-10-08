@@ -482,7 +482,7 @@
 
     // one imputation matrix per on/off mask, indexed like itertools.product([False, True], repeat=3)
     const Pmats = Array.from({ length: 8 }, (_, code) => imputation(Sigma, [Boolean(code & 4), Boolean(code & 2), Boolean(code & 1)]));
-    const matmul = (H, code) => Pmats[code].map((_, j) => null) && H.map((row) => {
+    const matmul = (H, code) => H.map((row) => {
       const out = [0, 0, 0];
       for (let j = 0; j < CORR_N; j++) for (let i = 0; i < CORR_N; i++) out[j] += row[i] * Pmats[code][i][j];
       return out;
@@ -506,7 +506,6 @@
     // Accuracy, regret and value gap of effective beliefs E (K x 3) on the probe states.
     // Actions the human cannot tell apart (identical effective weights) are split evenly.
     function scoreE(E) {
-      const group = E.map((row, a) => E.reduce((g, other, b) => (other.every((v, j) => v === row[j]) ? g.concat(b) : g), []) && null);
       const alike = E.map((row) => {
         const g = [];
         for (let b = 0; b < K; b++) if (E[b].every((v, j) => v === row[j])) g.push(b);
@@ -532,7 +531,6 @@
       }
       return [acc / P, reg / P, gap / P];
     }
-    void group;
 
     const belief = (counts) => U.map((row, a) => counts.map((c, j) => row[j] + (H0[a][j] - row[j]) * (1 - phi(c))));
     const at = (counts, m) => scoreE(matmul(belief(counts), maskCode(m)));
@@ -704,7 +702,7 @@
     const [path, query] = url.split("?");
     const q = new URLSearchParams(query || "");
     try {
-      const data = path === "/api/run" ? run(q) : await world(q, signal);
+      const data = path === "/api/run" ? run(q) : path === "/api/correlated" ? await correlated(q, signal) : await world(q, signal);
       return new Response(JSON.stringify(data), { status: 200, headers: { "Content-Type": "application/json" } });
     } catch (error) {
       if (error instanceof BadRequest) return new Response(JSON.stringify({ error: error.message }), { status: 400 });
@@ -713,10 +711,10 @@
   }
 
   if (typeof module !== "undefined" && module.exports) {
-    module.exports = { run, world, BadRequest };            // for the comparison test, under Node
+    module.exports = { run, world, correlated, BadRequest };   // for the comparison test, under Node
   } else {
     const realFetch = root.fetch.bind(root);
-    root.fetch = (url, options) => (typeof url === "string" && (url.startsWith("/api/run") || url.startsWith("/api/world"))
+    root.fetch = (url, options) => (typeof url === "string" && (url.startsWith("/api/run") || url.startsWith("/api/world") || url.startsWith("/api/correlated"))
       ? answer(url, options) : realFetch(url, options));
   }
 })(typeof window !== "undefined" ? window : globalThis);

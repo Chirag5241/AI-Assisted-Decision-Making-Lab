@@ -27,6 +27,11 @@ QUERIES = [
     "/api/world?K=4&n=2&U=1,2;-1,0.5;0,0;2,-2&H=0,0;0,0;0,0;0,0&F=1,1&A=1,1,0,1&curve=power%20law&p1=0.5&T=40",
     "/api/world?K=2&n=2&U=1,2;3,4&H=0,0",          # wrong shape: both sides refuse it
     "/api/run?curve=bogus",
+    "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
+    "&rho=0.8,0.8,0.6&k=2&explore=12&C=1,1,0&curve=exponential&p1=0.15&T=40&delta=0.97",
+    "/api/correlated?K=2&U=1,0,0;0,1,0&H=0,0,0;0,0,0&rho=0,0,0&k=1&explore=0&C=0,0,1"
+    "&curve=hyperbolic&p1=5&T=30&delta=0.9&rank=0",
+    "/api/correlated?rho=0.9,0.9,-0.9",            # not a correlation matrix: both sides refuse it
 ]
 
 DRIVER = """
@@ -36,7 +41,10 @@ const api = require(process.argv[1] + "/static-api.js");
   const out = [];
   for (const url of JSON.parse(process.argv[2])) {
     const [path, query] = url.split("?");
-    try { out.push(path === "/api/run" ? api.run(new URLSearchParams(query)) : await api.world(new URLSearchParams(query))); }
+    try {
+      const q = new URLSearchParams(query);
+      out.push(path === "/api/run" ? api.run(q) : await (path === "/api/correlated" ? api.correlated(q) : api.world(q)));
+    }
     catch (error) { if (error instanceof api.BadRequest) out.push({ status: 400 }); else throw error; }
   }
   console.log(JSON.stringify(out));

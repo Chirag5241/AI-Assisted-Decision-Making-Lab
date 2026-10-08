@@ -90,8 +90,3 @@ def test_page_and_navigation(client):
     page = client.get("/correlated")
     assert page.status_code == 200 and b"correlated.js" in page.data and b'aria-current="page">Correlated' in page.data
     assert b'href="/correlated"' in client.get("/worlds").data
-    app.config["STATIC_BUILD"] = True
-    try:
-        assert b'href="/correlated"' not in client.get("/worlds").data
-    finally:
-        app.config.pop("STATIC_BUILD")

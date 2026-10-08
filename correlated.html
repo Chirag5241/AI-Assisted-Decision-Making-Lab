@@ -1,0 +1,259 @@
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Correlated features &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791366213">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <p class="kicker">CS 598 · Helping a learning human pick the best move</p>
+      <h1>AI-Assisted Decision Making Lab</h1>
+    </div>
+    <nav class="mast-nav" aria-label="Sections">
+      <a href="index.html" >1 feature, 2 actions</a>
+      <a href="worlds.html" >More actions and features</a>
+      <a href="correlated.html" aria-current="page">Correlated features</a>
+      <a href="experiments.html" >Experiment 1 figures</a>
+    </nav>
+  </header>
+  
+<div class="layout">
+  <aside class="rail">
+    <form id="setup" class="controls" autocomplete="off">
+      <fieldset class="card">
+        <legend>The algorithm's policy</legend>
+        <p class="group-label first">Budget: features shown per round</p>
+        <div class="segmented two" role="radiogroup" aria-label="Budget k">
+          <label><input type="radio" name="k" value="1"><span>k = 1</span></label>
+          <label><input type="radio" name="k" value="2"><span>k = 2</span></label>
+        </div>
+        <p class="group-label">Explore first</p>
+        <div class="row">
+          <label for="explore"><span class="sym plain">rounds</span></label>
+          <input type="range" id="explore" data-key="explore" min="0" max="120" step="1">
+          <input type="number" data-key="explore" min="0" max="120" step="1" aria-label="exploration rounds">
+        </div>
+        <p class="group-label">Then commit to</p>
+        <div class="chips" id="commit-chips"></div>
+        <p class="hint" id="policy-hint"></p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Correlation <i>&Sigma;</i></legend>
+        
+        <div class="row">
+          <label for="r12"><span class="sym">&rho;<sub>12</sub></span></label>
+          <input type="range" id="r12" data-key="r12" min="-0.95" max="0.95" step="0.05">
+          <input type="number" data-key="r12" min="-0.95" max="0.95" step="0.05" aria-label="correlation of features 1 and 2">
+        </div>
+        
+        <div class="row">
+          <label for="r13"><span class="sym">&rho;<sub>13</sub></span></label>
+          <input type="range" id="r13" data-key="r13" min="-0.95" max="0.95" step="0.05">
+          <input type="number" data-key="r13" min="-0.95" max="0.95" step="0.05" aria-label="correlation of features 1 and 3">
+        </div>
+        
+        <div class="row">
+          <label for="r23"><span class="sym">&rho;<sub>23</sub></span></label>
+          <input type="range" id="r23" data-key="r23" min="-0.95" max="0.95" step="0.05">
+          <input type="number" data-key="r23" min="-0.95" max="0.95" step="0.05" aria-label="correlation of features 2 and 3">
+        </div>
+        
+        <div id="sigma"></div>
+        <p class="sigma-det" id="sigma-det"></p>
+        <div class="actions"><button type="button" data-rho="independent">Independent</button><button type="button" data-rho="equal">Equicorrelated</button></div>
+        <p class="hint">States are drawn from N(0, &Sigma;). The equicorrelated &Sigma; sets all three to their average, as in Guan et al.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Actions</legend>
+        <div class="row">
+          <label for="K"><span class="sym plain">actions</span></label>
+          <input type="range" id="K" data-size="K" min="2" max="6" step="1">
+          <input type="number" data-size="K" min="2" max="6" step="1" aria-label="number of actions">
+        </div>
+        <p class="hint">Every action is offered every round; only the features are rationed. Three features, always.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Truth <i>U</i></legend>
+        <div class="entries" id="matrix-U" role="group" aria-label="True utility weights, grouped by feature"></div>
+        <div class="actions"><button type="button" data-fill="U:random">Randomize</button></div>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Human's first belief <i>H</i><sub>0</sub></legend>
+        <div class="entries" id="matrix-H" role="group" aria-label="The human's initial weights, grouped by feature"></div>
+        <div class="actions"><button type="button" data-fill="H:random">Randomize</button><button type="button" data-fill="H:zeros">All zeros</button><button type="button" data-fill="H:truth">Copy the truth</button></div>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>How the human learns</legend>
+        <div class="segmented" role="radiogroup" aria-label="Learning curve">
+          
+          <label><input type="radio" name="curve" value="exponential"><span>Exponential</span></label>
+          
+          <label><input type="radio" name="curve" value="hyperbolic"><span>Hyperbolic</span></label>
+          
+          <label><input type="radio" name="curve" value="power law"><span>Power law</span></label>
+          
+          <label><input type="radio" name="curve" value="sigmoid"><span>Sigmoid</span></label>
+          
+        </div>
+        <div class="row">
+          <label for="p1"><span class="sym plain" id="p1-label">rate</span></label>
+          <input type="range" id="p1" data-key="p1">
+          <input type="number" data-key="p1" aria-label="learning speed">
+        </div>
+        <p class="hint" id="curve-hint"></p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Discount <i>&delta;</i> and horizon</legend>
+        <div class="row">
+          <label for="delta"><span class="sym plain">&delta;</span></label>
+          <input type="range" id="delta" data-key="delta" min="0.01" max="0.99" step="0.01">
+          <input type="number" data-key="delta" min="0.01" max="0.99" step="0.01" aria-label="discount factor">
+        </div>
+        <div class="row">
+          <label for="T"><span class="sym plain">rounds</span></label>
+          <input type="range" id="T" data-key="T" min="10" max="300" step="10">
+          <input type="number" data-key="T" min="10" max="300" step="10" aria-label="number of rounds">
+        </div>
+      </fieldset>
+    </form>
+  </aside>
+
+  <main id="bench" aria-busy="true">
+    <section class="verdict" aria-live="polite">
+      <div class="numeral-block">
+        <div class="numeral" id="numeral">&nbsp;</div>
+        <div class="numeral-label" id="numeral-label">expected discounted regret</div>
+      </div>
+      <div class="verdict-text">
+        <p class="sentence" id="sentence">Running the first world&hellip;</p>
+        <div class="strip-wrap">
+          <div class="strip share" id="strip" role="img" aria-label="Share of states in which the human picks the wrong action, round by round"><i class="wrong" id="strip-wrong"></i></div>
+          <div class="strip-axis"><span>round 0</span><span class="strip-key"><i class="key wrong"></i>share of states with the wrong action <i class="key right"></i>with the right action</span><span id="strip-end"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tiles" id="tiles"></section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 1</b> What correlated states look like: 300 of the probe states, two features at a time, coloured by the best move</figcaption>
+        <div class="segmented two" role="radiogroup" aria-label="Which round's choices to ring" style="max-width: 320px">
+          <label><input type="radio" name="ring" value="first"><span>mistakes at round 0</span></label>
+          <label><input type="radio" name="ring" value="last" checked><span>mistakes at the last round</span></label>
+        </div>
+        <div class="legend" id="scatter-legend"></div>
+        <div class="scatter-grid" id="fig-scatter"></div>
+      </figure>
+    </section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 2</b> Which features the algorithm shows, round by round</figcaption>
+        <div class="legend"><span><i class="on-key"></i>shown</span><span><i class="fit-key"></i>exploration ends</span></div>
+        <div class="chart" id="fig-schedule"></div>
+      </figure>
+    </section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 3</b> What the human believes: each action's weight on each feature. A weight moves only on rounds its feature is shown</figcaption>
+        <div class="legend" id="beliefs-legend"></div>
+        <div class="scatter-grid" id="fig-beliefs"></div>
+      </figure>
+    </section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 4</b> What the human actually weighs: beliefs once hidden features are filled in, <i>H</i>&nbsp;<i>P</i><sub>S</sub>, against the best possible with the same features, <i>U</i>&nbsp;<i>P</i><sub>S</sub></figcaption>
+        <div class="effective" id="fig-effective"></div>
+      </figure>
+    </section>
+
+    <section class="figs">
+      <figure>
+        <figcaption><b>Fig. 5</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;, against the best fixed subset</figcaption>
+        <div class="chart" id="fig-regret"></div>
+      </figure>
+      <figure>
+        <figcaption><b>Fig. 6</b> How often the human picks the best move</figcaption>
+        <div class="chart" id="fig-accuracy"></div>
+      </figure>
+    </section>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 7</b> How long to explore: discounted regret against the length of the exploration phase, one line per subset committed to</figcaption>
+        <div class="chart" id="fig-sweep"></div>
+      </figure>
+    </section>
+
+    <section class="rankings one-table">
+      <div>
+        <h2 class="section-title">Which policy should it follow?</h2>
+        <p class="section-sub" id="ranking-sub"></p>
+        <div class="table-scroll"><table class="ranking">
+          <thead><tr><th scope="col">Rank</th><th scope="col">Explore</th><th scope="col">Then show</th><th scope="col" class="num">Discounted regret</th>
+            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <tbody id="ranking"></tbody>
+        </table></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<footer class="reading">
+  <div class="reading-lead">
+    <h2>Reading this bench</h2>
+    <p class="callout"><mark>When features move together, a hidden one still counts, at whatever weight the human believes it has.</mark></p>
+    <p class="callout-sub">Guan, Raman and Fang (2026) show that once features are correlated, showing the same subset every round can
+      be arbitrarily worse than the best policy, which explores first and then commits. This bench carries their model
+      over to picking the best of several actions.</p>
+  </div>
+  <div class="reading-body notes">
+    <p>The human sees only the shown features <span class="math">x<sub>S</sub></span> and fills in the rest with what they predict,
+      <span class="math">E[x<sub>hidden</sub> | x<sub>S</sub>] = &Sigma;<sub>hS</sub> &Sigma;<sub>SS</sub><sup>&minus;1</sup> x<sub>S</sub></span>,
+      then picks <span class="math">argmax<sub>k</sub> (H x&#770;)<sub>k</sub></span>. Because the filled-in state is a fixed matrix
+      times the true one, <span class="math">x&#770; = P<sub>S</sub> x</span>, the human acts as if their weights were
+      <span class="math">H P<sub>S</sub></span> (Fig. 4).</p>
+    <p>As in the paper, a weight is learned only on the rounds its feature is shown. A filled-in value never corrects
+      the belief about that feature, so a misjudged hidden feature keeps pulling the choice the wrong way. With
+      independent features it would be filled in as zero and simply drop out.</p>
+    <p>Exploring rotates through every subset of the budgeted size, so each feature is shown equally often. Then the
+      algorithm commits to one subset for good. Exploring 0 rounds is the fixed-subset policy of Noti et al.</p>
+    <p>The ranking runs every fixed subset and every explore-then-commit policy whose exploration is a whole number
+      of rotations, up to 20 lengths. Unlike the paper's dynamic program, this search over one family is not
+      guaranteed to find the true optimum. Click a row to put that policy on the bench.</p>
+    <p>Each round is scored over 2,000 probe states drawn from <span class="math">N(0, &Sigma;)</span>, built from the
+      same draws as the independent bench, so with &Sigma; = I this page gives that bench's numbers.</p>
+    <p>Fig. 1 rings the probe states where the human's pick is not the best move. The dashed line is
+      <span class="math">E[x<sub>j</sub> | x<sub>i</sub>] = &rho;<sub>ij</sub> x<sub>i</sub></span>, the value the human
+      would fill in for the vertical feature from the horizontal one alone.</p>
+  </div>
+</footer>
+
+<script>
+  window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
+  window.DEFAULT_WORLD = {"C": [1, 1, 0], "H": [[-1.5, -1.0, 1.5], [-0.5, 0.5, 1.5], [1.5, -1.5, -0.5]], "T": 120, "U": [[-1.5, 0.5, 0.0], [0.5, 1.5, -1.0], [1.0, -1.5, 0.0]], "curve": "exponential", "delta": 0.97, "explore": 12, "k": 2, "p1": 0.15, "rho": [0.8, 0.8, 0.6]};
+</script>
+<script src="webapp/static/charts.js?v=1791365931"></script>
+<script src="webapp/static/matrix.js?v=1791365885"></script>
+<script src="webapp/static/probes.js?v=1791491725"></script>
+<script src="webapp/static/static-api.js?v=1791491680"></script>
+<script src="webapp/static/correlated.js?v=1791366201"></script>
+
+</body>
+</html>

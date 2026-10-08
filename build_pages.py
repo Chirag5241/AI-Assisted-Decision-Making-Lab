@@ -3,14 +3,14 @@
     python build_pages.py
 
 GitHub Pages cannot run the Flask server, so this renders the site's own pages to index.html,
-worlds.html and experiments.html at the repository root. They load the same stylesheet and
-scripts as the Flask site (from webapp/static), so the two look and behave alike. Two extra
-scripts stand in for the server:
+worlds.html, correlated.html and experiments.html at the repository root. They load the same
+stylesheet and scripts as the Flask site (from webapp/static), so the two look and behave alike.
+Two extra scripts stand in for the server:
 
-  webapp/static/static-api.js   answers /api/run and /api/world in the browser
+  webapp/static/static-api.js   answers /api/run, /api/world and /api/correlated in the browser
   webapp/static/probes.js       the probe states the Python site scores on (written here)
 
-Run it again after changing a template, and commit the three pages and probes.js.
+Run it again after changing a template, and commit the pages and probes.js.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ from webapp.app import MAX_FEATURES, N_PROBES, app
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "webapp" / "static"
-PAGES = {"/": "index.html", "/worlds": "worlds.html", "/experiments": "experiments.html"}
+PAGES = {"/": "index.html", "/worlds": "worlds.html", "/correlated": "correlated.html", "/experiments": "experiments.html"}
 NOTE = "<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->\n"
 
 
@@ -43,7 +43,6 @@ def versioned(name):
 
 def build():
     write_probes()
-    app.config["STATIC_BUILD"] = True    # pages the static copy has no stand-in for drop out of the navigation
     client = app.test_client()
     for route, filename in PAGES.items():
         html = client.get(route).data.decode()
@@ -57,6 +56,8 @@ def build():
         html = html.replace('<script src="webapp/static/lab.js', stand_in + '<script src="webapp/static/lab.js')
         html = html.replace('<script src="webapp/static/worlds.js',
                             f'<script src="{versioned("probes.js")}"></script>\n' + stand_in + '<script src="webapp/static/worlds.js')
+        html = html.replace('<script src="webapp/static/correlated.js',
+                            f'<script src="{versioned("probes.js")}"></script>\n' + stand_in + '<script src="webapp/static/correlated.js')
         assert 'href="/' not in html and 'src="/' not in html, f"{filename} still has a server-root link"
         (ROOT / filename).write_text(html.replace("<!doctype html>\n", "<!doctype html>\n" + NOTE, 1))
         print(f"wrote {filename} ({len(html) // 1024} KB)")
