@@ -105,6 +105,17 @@
       </fieldset>
 
       <fieldset class="card">
+        <legend>States <i>x</i><sub>t</sub></legend>
+        <div class="row">
+          <label for="seed"><span class="sym plain">draw</span></label>
+          <input type="range" id="seed" data-key="seed" min="0" max="999" step="1" value="0">
+          <input type="number" data-key="seed" min="0" max="999" step="1" value="0" aria-label="which draw of the states">
+        </div>
+        <div class="actions"><button type="button" id="redraw">Draw new states</button></div>
+        <p class="hint">Each round has its own state, drawn from N(0, I). The loss of a round is taken at that state, and everything on this page runs on the same draw. The number picks the draw.</p>
+      </fieldset>
+
+      <fieldset class="card">
         <legend>Discount <i>&delta;</i> and horizon</legend>
         <div class="row">
           <label for="delta"><span class="sym plain">&delta;</span></label>
@@ -171,7 +182,7 @@
 
 
 <figure id="std-choice">
-  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, for one reference state<span class="cap-note">For the state with every feature at +1.</span></figcaption>
+  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, at the state drawn each round</figcaption>
   
   <div class="chart" id="fig-choice"></div>
   
@@ -182,7 +193,7 @@
 
 
 <figure id="std-regret">
-  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, before and after discounting</figcaption>
+  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, at the state drawn for it</figcaption>
   
   <div class="chart" id="fig-regret"></div>
   
@@ -217,8 +228,8 @@
         <h2 class="section-title">Which features should it show?</h2>
         <p class="section-sub" id="ranking-features-sub"></p>
         <div class="table-scroll"><table class="ranking">
-          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th><th scope="col" class="num">Discounted regret</th>
-            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th><th scope="col" class="num">Discounted regret, this draw</th>
+            <th scope="col" class="num">Averaged over states</th><th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
           <tbody id="ranking-features"></tbody>
         </table></div>
       </div>
@@ -226,8 +237,8 @@
         <h2 class="section-title">Which actions should it offer?</h2>
         <p class="section-sub" id="ranking-actions-sub"></p>
         <div class="table-scroll"><table class="ranking">
-          <thead><tr><th scope="col">Rank</th><th scope="col">Actions offered</th><th scope="col" class="num">Discounted regret</th>
-            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <thead><tr><th scope="col">Rank</th><th scope="col">Actions offered</th><th scope="col" class="num">Discounted regret, this draw</th>
+            <th scope="col" class="num">Averaged over states</th><th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
           <tbody id="ranking-actions"></tbody>
         </table></div>
       </div>
@@ -246,9 +257,13 @@
     
   </div>
   <div class="reading-body notes">
+    <p>Each round has its own state <span class="math">x<sub>t</sub> ~ N(0, I)</span>, and the regret of the round is
+      taken there: zero if the human picks the best move at <span class="math">x<sub>t</sub></span>, otherwise what that
+      mistake costs in that state. The large number is its discounted sum on this draw, and every row of the tables is
+      run on the same draw. Draw the states again to see how much of a result is the draw.</p>
     <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
-      state. So instead of one flip round, each round is scored over 2,000 probe states drawn from
-      <span class="math">N(0, I)</span>.</p>
+      state. The grey in the figures, the bar at the top and the &ldquo;averaged over states&rdquo; numbers therefore
+      score each round over 2,000 probe states drawn from <span class="math">N(0, I)</span>.</p>
     <p>Actions work like features: dropping one the human misjudges removes those mistakes, but it can never be picked
       when it is the best move, and it is never learned.</p>
     
@@ -258,11 +273,11 @@
       heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: that weight
       is never learned, so its line stays flat at the first belief.</p>
     
-    <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>, averaged
-      over the probe states: above zero the human expects too little from their pick, below zero too much.</p>
-    <p>Fig. 3 follows one state, every feature at +1: the action the human picks there each round against the best
-      move, with a grey box over the rounds where they differ. Other states can flip at other times, which is what
-      the bar at the top and the lighter grey in the other figures add up.</p>
+    <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span> at
+      each round's state: above zero the human expects too little from their pick, below zero too much.</p>
+    <p>Fig. 3 follows the drawn states: the action the human picks at <span class="math">x<sub>t</sub></span> against the
+      best move there, with a grey box over the rounds where they differ. How often they would differ over all states
+      is the bar at the top and the lighter grey in the other figures.</p>
     <p>Features here are independent, and every weight follows the chosen learning curve on the rounds it is shown.
       Learning speed belongs to the feature: all features share one speed, or each has its own, and an action's
       weights on a feature always move at that feature's speed.</p>
@@ -275,13 +290,13 @@
   window.TIMED_BENCH = false;
   window.MAX_WINDOWS = 12;
 </script>
-<script src="webapp/static/charts.js?v=1791492645"></script>
-<script src="webapp/static/figures.js?v=1791493952"></script>
+<script src="webapp/static/charts.js?v=1791496874"></script>
+<script src="webapp/static/figures.js?v=1791496912"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791494594"></script>
-<script src="webapp/static/static-api.js?v=1791493902"></script>
-<script src="webapp/static/worlds.js?v=1791493993"></script>
+<script src="webapp/static/probes.js?v=1791497588"></script>
+<script src="webapp/static/static-api.js?v=1791496803"></script>
+<script src="webapp/static/worlds.js?v=1791496940"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

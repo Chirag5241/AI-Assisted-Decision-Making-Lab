@@ -88,6 +88,29 @@ def evaluate(H, U, X, F=None, A=None, value_gap=False):
     return accuracy.reshape(lead), mean_regret.reshape(lead), gap.reshape(lead)
 
 
+def realized(seen, U, x, offered=None):
+    """Regret, value gap, pick and best move at one drawn state: the loss of a round, not its average.
+
+    `seen` (..., K, n) are the weights the human scores with (hidden features already zeroed, or
+    filled in), `x` (..., n) the state drawn for each world and `offered` (..., K) the actions on the
+    table; `x` and `offered` broadcast against `seen`. Actions the human cannot tell apart at that
+    state share the regret evenly, as in `evaluate`; the pick reported is the lowest-numbered of
+    them. Regret is measured against the best of all K actions on the full state.
+    """
+    seen = np.asarray(seen, float)
+    est = np.einsum("...kn,...n->...k", seen, x)
+    if offered is not None:
+        est = np.where(offered, est, -np.inf)
+    true = np.einsum("kn,...n->...k", np.asarray(U, float), x)
+    top = est.max(axis=-1, keepdims=True)
+    tied = est == top
+    regret_of = true.max(axis=-1, keepdims=True) - true
+    regret = np.broadcast_to(tied * regret_of, est.shape).sum(axis=-1) / tied.sum(axis=-1)
+    shape = regret.shape
+    return (regret, np.broadcast_to(true.max(axis=-1), shape) - top[..., 0], tied.argmax(axis=-1),
+            np.broadcast_to(true.argmax(axis=-1), shape))
+
+
 # --- closed form, 1 feature / 2 actions / shared curve -----------------------
 
 def flip_threshold(du, dh0):

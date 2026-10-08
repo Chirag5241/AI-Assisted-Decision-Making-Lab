@@ -15,7 +15,7 @@
     })
     .then((data) => {
       // the same fixed axes as on the bench: regret by the truth alone, value gap by the truth and the first beliefs
-      const top = data.worst_regret || 1, bound = 1.1 * (data.value_bound || 1);
+      const top = data.regret_cap || 1, bound = 1.05 * (data.value_cap || 1);
       StandardFigures.draw(data, {
         regret: { lo: -0.04 * top, hi: 1.04 * top }, value: { lo: -bound, hi: bound },
         refName: "everything shown and offered",

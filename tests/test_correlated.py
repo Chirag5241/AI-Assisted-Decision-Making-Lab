@@ -46,7 +46,8 @@ def test_exploring_first_beats_every_fixed_subset_in_the_default_world(client):
     data = client.get(query()).get_json()
     ranking = data["ranking"]
     best, fixed = ranking["best"], ranking["best_fixed"]
-    assert best["explore"] > 0 and best["discounted"] < 0.6 * fixed["discounted"]
+    # on the states drawn, and by a wide margin on average over all states
+    assert best["explore"] > 0 and best["discounted"] < fixed["discounted"] and best["mean"] < 0.6 * fixed["mean"]
     assert ranking["retained"] == pytest.approx(best["discounted"] / fixed["discounted"])
     # committing to the same pair without exploring leaves feature 3 misjudged for good
     assert fixed["mask"] == best["mask"] == [True, True, False]
@@ -54,6 +55,7 @@ def test_exploring_first_beats_every_fixed_subset_in_the_default_world(client):
     # the bench is the ranked policy it claims to be, and its number is the ranking's
     now = next(r for r in ranking["rows"] if r["current"])
     assert now["explore"] == 12 and data["numeral"] == f"{now['discounted']:.2f}"
+    assert f"{now['mean']:.2f}" == data["stats"][0]["value"]
     # the explored feature is shown during exploration only
     schedule = np.array(data["schedule"])
     assert schedule.shape == (3, 120) and schedule[:, :12].sum(axis=0).tolist() == [2] * 12

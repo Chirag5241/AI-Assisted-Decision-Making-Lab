@@ -3,7 +3,7 @@
 (function () {
   const SPECS = window.CURVE_SPECS;
   const PRESETS = window.PRESETS;
-  const KEYS = ["u1", "u2", "h1", "h2", "p1", "T", "delta"];
+  const KEYS = ["u1", "u2", "h1", "h2", "p1", "T", "delta", "seed"];
   const $ = (id) => document.getElementById(id);
   const inputs = (key) => document.querySelectorAll(`[data-key="${key}"]`);
   const bench = $("bench");
@@ -70,6 +70,10 @@
       return tile;
     }));
 
+    const [u1, u2] = data.u, h1 = data.series.h1[0], h2 = data.series.h2[0];
+    const regretTop = 4 * (Math.abs(data.du) || 0.25);
+    const valueTop = 4 * Math.max(Math.abs(Math.max(u1, u2) - Math.max(h1, h2)), Math.abs(Math.min(u1, u2) - Math.min(h1, h2)), 0.25);
+
     // Figs. 1 to 6, the standard ones, from this bench's answer in the shape every bench hands over: one feature,
     // two actions, both in play every round, and the human right in every state or in none.
     const wrong = [];
@@ -79,13 +83,15 @@
       T: data.T, K: 2, U: [[data.u[0]], [data.u[1]]], delta: data.delta,
       beliefs: [[data.series.h1, data.series.h2]],
       schedule: { F: [always], A: [always, always] }, changes: [],
-      choice: { picks: data.series.choice, best: data.best, missed: wrong },
-      series: { reg: data.series.regret, discounted: data.series.discounted, value_gap: data.series.value_gap,
+      choice: { picks: data.series.choice, best: data.series.best, missed: wrong },
+      series: { reg: data.series.regret, discounted: data.series.discounted, reg_mean: data.series.regret_mean,
+        value_gap: data.series.value_gap, value_gap_mean: data.series.value_gap_mean,
         acc: wrong.map((w) => (w ? 0 : 1)) },
     }, {
-      // fixed to what the sliders allow, so no axis moves while one is dragged
-      regret: { lo: -0.2, hi: 5.2, yticks: [0, 1, 2, 3, 4, 5].map((v) => ({ v, label: v })) },
-      value: { lo: -2.6, hi: 2.6, yticks: [-2, -1, 0, 1, 2].map((v) => ({ v, label: v })) },
+      // Fixed by the world, not by the draw or the learner. A wrong round costs |du| |x_t|, and a state beyond
+      // 4 is as good as never drawn. The value gap is at most |x_t| times the larger of the two gaps between
+      // the truth and the first beliefs (best against best, worst against worst).
+      regret: { lo: -0.04 * regretTop, hi: 1.04 * regretTop }, value: { lo: -valueTop, hi: valueTop },
       truthLabels: true,
     });
 
@@ -157,6 +163,16 @@
 
   document.querySelectorAll(".preset").forEach((button) =>
     button.addEventListener("click", () => { load(PRESETS[button.dataset.preset]); run(); }));
+
+  // a fresh draw of the states: another number, picked at random
+  $("redraw").addEventListener("click", () => {
+    const box = inputs("seed")[0], max = parseInt(box.max, 10);
+    let next = Math.floor(Math.random() * (max + 1));
+    if (String(next) === box.value) next = (next + 1) % (max + 1);
+    inputs("seed").forEach((el) => { el.value = next; });
+    schedule();
+  });
+
 
   // A shared link (?u1=...&curve=...) restores its world; otherwise start from scenario B.
   // ... or, with a bare link, what was on this page before moving to another one.

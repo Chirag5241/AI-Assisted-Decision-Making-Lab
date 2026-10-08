@@ -6,7 +6,7 @@
   "use strict";
 
   const MEAN_ABS_X = Math.sqrt(2 / Math.PI);          // E|x| for x ~ N(0, 1)
-  const MAX_ACTIONS = 6, MAX_FEATURES = 6, MAX_WINDOWS = 12;
+  const MAX_ACTIONS = 6, MAX_FEATURES = 6, MAX_WINDOWS = 12, MAX_SEED = 999;
 
   const sigmoid = (p, m) => {
     const w = p / 5, s = 1 / (1 + Math.exp(-(m - p) / w)), s0 = 1 / (1 + Math.exp(p / w));
@@ -66,6 +66,22 @@
     return { labels, bin };
   }
 
+  // The state of each round, x_t ~ N(0, I), as [round][feature]: mulberry32, then Box-Muller. These are
+  // the very numbers simlab/draws.py makes, so a draw is the same on the Flask site and here.
+  function drawStates(seed, T, n) {
+    const uniform = (i) => {
+      const a = (seed + (i + 1) * 0x6D2B79F5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), a | 1);
+      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+      return (t ^ (t >>> 14)) >>> 0;
+    };
+    return Array.from({ length: T }, (_, t) => Array.from({ length: n }, (_, j) => {
+      const m = t * n + j, u1 = (uniform(2 * m) + 0.5) / 4294967296, u2 = uniform(2 * m + 1) / 4294967296;
+      return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+    }));
+  }
+  const seedOf = (q) => Math.trunc(num(q, "seed", 0, 0, MAX_SEED));
+
   // ---- /api/run: one feature, two actions ----------------------------------
 
   function run(q) {
@@ -75,7 +91,7 @@
     const speed = num(q, "p1", spec.def, spec.min, spec.max);   // one feature, so one curve for both actions
     const u1 = num(q, "u1", 1.2, -3, 3), u2 = num(q, "u2", 1.0, -3, 3);
     const h1 = num(q, "h1", 0.0, -3, 3), h2 = num(q, "h2", 1.5, -3, 3);
-    const T = Math.trunc(num(q, "T", 80, 10, 400)), delta = num(q, "delta", 0.95, 0.01, 0.99);
+    const T = Math.trunc(num(q, "T", 80, 10, 400)), delta = num(q, "delta", 0.95, 0.01, 0.99), seed = seedOf(q);
     const du = u1 - u2, dh0 = h1 - h2;
 
     // everything is shown every round, so the beliefs follow the learning curve in closed form
@@ -91,14 +107,21 @@
     for (let t = 1; t < T; t++) if (wrong[t] !== wrong[t - 1]) switches++;
     const nWrong = wrong.filter(Boolean).length;
 
-    // regret is |du| |x| on a wrong round; over x ~ N(0, 1) that averages to |du| E|x|
-    const wrongCost = Math.abs(du) * MEAN_ABS_X;
-    const regretPerRound = wrong.map((w) => (w ? wrongCost : 0));
+    // The state of each round is drawn, x_t ~ N(0, 1), and the loss is taken there: |du| |x_t| on a wrong
+    // round. Averaged over every state instead, that is |du| E|x| per wrong round.
+    const x = drawStates(seed, T, 1).map((row) => row[0]);
+    const regretPerRound = wrong.map((w, t) => (w ? Math.abs(du) * Math.abs(x[t]) : 0));
     const discounted = regretPerRound.map((r, t) => Math.pow(delta, t) * r);
     const regret = discounted.reduce((a, b) => a + b, 0);
-    const valueGap = gap.map((g) => ((Math.abs(du) - Math.abs(g)) * MEAN_ABS_X) / 2);
-    const best = du === 0 ? null : (du > 0 ? 0 : 1);
-    const choice = wrong.map((w, t) => (best === null ? (b1[t] >= b2[t] ? 0 : 1) : (w ? 1 - best : best)));
+    const wrongCost = Math.abs(du) * MEAN_ABS_X;
+    const meanRegretPerRound = wrong.map((w) => (w ? wrongCost : 0));
+    const meanRegret = meanRegretPerRound.reduce((sum, r, t) => sum + Math.pow(delta, t) * r, 0);
+    // the value gap at x_t, max_k u_k x_t - max_k h_k x_t, and its average over states
+    const valueGap = gap.map((_, t) => Math.max(u1 * x[t], u2 * x[t]) - Math.max(b1[t] * x[t], b2[t] * x[t]));
+    const meanValueGap = gap.map((g) => ((Math.abs(du) - Math.abs(g)) * MEAN_ABS_X) / 2);
+    // the best move and the choice at x_t: both swap with the sign of x_t, and differ exactly on the wrong rounds
+    const best = x.map((v) => (u2 * v > u1 * v ? 1 : 0));
+    const choice = wrong.map((w, t) => (du === 0 ? (b2[t] * x[t] > b1[t] * x[t] ? 1 : 0) : (w ? 1 - best[t] : best[t])));
 
     const gaps = `belief gap ${signed2(dh0)} against a true gap of ${signed2(du)}`;
     let numeral, label, sentence;
@@ -157,15 +180,17 @@
         Object.assign({ label: "Learning needed" }, needed),
         { label: "Rounds wrong", value: String(nWrong), note: `out of ${T} simulated` },
         { label: "Choice changes", value: String(switches), note: "right/wrong switches" },
-        { label: "Expected discounted regret", value: f2(regret),
-          note: wrong[T - 1] ? `lower bound: still wrong at round ${T}` : `δ = ${delta}, states x ~ N(0, 1)` },
+        { label: "Discounted regret on this draw", value: f2(regret),
+          note: wrong[T - 1] ? `${f2(meanRegret)} averaged over states; a lower bound, still wrong at round ${T}`
+            : `${f2(meanRegret)} averaged over states x ~ N(0, 1)` },
       ],
       series: {
-        h1: b1.map((v) => round(v, 4)), h2: b2.map((v) => round(v, 4)),
-        regret: regretPerRound.map((v) => round(v, 4)), choice: choice.map((c) => c + 1),
-        discounted: discounted.map((v) => round(v, 4)), value_gap: valueGap.map((v) => round(v, 4)),
+        h1: b1.map((v) => round(v, 4)), h2: b2.map((v) => round(v, 4)), x: x.map((v) => round(v, 3)),
+        regret: regretPerRound.map((v) => round(v, 4)), discounted: discounted.map((v) => round(v, 4)),
+        value_gap: valueGap.map((v) => round(v, 4)), choice: choice.map((c) => c + 1), best: best.map((c) => c + 1),
+        regret_mean: meanRegretPerRound.map((v) => round(v, 4)), value_gap_mean: meanValueGap.map((v) => round(v, 4)),
       },
-      wrong_cost: wrongCost, best: best === null ? null : best + 1,
+      seed,
       map: { lim, G, bins, labels: scale.labels },
     };
   }
@@ -247,8 +272,9 @@
     }
     const U = matrix(q, "U", K, n), H0 = matrix(q, "H", K, n);
     const speeds = speedsOf(q, spec, n);
-    const delta = num(q, "delta", 0.95, 0.01, 0.99);
+    const delta = num(q, "delta", 0.95, 0.01, 0.99), seed = seedOf(q);
     const full = q.get("rank") !== "0";
+    const xDraw = drawStates(seed, T, n);     // the state of each round; every policy is run on this draw
 
     const X = probes(n), P = X.length / n;
     // phis[j][m]: how much of feature j's gap is closed after m rounds in use
@@ -256,7 +282,7 @@
 
     // what every action is truly worth in every probe state, and the regret of picking it
     const regretOf = new Float64Array(P * K), bestTrue = new Float64Array(P);
-    let worstRegret = 0, vTrue = 0, vBelief = 0;
+    let regretCap = 0, valueCap = -Infinity;      // the fixed axes: the largest regret, and value, any probe state allows
     for (let p = 0; p < P; p++) {
       let hi = -Infinity, lo = Infinity, believed = -Infinity;
       for (let k = 0; k < K; k++) {
@@ -269,7 +295,23 @@
       }
       for (let k = 0; k < K; k++) regretOf[p * K + k] = hi - regretOf[p * K + k];
       bestTrue[p] = hi;
-      worstRegret += (hi - lo) / P; vTrue += hi / P; vBelief += believed / P;
+      regretCap = Math.max(regretCap, hi - lo); valueCap = Math.max(valueCap, hi, believed);
+    }
+
+    // The round's own loss, at the state x drawn for it and with the weights W[k][j] the human holds then:
+    // regret, value gap, the pick and the best move. Actions that tie share the regret; the pick is the first.
+    function realized(W, F, A, x) {
+      const worth = U.map((row) => row.reduce((sum, u, j) => sum + u * x[j], 0));
+      let hi = -Infinity, best = -1, top = -Infinity, sumR = 0, count = 0, pick = -1;
+      worth.forEach((v, k) => { if (v > hi) { hi = v; best = k; } });
+      for (let k = 0; k < K; k++) {
+        if (!A[k]) continue;
+        let v = 0;
+        for (let j = 0; j < n; j++) if (F[j]) v += W[k][j] * x[j];
+        if (v > top) { top = v; sumR = hi - worth[k]; count = 1; pick = k; }
+        else if (v === top) { sumR += hi - worth[k]; count++; }
+      }
+      return { reg: sumR / count, gap: hi - top, pick, best };
     }
 
     // Every action's score in every probe state for one set of shown features, from the first beliefs
@@ -321,21 +363,26 @@
       return [acc / P, reg / P, gap / P];
     }
 
-    // One policy: the features shown and the actions offered in each round. With `keep`, the beliefs
-    // of every round are returned too, as [round][action][feature].
+    // One policy: the features shown and the actions offered in each round. `real` holds the loss of each
+    // round at its drawn state and `disc` its discounted sum, the objective on this draw; acc, reg and vgap are
+    // the averages over states and `mean` their discounted sum. With `keep`, the beliefs of every round are
+    // returned too, as [round][action][feature].
     function score(Ft, At, keep) {
       const N = U.map((row) => row.map(() => 0));
-      const acc = [], reg = [], vgap = [], beliefs = [];
-      let disc = 0;
+      const acc = [], reg = [], vgap = [], beliefs = [], real = [];
+      let disc = 0, mean = 0;
       for (let t = 0; t < T; t++) {
         const [a, r, g] = evaluate(Ft[t], At[t], N);
-        acc.push(a); reg.push(r); vgap.push(g); disc += Math.pow(delta, t) * r;
-        if (keep) beliefs.push(U.map((row, k) => row.map((u, j) => u + (H0[k][j] - u) * (1 - phis[j][N[k][j]]))));
+        acc.push(a); reg.push(r); vgap.push(g); mean += Math.pow(delta, t) * r;
+        const W = U.map((row, k) => row.map((u, j) => u + (H0[k][j] - u) * (1 - phis[j][N[k][j]])));
+        real.push(realized(W, Ft[t], At[t], xDraw[t]));
+        disc += Math.pow(delta, t) * real[t].reg;
+        if (keep) beliefs.push(W);
         for (let k = 0; k < K; k++) if (At[t][k]) for (let j = 0; j < n; j++) if (Ft[t][j]) N[k][j]++;
       }
       // once everything shown is learned: the last round's choice, kept up until every weight in use is right
       const [accLimit, regLimit] = evaluate(Ft[T - 1], At[T - 1], null);
-      return { acc, reg, vgap, disc, accLimit, regLimit, beliefs };
+      return { acc, reg, vgap, disc, mean, real, accLimit, regLimit, beliefs };
     }
 
     // Ranking every subset can take a while for large worlds: give the page a turn now and then,
@@ -402,7 +449,7 @@
           rows: listed.map((i) => {
             const extra = i === sets.length;
             return { rank: place[i], mask: extra ? null : sets[i], label: extra ? "the schedule on the bench" : describe(sets[i], noun),
-              discounted: results[i].disc, start: results[i].acc[0], end: results[i].acc[T - 1], floor: results[i].regLimit,
+              discounted: results[i].disc, mean: results[i].mean, start: results[i].acc[0], end: results[i].acc[T - 1], floor: results[i].regLimit,
               current: i === here, scheduled: extra };
           }),
           total: results.length, rank: place[here], best: { set: sets[best], disc: results[best].disc },
@@ -412,52 +459,44 @@
       const byAction = await rank(subsets(K), Abench, "action", (set) => [Fbench, every(set)]);
       const kept = scheduled ? " every round" : "";       // a fixed subset, against a schedule that changes
       const featureHelps = byFeature.best.disc < now.disc - 1e-9;
-      if (featureHelps) sentence += `Showing ${describe(byFeature.best.set, "feature")}${kept} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
+      if (featureHelps) sentence += `On this draw, showing ${describe(byFeature.best.set, "feature")}${kept} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
       if (byAction.best.disc < now.disc - 1e-9) {
         const offer = `ffering ${describe(byAction.best.set, "action")}${kept} instead would cut`;
-        sentence += featureHelps ? `Separately, o${offer} it to ${f2(byAction.best.disc)}.` : `O${offer} the discounted regret to ${f2(byAction.best.disc)}.`;
+        sentence += featureHelps ? `Separately, o${offer} it to ${f2(byAction.best.disc)}.` : `On this draw, o${offer} the discounted regret to ${f2(byAction.best.disc)}.`;
       } else if (!featureHelps) {
-        sentence += scheduled ? "No fixed choice of the features alone, or of the actions alone, does better over this horizon."
-          : "Changing only the features, or only the actions, does no better over this horizon.";
+        sentence += scheduled ? "On this draw, no fixed choice of the features alone, or of the actions alone, does better."
+          : "On this draw, changing only the features, or only the actions, does no better.";
       }
       delete byFeature.best; delete byAction.best;
       rankings = { features: byFeature, actions: byAction };
     }
 
-    // the choice for the state with every feature at +1: shown beliefs summed per offered action
-    const worth = U.map((row) => row.reduce((a, b) => a + b, 0));
-    const top = Math.max(...worth), bestMove = worth.indexOf(top);
-    const picks = now.beliefs.map((H, t) => {
-      let pick = -1, bestScore = -Infinity;
-      for (let k = 0; k < K; k++) {
-        if (!Abench[t][k]) continue;
-        let v = 0;
-        for (let j = 0; j < n; j++) if (Fbench[t][j]) v += H[k][j];
-        if (v > bestScore) { bestScore = v; pick = k; }     // ties go to the lowest-numbered action
-      }
-      return pick;
-    });
     const changed = (rounds, t) => !same(rounds[t], rounds[t - 1]);
     const changes = [];
     for (let t = 1; t < T; t++) if (changed(Fbench, t) || changed(Abench, t)) changes.push(t);
 
     return {
-      K, n, T, numeral: f2(now.disc), numeral_label: "expected discounted regret",
+      K, n, T, seed, numeral: f2(now.disc), numeral_label: "discounted regret on this draw",
       sentence: sentence.trim(), rankings, full,
       stats: [
-        { label: "Best move picked at round 0", value: pct(now.acc[0]), note: "with the human's first beliefs" },
-        { label: `Best move picked at round ${T - 1}`, value: pct(now.acc[T - 1]), note: `heading for ${pct(now.accLimit)} once fully learned` },
+        { label: "Averaged over states", value: f2(now.mean), note: "the same discounted regret, averaged over every state instead of the ones drawn" },
+        { label: `Best move picked at round ${T - 1}`, value: pct(now.acc[T - 1]),
+          note: `of states; ${pct(now.acc[0])} at round 0, heading for ${pct(now.accLimit)} once fully learned` },
         { label: "Regret per round once learned", value: f2(now.regLimit),
-          note: now.regLimit > 1e-9 ? "the lasting price of what is held back" : "nothing held back matters" },
+          note: now.regLimit > 1e-9 ? "on average, the lasting price of what is held back" : "nothing held back matters" },
         { label: "Against showing everything", value: signed2(now.disc - everything.disc),
-          note: heldBack ? `discounted regret; showing and offering everything costs ${f2(everything.disc)}` : "this is the show-everything policy" },
+          note: heldBack ? `on this draw; showing and offering everything costs ${f2(everything.disc)}` : "this is the show-everything policy" },
       ],
+      // reg, discounted and value_gap are taken at the state drawn in each round; the *_mean series are their
+      // averages over all states, and acc is the share of states with the best move
       series: {
-        acc: now.acc.map((v) => round(v, 4)), reg: now.reg.map((v) => round(v, 4)),
-        discounted: now.reg.map((r, t) => round(Math.pow(delta, t) * r, 4)),
-        value_gap: now.vgap.map((v) => round(v, 4)),
+        reg: now.real.map((r) => round(r.reg, 4)), discounted: now.real.map((r, t) => round(Math.pow(delta, t) * r.reg, 4)),
+        value_gap: now.real.map((r) => round(r.gap, 4)),
+        reg_mean: now.reg.map((v) => round(v, 4)), value_gap_mean: now.vgap.map((v) => round(v, 4)),
+        acc: now.acc.map((v) => round(v, 4)),
         ref_acc: heldBack ? everything.acc.map((v) => round(v, 4)) : null,
       },
+      x: xDraw.map((row) => row.map((v) => round(v, 3))),
       // Every weight over time as [feature][action][round]. A weight on a hidden feature, or of an action that is
       // not offered, is not learned in that round and keeps its value (the page fades those flat stretches).
       beliefs: Array.from({ length: n }, (_, j) => U.map((_, k) => now.beliefs.map((H) => round(H[k][j], 3)))),
@@ -467,9 +506,9 @@
         F: Fbase.map((_, j) => Fbench.map((m) => (m[j] ? 1 : 0))), A: Abase.map((_, k) => Abench.map((m) => (m[k] ? 1 : 0))),
       },
       changes,
-      choice: { x: Array(n).fill(1), picks: picks.map((k) => k + 1), best: bestMove + 1, missed: picks.map((k) => worth[k] < top - 1e-9) },
+      choice: { picks: now.real.map((r) => r.pick + 1), best: now.real.map((r) => r.best + 1), missed: now.real.map((r) => r.reg > 1e-9) },
       acc_limit: now.accLimit, reg_limit: now.regLimit,
-      worst_regret: worstRegret, value_bound: Math.max(vTrue, vBelief),
+      regret_cap: regretCap, value_cap: valueCap,
     };
   }
 
@@ -565,7 +604,7 @@
     const U = matrix(q, "U", K, CORR_N), H0 = matrix(q, "H", K, CORR_N);
     const rho = parseRho(q);
     const k = Math.trunc(num(q, "k", 2, 1, CORR_N - 1));
-    const T = Math.trunc(num(q, "T", 120, 10, 300)), delta = num(q, "delta", 0.95, 0.01, 0.99);
+    const T = Math.trunc(num(q, "T", 120, 10, 300)), delta = num(q, "delta", 0.95, 0.01, 0.99), seed = seedOf(q);
     const explore = Math.trunc(num(q, "explore", 0, 0, T));
     const commit = mask(q, "C", CORR_N);
     if (commit.filter(Boolean).length > k) throw new BadRequest(`at most ${k} features can be shown per round`);
@@ -592,18 +631,35 @@
     });
 
     const pay = new Float64Array(P * K), bestTrue = new Float64Array(P);
-    let worstRegret = 0, bestMean = 0;
+    let regretCap = 0, valueCap = -Infinity;      // the fixed axes: the largest regret, and value, any probe state allows
     for (let p = 0; p < P; p++) {
-      let hi = -Infinity, lo = Infinity;
+      let hi = -Infinity, lo = Infinity, believed = -Infinity;
       for (let a = 0; a < K; a++) {
-        let v = 0;
-        for (let j = 0; j < CORR_N; j++) v += U[a][j] * X[p * CORR_N + j];
+        let v = 0, h = 0;
+        for (let j = 0; j < CORR_N; j++) { v += U[a][j] * X[p * CORR_N + j]; h += H0[a][j] * X[p * CORR_N + j]; }
         pay[p * K + a] = v;
         if (v > hi) hi = v;
         if (v < lo) lo = v;
+        if (h > believed) believed = h;
       }
       bestTrue[p] = hi;
-      worstRegret += (hi - lo) / P; bestMean += hi / P;
+      regretCap = Math.max(regretCap, hi - lo); valueCap = Math.max(valueCap, hi, believed);
+    }
+
+    // The state drawn for each round, x_t ~ N(0, Sigma), from the same standard normals as the other benches.
+    const xDraw = drawStates(seed, T, CORR_N).map((z) => [0, 1, 2].map((j) => z[0] * L[j][0] + z[1] * L[j][1] + z[2] * L[j][2]));
+    // The round's own loss at its drawn state x, for effective beliefs E: regret, value gap, pick and best move.
+    // Actions that tie at x share the regret; the pick is the first of them.
+    function realizedE(E, x) {
+      const worth = U.map((row) => row[0] * x[0] + row[1] * x[1] + row[2] * x[2]);
+      let hi = -Infinity, best = -1, top = -Infinity, sumR = 0, count = 0, pick = -1;
+      worth.forEach((v, a) => { if (v > hi) { hi = v; best = a; } });
+      E.forEach((row, a) => {
+        const v = row[0] * x[0] + row[1] * x[1] + row[2] * x[2];
+        if (v > top) { top = v; sumR = hi - worth[a]; count = 1; pick = a; }
+        else if (v === top) { sumR += hi - worth[a]; count++; }
+      });
+      return { reg: sumR / count, gap: hi - top, pick, best };
     }
 
     // Accuracy, regret and value gap of effective beliefs E (K x 3) on the probe states.
@@ -636,12 +692,16 @@
     }
 
     const belief = (counts) => U.map((row, a) => counts.map((c, j) => row[j] + (H0[a][j] - row[j]) * (1 - phi(c, j))));
-    const at = (counts, m) => scoreE(matmul(belief(counts), maskCode(m)));
+    // one round: its averages over states, and its loss at the drawn state of round t
+    const at = (counts, m, t) => {
+      const E = matmul(belief(counts), maskCode(m));
+      return { mean: scoreE(E), real: realizedE(E, xDraw[t]) };
+    };
 
     const cycle = rotation(k);
     const rot = [];
-    for (let t = 0; t < T; t++) rot.push(at(rotationCounts(cycle, t), cycle[t % cycle.length]));
-    const rotAcc = rot.map((s) => s[0]), rotReg = rot.map((s) => s[1]), rotGap = rot.map((s) => s[2]);
+    for (let t = 0; t < T; t++) rot.push(at(rotationCounts(cycle, t), cycle[t % cycle.length], t));
+    const rotAcc = rot.map((s) => s.mean[0]), rotReg = rot.map((s) => s.mean[1]), rotGap = rot.map((s) => s.mean[2]);
 
     const fixed = subsets(CORR_N).filter((m) => m.filter(Boolean).length <= k);
     let policies = [[explore, commit]].concat(fixed.map((m) => [0, m]));
@@ -664,18 +724,19 @@
 
     // committed rounds: counts grow only for the features the policy keeps showing
     const acc = policies.map(() => rotAcc.slice()), reg = policies.map(() => rotReg.slice()), gap = policies.map(() => rotGap.slice());
-    let maxAbsGap = 0;
-    for (const g of rotGap) if (Math.abs(g) > maxAbsGap) maxAbsGap = Math.abs(g);
+    const real = policies.map(() => rot.map((s) => s.real));       // [policy][round]: the loss at the drawn state
     for (let p = 0; p < policies.length; p++) {
       const e = Math.min(policies[p][0], T), m = policies[p][1], base = rotationCounts(cycle, e);
       for (let t = e; t < T; t++) {
-        const [a, r, g] = at(base.map((c, j) => c + (m[j] ? t - e : 0)), m);
-        acc[p][t] = a; reg[p][t] = r; gap[p][t] = g;
-        if (Math.abs(g) > maxAbsGap) maxAbsGap = Math.abs(g);
+        const round = at(base.map((c, j) => c + (m[j] ? t - e : 0)), m, t);
+        [acc[p][t], reg[p][t], gap[p][t]] = round.mean;
+        real[p][t] = round.real;
       }
       if (p % 2 === 1) await breathe();
     }
-    const discounted = reg.map((series) => series.reduce((sum, r, t) => sum + Math.pow(delta, t) * r, 0));
+    // the objective on this draw, and the same sum of the averages over states
+    const discounted = real.map((series) => series.reduce((sum, r, t) => sum + Math.pow(delta, t) * r.reg, 0));
+    const meanDiscounted = reg.map((series) => series.reduce((sum, r, t) => sum + Math.pow(delta, t) * r, 0));
 
     const limit = policies.map(([e, m]) => {
       const frozen = belief(rotationCounts(cycle, Math.min(e, T)));
@@ -686,7 +747,7 @@
     const labelOf = (e, m) => (e === 0 ? `show ${describe(m, "feature")} every round`
       : `explore ${e} rounds, then show ${describe(m, "feature")}`);
     const rowOf = (p, rank) => ({ rank, explore: policies[p][0], mask: policies[p][1].slice(), label: labelOf(...policies[p]),
-      discounted: discounted[p], floor: limit[p][1], start: acc[p][0], end: acc[p][T - 1], current: p === 0 });
+      discounted: discounted[p], mean: meanDiscounted[p], floor: limit[p][1], start: acc[p][0], end: acc[p][T - 1], current: p === 0 });
 
     const fixedIds = policies.reduce((ids, [e], p) => (e === 0 ? ids.concat(p) : ids), []);
     const bestFixed = fixedIds.reduce((best, p) => (discounted[p] < discounted[best] ? p : best));
@@ -709,8 +770,8 @@
       order.forEach((p, i) => { place[p] = i + 1; });
       const best = order[0];
       const listed = [...new Set(order.slice(0, 10).concat([0, bestFixed]))].sort((a, b) => place[a] - place[b]);
-      if (best !== 0 && discounted[best] < discounted[0] - 1e-9) sentence += `The best policy found is to ${labelOf(...policies[best])}, at ${f2(discounted[best])}. `;
-      sentence += policies[best][0] === 0 ? "No exploration beats the best fixed subset here."
+      if (best !== 0 && discounted[best] < discounted[0] - 1e-9) sentence += `On this draw, the best policy found is to ${labelOf(...policies[best])}, at ${f2(discounted[best])}. `;
+      sentence += policies[best][0] === 0 ? "On this draw, no exploration beats the best fixed subset."
         : `Never exploring costs at least ${f2(discounted[bestFixed])}, so the best fixed subset keeps only ${pct(discounted[best] / discounted[bestFixed])} of that performance.`;
       const lengths = [0].concat(exploreGrid(T, cycle.length));
       const where = {};
@@ -741,43 +802,35 @@
       return pick;
     };
 
-    // the choice for the state with every feature at +1: shown features seen, hidden ones filled in
-    const worth = U.map((row) => row.reduce((a, b) => a + b, 0));
-    const topWorth = Math.max(...worth);
-    const refPicks = Array.from({ length: T }, (_, t) => {
-      const E = matmul(belief(benchCounts(t)), maskCode(benchMask(t)));
-      let pick = 0, bestScore = -Infinity;
-      E.forEach((row, a) => { const v = row[0] + row[1] + row[2]; if (v > bestScore) { bestScore = v; pick = a; } });   // ties go to the lowest-numbered action
-      return pick;
-    });
-
     const ref = explore === 0 && bestFixed === 0 ? null : bestFixed;
     return {
       K, n: CORR_N, T, k, delta, rho, Sigma: Sigma.map((row) => row.map((v) => round(v, 4))),
-      numeral: f2(discounted[0]), numeral_label: "expected discounted regret",
+      seed, numeral: f2(discounted[0]), numeral_label: "discounted regret on this draw",
       sentence: sentence.trim(), full, ranking,
       stats: [
-        { label: `Best move picked at round ${T - 1}`, value: pct(acc[0][T - 1]),
-          note: `heading for ${pct(limit[0][0])} once the committed features are learned` },
+        { label: "Averaged over states", value: f2(meanDiscounted[0]), note: "the same discounted regret, averaged over every state instead of the ones drawn" },
         { label: "Regret per round once learned", value: f2(limit[0][1]),
-          note: limit[0][1] > 1e-9 ? "what wrongly filled-in features keep costing" : "nothing is lost for good" },
+          note: limit[0][1] > 1e-9 ? "on average, what wrongly filled-in features keep costing" : "nothing is lost for good" },
         { label: "Best fixed subset", value: f2(discounted[bestFixed]),
-          note: `discounted regret showing ${describe(policies[bestFixed][1], "feature")} every round` },
+          note: `on this draw, showing ${describe(policies[bestFixed][1], "feature")} every round` },
         { label: "Against the best fixed subset", value: signed2(discounted[0] - discounted[bestFixed]),
-          note: ref === null ? "this is the best fixed subset" : "discounted regret, negative is better" },
+          note: ref === null ? "this is the best fixed subset" : "on this draw; negative is better" },
       ],
+      // reg, discounted and value_gap are taken at the state drawn in each round; the *_mean series are their
+      // averages over all states, and acc is the share of states with the best move
       series: {
-        acc: acc[0].map((v) => round(v, 4)), reg: reg[0].map((v) => round(v, 4)),
-        discounted: reg[0].map((r, t) => round(Math.pow(delta, t) * r, 4)),
-        value_gap: gap[0].map((v) => round(v, 4)),
+        reg: real[0].map((r) => round(r.reg, 4)), discounted: real[0].map((r, t) => round(Math.pow(delta, t) * r.reg, 4)),
+        value_gap: real[0].map((r) => round(r.gap, 4)),
+        reg_mean: reg[0].map((v) => round(v, 4)), value_gap_mean: gap[0].map((v) => round(v, 4)),
+        acc: acc[0].map((v) => round(v, 4)),
         ref_acc: ref === null ? null : acc[ref].map((v) => round(v, 4)),
-        ref_discounted: ref === null ? null : reg[ref].map((r, t) => round(Math.pow(delta, t) * r, 4)),
       },
+      x: xDraw.map((row) => row.map((v) => round(v, 3))),
       ref_label: ref === null ? null : labelOf(...policies[ref]),
       schedule: [0, 1, 2].map((j) => Array.from({ length: T }, (_, t) => (benchMask(t)[j] ? 1 : 0))),
       beliefs: [0, 1, 2].map((j) => U.map((row, a) => Array.from({ length: T }, (_, t) => round(row[j] + (H0[a][j] - row[j]) * (1 - phi(benchCounts(t)[j], j)), 3)))),
       U, C: commit.slice(), explore,
-      choice: { x: [1, 1, 1], picks: refPicks.map((a) => a + 1), best: worth.indexOf(topWorth) + 1, missed: refPicks.map((a) => worth[a] < topWorth - 1e-9) },
+      choice: { picks: real[0].map((r) => r.pick + 1), best: real[0].map((r) => r.best + 1), missed: real[0].map((r) => r.reg > 1e-9) },
       effective: { first: roundM(E0, 3), last: roundM(ET, 3), truth: roundM(ETU, 3), first_mask: benchMask(0).slice() },
       scatter: {
         x: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => [0, 1, 2].map((j) => round(X[p * CORR_N + j], 3))),
@@ -790,7 +843,7 @@
         last: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => argmax(ET, p) + 1),
       },
       acc_limit: limit[0][0], reg_limit: limit[0][1],
-      worst_regret: worstRegret, value_bound: Math.max(bestMean, maxAbsGap),
+      regret_cap: regretCap, value_cap: valueCap,
     };
   }
 

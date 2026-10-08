@@ -121,6 +121,17 @@
       </fieldset>
 
       <fieldset class="card">
+        <legend>States <i>x</i><sub>t</sub></legend>
+        <div class="row">
+          <label for="seed"><span class="sym plain">draw</span></label>
+          <input type="range" id="seed" data-key="seed" min="0" max="999" step="1" value="0">
+          <input type="number" data-key="seed" min="0" max="999" step="1" value="0" aria-label="which draw of the states">
+        </div>
+        <div class="actions"><button type="button" id="redraw">Draw new states</button></div>
+        <p class="hint">Each round has its own state, drawn from N(0, 1). The loss of a round is taken at that state, and everything on this page runs on the same draw. The number picks the draw.</p>
+      </fieldset>
+
+      <fieldset class="card">
         <legend>Discount <i>&delta;</i> and horizon</legend>
         
 <div class="row">
@@ -188,7 +199,7 @@
 
 
 <figure id="std-choice">
-  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, for one reference state<span class="cap-note">For a positive state. For a negative state the choice and the best move both swap.</span></figcaption>
+  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, at the state drawn each round<span class="cap-note">Both lines swap with the sign of x<sub>t</sub>; they differ exactly in the rounds before the flip.</span></figcaption>
   
   <div class="chart" id="fig-choice"></div>
   
@@ -199,7 +210,7 @@
 
 
 <figure id="std-regret">
-  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, before and after discounting</figcaption>
+  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, at the state drawn for it</figcaption>
   
   <div class="chart" id="fig-regret"></div>
   
@@ -268,14 +279,15 @@
     <p class="formula">&phi;(t) &gt; |&Delta;h<sub>0</sub>| / (|&Delta;h<sub>0</sub>| + |&Delta;u|)</p>
     <p>so the map in Fig. 8 is made of rays through the origin: only the ratio of the two gaps matters. The curve
       belongs to the feature, so both actions always share it and the choice flips at most once.</p>
-    <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; (Ux)<sub>&ycirc;</sub></span>.
-      Here that is <span class="math">|&Delta;u| &middot; |x|</span> when the choice is wrong and zero when it is right;
-      Fig. 4 averages it over <span class="math">x ~ N(0, 1)</span> and weights round <i>t</i> by
-      <span class="math">&delta;<sup>t</sup></span>; the objective is the sum of those bars. For a negative state both the choice in Fig. 3
-      and the best move swap, so the regret is the same.</p>
+    <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub> &minus; (Ux<sub>t</sub>)<sub>&ycirc;</sub></span>,
+      taken at the state <span class="math">x<sub>t</sub> ~ N(0, 1)</span> drawn for that round. Here that is
+      <span class="math">|&Delta;u| &middot; |x<sub>t</sub>|</span> when the choice is wrong and zero when it is right, so in Fig. 4
+      the wrong rounds are as tall as their states are large. Weighted by <span class="math">&delta;<sup>t</sup></span> and summed,
+      it is the objective on this draw. The dashed line is its average over states,
+      <span class="math">|&Delta;u| &middot; E|x|</span>. For a negative state both the choice in Fig. 3 and the best move swap.</p>
     <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>: what the best
       move is truly worth minus what the human expects from the move they pick. Above zero the human expects too
-      little, below zero too much. Averaged over states it equals
+      little, below zero too much. It is taken at each round's state; averaged over states it equals
       <span class="math">(|&Delta;u| &minus; |h<sub>1</sub> &minus; h<sub>2</sub>|) &middot; E|x| / 2</span>,
       so it can sit at zero while the human still picks the wrong action.</p>
   </div>
@@ -285,10 +297,10 @@
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.PRESETS = [{"curve": "exponential", "h1": 0.0, "h2": 1.0, "name": "A", "p1": 0.1, "title": "Wrong start, large true gap", "u1": 2.0, "u2": 0.0}, {"curve": "exponential", "h1": 0.0, "h2": 1.5, "name": "B", "p1": 0.1, "title": "Wrong start, small true gap", "u1": 1.2, "u2": 1.0}, {"curve": "exponential", "h1": 0.5, "h2": 0.0, "name": "C", "p1": 0.1, "title": "Right from the start", "u1": 2.0, "u2": 0.0}];
 </script>
-<script src="webapp/static/charts.js?v=1791492645"></script>
-<script src="webapp/static/figures.js?v=1791493952"></script>
-<script src="webapp/static/static-api.js?v=1791493902"></script>
-<script src="webapp/static/lab.js?v=1791493993"></script>
+<script src="webapp/static/charts.js?v=1791496874"></script>
+<script src="webapp/static/figures.js?v=1791496912"></script>
+<script src="webapp/static/static-api.js?v=1791496803"></script>
+<script src="webapp/static/lab.js?v=1791496940"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

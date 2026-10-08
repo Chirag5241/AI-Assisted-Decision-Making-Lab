@@ -57,15 +57,16 @@
       <ol>
         <li><b>The algorithm chooses what is in play.</b> It shows a set of features F<sub>t</sub> and offers a set
           of actions A<sub>t</sub>. This choice, over all the rounds, is the policy being tested.</li>
-        <li><b>The human picks an action.</b> A state x is drawn. The human scores each offered action from the
-          shown features with their own weights H<sub>t</sub> and picks the highest (<a href="#eq-choice">Eq. 2</a>). The
-          round costs the regret of that pick against the best move (<a href="#eq-regret">Eq. 6</a>).</li>
+        <li><b>The human picks an action.</b> The state of the round, x<sub>t</sub>, is drawn
+          (<a href="#eq-value">Eq. 1</a>). The human scores each offered action from the shown features with their own
+          weights H<sub>t</sub> and picks the highest (<a href="#eq-choice">Eq. 2</a>). The round costs the regret of
+          that pick at x<sub>t</sub>, against the best move there (<a href="#eq-regret">Eq. 6</a>).</li>
         <li><b>The human learns.</b> Every weight that was in use closes part of its gap to the truth
           (<a href="#eq-learning">Eq. 4</a>). A weight that was held back does not move.</li>
       </ol>
       <dl class="symbols">
         <div><dt>K, n</dt><dd>the number of actions and of features</dd></div>
-        <div><dt>x</dt><dd>the state of a round, one number per feature</dd></div>
+        <div><dt>x<sub>t</sub></dt><dd>the state drawn for round t, one real number per feature</dd></div>
         <div><dt>U</dt><dd>the truth: u<sub>kj</sub> is the weight of feature j in the value of action k</dd></div>
         <div><dt>H<sub>t</sub></dt><dd>what the human believes U is in round t; H<sub>0</sub> is the first belief</dd></div>
         <div><dt>F<sub>t</sub>, A<sub>t</sub></dt><dd>the features shown and the actions offered in round t</dd></div>
@@ -82,8 +83,8 @@
     
     <article class="eq" id="eq-value">
       <header><b>Eq. 1</b><h4>What an action is worth</h4></header>
-      <p class="formula">(<i>Ux</i>)<sub>k</sub> = &Sigma;<sub>j</sub> u<sub>kj</sub> x<sub>j</sub>,&emsp;x ~ N(0, I)</p>
-      <p class="eq-text">The state x has one number per feature. The truth U has one row per action and one column per feature: u<sub>kj</sub> is the weight of feature j in the value of action k. States are drawn afresh every round; on the Correlated features bench they come from N(0, &Sigma;).</p>
+      <p class="formula">(<i>Ux</i><sub>t</sub>)<sub>k</sub> = &Sigma;<sub>j</sub> u<sub>kj</sub> (x<sub>t</sub>)<sub>j</sub>,&emsp;x<sub>t</sub> ~ N(0, I)</p>
+      <p class="eq-text">Each round has its own state x<sub>t</sub>, one real number per feature, drawn afresh from a normal distribution (from N(0, &Sigma;) on the Correlated features bench). The truth U has one row per action and one column per feature: u<sub>kj</sub> is the weight of feature j in the value of action k. A bench runs on one draw of the states x<sub>0</sub> &hellip; x<sub>T&minus;1</sub> and can draw them again.</p>
       <p class="eq-meta">
         
         <span class="derivation pending">Derivation not written yet</span>
@@ -92,8 +93,8 @@
     
     <article class="eq" id="eq-choice">
       <header><b>Eq. 2</b><h4>The human&#39;s choice</h4></header>
-      <p class="formula">&ycirc;<sub>t</sub>(x) = argmax<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> x<sub>j</sub></p>
-      <p class="eq-text">In round t the algorithm shows the features F<sub>t</sub> and offers the actions A<sub>t</sub>. The human scores each offered action with their own weights H<sub>t</sub>, using only the shown features, and picks the highest. Ties are split evenly.</p>
+      <p class="formula">&ycirc;<sub>t</sub> = argmax<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> (x<sub>t</sub>)<sub>j</sub></p>
+      <p class="eq-text">In round t the algorithm shows the features F<sub>t</sub> and offers the actions A<sub>t</sub>. The human scores each offered action at the state x<sub>t</sub> with their own weights H<sub>t</sub>, using only the shown features, and picks the highest. Actions that tie share the regret evenly.</p>
       <p class="eq-meta">
         <span>Drawn in <a href="#fig-1">Fig. 1</a>, <a href="#fig-3">Fig. 3</a></span>
         <span class="derivation pending">Derivation not written yet</span>
@@ -102,7 +103,7 @@
     
     <article class="eq" id="eq-best">
       <header><b>Eq. 3</b><h4>The best move</h4></header>
-      <p class="formula">y*(x) = argmax<sub>k</sub> (<i>Ux</i>)<sub>k</sub></p>
+      <p class="formula">y*<sub>t</sub> = argmax<sub>k</sub> (<i>Ux</i><sub>t</sub>)<sub>k</sub></p>
       <p class="eq-text">The best move uses the truth, every feature and every action, whatever the algorithm holds back. Regret is always measured against it.</p>
       <p class="eq-meta">
         <span>Drawn in <a href="#fig-3">Fig. 3</a>, <a href="#fig-6">Fig. 6</a></span>
@@ -132,8 +133,8 @@
     
     <article class="eq" id="eq-regret">
       <header><b>Eq. 6</b><h4>Regret loss of a round</h4></header>
-      <p class="formula">&#8467;<sub>t</sub> = E<sub>x</sub>[ max<sub>k</sub> (<i>Ux</i>)<sub>k</sub> &minus; (<i>Ux</i>)<sub>&ycirc;<sub>t</sub>(x)</sub> ]</p>
-      <p class="eq-text">What the best move is worth minus what the chosen move is worth, averaged over states. It is zero in a state where the human picks the best move. With one feature and two actions it is |&Delta;u| &middot; E|x| = |&Delta;u| &radic;(2/&pi;) on a wrong round; on the other benches it is the mean over 2,000 probe states.</p>
+      <p class="formula">&#8467;(x<sub>t</sub>, &ycirc;<sub>t</sub>) = max<sub>k</sub> (<i>Ux</i><sub>t</sub>)<sub>k</sub> &minus; (<i>Ux</i><sub>t</sub>)<sub>&ycirc;<sub>t</sub></sub></p>
+      <p class="eq-text">What the best move is worth at the state x<sub>t</sub> of that round, minus what the chosen move is worth there. It is zero when the human picks the best move, and otherwise it depends on the state that was drawn: with one feature and two actions it is |&Delta;u| &middot; |x<sub>t</sub>| on a wrong round. This is the loss an algorithm would be trained on. Its average over all states, E<sub>x</sub>[&#8467;], is drawn beside it for reference: |&Delta;u| &radic;(2/&pi;) on a wrong round with one feature, and the mean over 2,000 probe states on the other benches.</p>
       <p class="eq-meta">
         <span>Drawn in <a href="#fig-4">Fig. 4</a></span>
         <span class="derivation pending">Derivation not written yet</span>
@@ -142,8 +143,8 @@
     
     <article class="eq" id="eq-objective">
       <header><b>Eq. 7</b><h4>The objective: discounted regret</h4></header>
-      <p class="formula">R = &Sigma;<sub>t = 0</sub><sup>T &minus; 1</sup> &delta;<sup>t</sup> &#8467;<sub>t</sub></p>
-      <p class="eq-text">The algorithm's patience &delta; is one number in (0, 1). Near 0 only the first rounds count; near 1 later rounds count almost as much. This sum is the large number at the top of every bench and the quantity every ranking table sorts by.</p>
+      <p class="formula">R = &Sigma;<sub>t = 0</sub><sup>T &minus; 1</sup> &delta;<sup>t</sup> &#8467;(x<sub>t</sub>, &ycirc;<sub>t</sub>)</p>
+      <p class="eq-text">The algorithm's patience &delta; is one number in (0, 1). Near 0 only the first rounds count; near 1 later rounds count almost as much. The sum is taken on the states that were drawn, so it changes from draw to draw. It is the quantity every ranking table sorts by, with every policy run on the same draw, and the tables give its average over states beside it.</p>
       <p class="eq-meta">
         <span>Drawn in <a href="#fig-4">Fig. 4</a></span>
         <span class="derivation pending">Derivation not written yet</span>
@@ -152,8 +153,8 @@
     
     <article class="eq" id="eq-value-gap">
       <header><b>Eq. 8</b><h4>Value gap</h4></header>
-      <p class="formula">g<sub>t</sub> = E<sub>x</sub>[ max<sub>k</sub> (<i>Ux</i>)<sub>k</sub> &minus; &ucirc;<sub>t</sub>(&ycirc;) ],&emsp;&ucirc;<sub>t</sub>(&ycirc;) = max<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> x<sub>j</sub></p>
-      <p class="eq-text">What the best move is truly worth minus what the human expects from the move they pick. It measures how well calibrated the human is, not whether they choose well: it can sit at zero while the choice is still wrong.</p>
+      <p class="formula">g<sub>t</sub> = max<sub>k</sub> (<i>Ux</i><sub>t</sub>)<sub>k</sub> &minus; &ucirc;<sub>t</sub>(&ycirc;<sub>t</sub>),&emsp;&ucirc;<sub>t</sub>(&ycirc;<sub>t</sub>) = max<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> (x<sub>t</sub>)<sub>j</sub></p>
+      <p class="eq-text">What the best move is truly worth at x<sub>t</sub> minus what the human expects from the move they pick. It measures how well calibrated the human is, not whether they choose well: it can be zero while the choice is wrong. Its average over states is drawn beside it.</p>
       <p class="eq-meta">
         <span>Drawn in <a href="#fig-5">Fig. 5</a></span>
         <span class="derivation pending">Derivation not written yet</span>
@@ -163,7 +164,7 @@
     <article class="eq" id="eq-accuracy">
       <header><b>Eq. 9</b><h4>Share of states with the best move</h4></header>
       <p class="formula">a<sub>t</sub> = P<sub>x</sub>[ &ycirc;<sub>t</sub>(x) = y*(x) ]</p>
-      <p class="eq-text">With several features the human is no longer simply right or wrong: it depends on the state. a<sub>t</sub> is the share of states in which the pick is the best move. 1 &minus; a<sub>t</sub> is the grey behind every figure and the hatched bar at the top of a bench.</p>
+      <p class="eq-text">This one is not about the state that was drawn but about all of them: the share of states in which the human, with the beliefs of round t, would pick the best move. With several features that depends on the state. 1 &minus; a<sub>t</sub> is the grey behind every figure and the hatched bar at the top of a bench.</p>
       <p class="eq-meta">
         <span>Drawn in <a href="#fig-6">Fig. 6</a></span>
         <span class="derivation pending">Derivation not written yet</span>
@@ -270,29 +271,29 @@
     
     <article class="specimen" id="fig-3">
       <figure>
-        <figcaption><b>Fig. 3</b>The human's choice &ycirc; against the best move y*, for one reference state</figcaption>
+        <figcaption><b>Fig. 3</b>The human's choice &ycirc; against the best move y*, at the state drawn each round</figcaption>
         
         <div class="chart" id="fig-choice"></div>
         
       </figure>
       <div class="reading-notes">
-        <div><h4>What is drawn</h4><p>For one fixed state, the action the human picks in each round as a solid step line and the best move as a dashed one, with a grey box over the rounds where they differ.</p></div>
-        <div><h4>How to read it</h4><p>This is one state's story. Other states can flip at other rounds, which is what Fig. 6 adds up.</p>
+        <div><h4>What is drawn</h4><p>The action the human picks at each round's state as a solid step line and the best move there as a dashed one, with a grey box over the rounds where they differ.</p></div>
+        <div><h4>How to read it</h4><p>Both lines move from round to round because the state does. A grey box is a round that costs regret; how much is Fig. 4. How often the two would agree over all states is Fig. 6.</p>
           <p class="eq-meta"><span>From <a href="#eq-choice">Eq. 2</a>, <a href="#eq-best">Eq. 3</a></span></p></div>
         <div><h4>On each bench</h4>
           <dl class="per-bench">
             
             <div><dt><a href="index.html">1 feature, 2 actions</a></dt>
-              <dd>For a positive state. For a negative state the choice and the best move both swap.</dd></div>
+              <dd>Both lines swap with the sign of x<sub>t</sub>; they differ exactly in the rounds before the flip.</dd></div>
             
             <div><dt><a href="worlds.html">More actions and features</a></dt>
-              <dd>For the state with every feature at +1.</dd></div>
+              <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
-              <dd>For the state with every feature at +1.</dd></div>
+              <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="correlated.html">Correlated features</a></dt>
-              <dd>For the state with every feature at +1, hidden features filled in from the shown ones.</dd></div>
+              <dd>Hidden features are filled in from the shown ones before the human scores the actions.</dd></div>
             
           </dl>
         </div>
@@ -302,14 +303,14 @@
     
     <article class="specimen half" id="fig-4">
       <figure>
-        <figcaption><b>Fig. 4</b>Regret loss each round, before and after discounting</figcaption>
+        <figcaption><b>Fig. 4</b>Regret loss each round, at the state drawn for it</figcaption>
         
         <div class="chart" id="fig-regret"></div>
         
       </figure>
       <div class="reading-notes">
-        <div><h4>What is drawn</h4><p>The grey line is the expected regret of each round, &#8467;<sub>t</sub>. The ink line weights it by &delta;<sup>t</sup>.</p></div>
-        <div><h4>How to read it</h4><p>The area under the ink line is the objective, the large number at the top of the bench. A dashed level, where drawn, is the regret that remains once everything in use is learned.</p>
+        <div><h4>What is drawn</h4><p>The ink line is the loss of each round at its state, &#8467;(x<sub>t</sub>, &ycirc;<sub>t</sub>). The grey line weights it by &delta;<sup>t</sup>. The dashed line is the same loss averaged over all states.</p></div>
+        <div><h4>How to read it</h4><p>The ink line is zero in a round where the human picks the best move and otherwise as tall as that round's state makes the mistake cost. The area under the grey line is the objective on this draw. Draw the states again and the ink line changes; the dashed average does not.</p>
           <p class="eq-meta"><span>From <a href="#eq-regret">Eq. 6</a>, <a href="#eq-objective">Eq. 7</a></span></p></div>
         <div><h4>On each bench</h4>
           <dl class="per-bench">
@@ -324,7 +325,7 @@
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="correlated.html">Correlated features</a></dt>
-              <dd>The dashed line is the best fixed subset, discounted.</dd></div>
+              <dd>Drawn as described.</dd></div>
             
           </dl>
         </div>
@@ -340,7 +341,7 @@
         
       </figure>
       <div class="reading-notes">
-        <div><h4>What is drawn</h4><p>One line, g<sub>t</sub>, around a zero line.</p></div>
+        <div><h4>What is drawn</h4><p>The ink line is g<sub>t</sub> at each round's state, around a zero line. The dashed line is its average over all states.</p></div>
         <div><h4>How to read it</h4><p>Above zero the human expects too little from the move they pick; below zero, too much. Zero does not mean the choice is right.</p>
           <p class="eq-meta"><span>From <a href="#eq-value-gap">Eq. 8</a></span></p></div>
         <div><h4>On each bench</h4>
@@ -402,10 +403,11 @@
     <ul class="conventions">
       <li><b>Colour is the action.</b> a<sub>1</sub> is always the same blue, a<sub>2</sub> the same orange, and so on,
         in every figure and on every slider. In Fig. 2 each feature's panel uses a slightly lighter shade.</li>
-      <li><b>Dashed is the truth.</b> A dashed line of an action's colour is the true weight its solid line is heading
-        for. A dashed ink line is a reference: the best move, or a level reached once everything in use is learned.</li>
-      <li><b>Grey behind a plot is error.</b> The darker the grey in a round, the larger the share of states in which
-        the human picks the wrong action. It is the same in every figure of a bench.</li>
+      <li><b>Dashed in an action's colour is the truth</b>: the true weight that action's solid line is heading for.</li>
+      <li><b>Grey behind a plot is error over all states.</b> The darker the grey in a round, the larger the share of
+        states in which the human would pick the wrong action. It is the same in every figure of a bench.</li>
+      <li><b>Solid is the draw, dashed ink its average.</b> In Figs. 4 and 5 the solid line is taken at the state drawn
+        in each round, and the dashed line is the same quantity averaged over all states.</li>
       <li><b>Faded means out of use.</b> A faded stretch of a line is a weight that was held back in those rounds, so
         nothing was learned about it.</li>
       <li><b>Dotted vertical rules mark a change of policy</b>: the rounds at which what is shown or offered changes.</li>
@@ -503,11 +505,11 @@
 <script>
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "W": "f3:20-25", "curve": "exponential", "delta": 0.95, "p1": 0.05};
 </script>
-<script src="webapp/static/charts.js?v=1791492645"></script>
-<script src="webapp/static/figures.js?v=1791493952"></script>
-<script src="webapp/static/probes.js?v=1791494594"></script>
-<script src="webapp/static/static-api.js?v=1791493902"></script>
-<script src="webapp/static/overview.js?v=1791494061"></script>
+<script src="webapp/static/charts.js?v=1791496874"></script>
+<script src="webapp/static/figures.js?v=1791496912"></script>
+<script src="webapp/static/probes.js?v=1791497588"></script>
+<script src="webapp/static/static-api.js?v=1791496803"></script>
+<script src="webapp/static/overview.js?v=1791496940"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

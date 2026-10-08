@@ -40,7 +40,8 @@ window.Charts = (function () {
       if (lo === undefined) lo = mn - pad;
       if (hi === undefined) hi = mx + pad;
     }
-    const X = (t) => L + (T === 1 ? 0 : (t / (T - 1)) * pw), Y = (v) => TOP + (1 - (v - lo) / (hi - lo)) * ph;
+    // axes are fixed, so a value beyond one is drawn at the frame rather than outside it (the tooltip keeps the number)
+    const X = (t) => L + (T === 1 ? 0 : (t / (T - 1)) * pw), Y = (v) => TOP + (1 - (clamp(v, lo, hi) - lo) / (hi - lo)) * ph;
     const edge = (t) => Math.min(Math.max(X(t), L), L + pw);
     const text = (attrs, s) => { const t = svgEl("text", attrs); t.textContent = s; return t; };
 

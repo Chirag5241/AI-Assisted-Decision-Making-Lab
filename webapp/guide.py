@@ -16,23 +16,26 @@ from __future__ import annotations
 EQUATIONS = [
     dict(
         id="value", name="What an action is worth",
-        html="(<i>Ux</i>)<sub>k</sub> = &Sigma;<sub>j</sub> u<sub>kj</sub> x<sub>j</sub>,"
-             "&emsp;x ~ N(0, I)",
-        text="The state x has one number per feature. The truth U has one row per action and one column per "
-             "feature: u<sub>kj</sub> is the weight of feature j in the value of action k. States are drawn "
-             "afresh every round; on the Correlated features bench they come from N(0, &Sigma;).",
+        html="(<i>Ux</i><sub>t</sub>)<sub>k</sub> = &Sigma;<sub>j</sub> u<sub>kj</sub> (x<sub>t</sub>)<sub>j</sub>,"
+             "&emsp;x<sub>t</sub> ~ N(0, I)",
+        text="Each round has its own state x<sub>t</sub>, one real number per feature, drawn afresh from a normal "
+             "distribution (from N(0, &Sigma;) on the Correlated features bench). The truth U has one row per "
+             "action and one column per feature: u<sub>kj</sub> is the weight of feature j in the value of "
+             "action k. A bench runs on one draw of the states x<sub>0</sub> &hellip; x<sub>T&minus;1</sub> and "
+             "can draw them again.",
         figures=[], derivation=None),
     dict(
         id="choice", name="The human's choice",
-        html="&ycirc;<sub>t</sub>(x) = argmax<sub>k &isin; A<sub>t</sub></sub> "
-             "&Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> x<sub>j</sub>",
+        html="&ycirc;<sub>t</sub> = argmax<sub>k &isin; A<sub>t</sub></sub> "
+             "&Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> (x<sub>t</sub>)<sub>j</sub>",
         text="In round t the algorithm shows the features F<sub>t</sub> and offers the actions A<sub>t</sub>. "
-             "The human scores each offered action with their own weights H<sub>t</sub>, using only the shown "
-             "features, and picks the highest. Ties are split evenly.",
+             "The human scores each offered action at the state x<sub>t</sub> with their own weights "
+             "H<sub>t</sub>, using only the shown features, and picks the highest. Actions that tie share the "
+             "regret evenly.",
         figures=["schedule", "choice"], derivation=None),
     dict(
         id="best", name="The best move",
-        html="y*(x) = argmax<sub>k</sub> (<i>Ux</i>)<sub>k</sub>",
+        html="y*<sub>t</sub> = argmax<sub>k</sub> (<i>Ux</i><sub>t</sub>)<sub>k</sub>",
         text="The best move uses the truth, every feature and every action, whatever the algorithm holds back. "
              "Regret is always measured against it.",
         figures=["choice", "accuracy"], derivation=None),
@@ -59,35 +62,41 @@ EQUATIONS = [
         figures=["beliefs"], derivation=None),
     dict(
         id="regret", name="Regret loss of a round",
-        html="&#8467;<sub>t</sub> = E<sub>x</sub>[ max<sub>k</sub> (<i>Ux</i>)<sub>k</sub> &minus; "
-             "(<i>Ux</i>)<sub>&ycirc;<sub>t</sub>(x)</sub> ]",
-        text="What the best move is worth minus what the chosen move is worth, averaged over states. It is zero "
-             "in a state where the human picks the best move. With one feature and two actions it is "
-             "|&Delta;u| &middot; E|x| = |&Delta;u| &radic;(2/&pi;) on a wrong round; on the other benches it is "
-             "the mean over 2,000 probe states.",
+        html="&#8467;(x<sub>t</sub>, &ycirc;<sub>t</sub>) = max<sub>k</sub> (<i>Ux</i><sub>t</sub>)<sub>k</sub> &minus; "
+             "(<i>Ux</i><sub>t</sub>)<sub>&ycirc;<sub>t</sub></sub>",
+        text="What the best move is worth at the state x<sub>t</sub> of that round, minus what the chosen move "
+             "is worth there. It is zero when the human picks the best move, and otherwise it depends on the "
+             "state that was drawn: with one feature and two actions it is |&Delta;u| &middot; |x<sub>t</sub>| on "
+             "a wrong round. This is the loss an algorithm would be trained on. Its average over all states, "
+             "E<sub>x</sub>[&#8467;], is drawn beside it for reference: |&Delta;u| &radic;(2/&pi;) on a wrong round "
+             "with one feature, and the mean over 2,000 probe states on the other benches.",
         figures=["regret"], derivation=None),
     dict(
         id="objective", name="The objective: discounted regret",
-        html="R = &Sigma;<sub>t = 0</sub><sup>T &minus; 1</sup> &delta;<sup>t</sup> &#8467;<sub>t</sub>",
+        html="R = &Sigma;<sub>t = 0</sub><sup>T &minus; 1</sup> &delta;<sup>t</sup> "
+             "&#8467;(x<sub>t</sub>, &ycirc;<sub>t</sub>)",
         text="The algorithm's patience &delta; is one number in (0, 1). Near 0 only the first rounds count; "
-             "near 1 later rounds count almost as much. This sum is the large number at the top of every "
-             "bench and the quantity every ranking table sorts by.",
+             "near 1 later rounds count almost as much. The sum is taken on the states that were drawn, so it "
+             "changes from draw to draw. It is the quantity every ranking table sorts by, with every policy "
+             "run on the same draw, and the tables give its average over states beside it.",
         figures=["regret"], derivation=None),
     dict(
         id="value-gap", name="Value gap",
-        html="g<sub>t</sub> = E<sub>x</sub>[ max<sub>k</sub> (<i>Ux</i>)<sub>k</sub> &minus; "
-             "&ucirc;<sub>t</sub>(&ycirc;) ],&emsp;&ucirc;<sub>t</sub>(&ycirc;) = max<sub>k &isin; A<sub>t</sub></sub> "
-             "&Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> x<sub>j</sub>",
-        text="What the best move is truly worth minus what the human expects from the move they pick. It "
-             "measures how well calibrated the human is, not whether they choose well: it can sit at zero "
-             "while the choice is still wrong.",
+        html="g<sub>t</sub> = max<sub>k</sub> (<i>Ux</i><sub>t</sub>)<sub>k</sub> &minus; "
+             "&ucirc;<sub>t</sub>(&ycirc;<sub>t</sub>),&emsp;&ucirc;<sub>t</sub>(&ycirc;<sub>t</sub>) = "
+             "max<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> "
+             "(x<sub>t</sub>)<sub>j</sub>",
+        text="What the best move is truly worth at x<sub>t</sub> minus what the human expects from the move "
+             "they pick. It measures how well calibrated the human is, not whether they choose well: it can "
+             "be zero while the choice is wrong. Its average over states is drawn beside it.",
         figures=["value"], derivation=None),
     dict(
         id="accuracy", name="Share of states with the best move",
         html="a<sub>t</sub> = P<sub>x</sub>[ &ycirc;<sub>t</sub>(x) = y*(x) ]",
-        text="With several features the human is no longer simply right or wrong: it depends on the state. "
-             "a<sub>t</sub> is the share of states in which the pick is the best move. 1 &minus; a<sub>t</sub> "
-             "is the grey behind every figure and the hatched bar at the top of a bench.",
+        text="This one is not about the state that was drawn but about all of them: the share of states in "
+             "which the human, with the beliefs of round t, would pick the best move. With several features "
+             "that depends on the state. 1 &minus; a<sub>t</sub> is the grey behind every figure and the "
+             "hatched bar at the top of a bench.",
         figures=["accuracy"], derivation=None),
     dict(
         id="flip", name="The flip, with one feature and two actions",
@@ -129,21 +138,25 @@ STANDARD_FIGURES = [
              "closes on its dashed truth is the feature's learning curve.",
         equations=["learning", "curves"]),
     dict(
-        key="choice", title="The human's choice &ycirc; against the best move y*, for one reference state",
-        draws="For one fixed state, the action the human picks in each round as a solid step line and the "
-              "best move as a dashed one, with a grey box over the rounds where they differ.",
-        read="This is one state's story. Other states can flip at other rounds, which is what Fig. 6 adds up.",
+        key="choice", title="The human's choice &ycirc; against the best move y*, at the state drawn each round",
+        draws="The action the human picks at each round's state as a solid step line and the best move "
+              "there as a dashed one, with a grey box over the rounds where they differ.",
+        read="Both lines move from round to round because the state does. A grey box is a round that costs "
+             "regret; how much is Fig. 4. How often the two would agree over all states is Fig. 6.",
         equations=["choice", "best"]),
     dict(
-        key="regret", title="Regret loss each round, before and after discounting",
-        draws="The grey line is the expected regret of each round, &#8467;<sub>t</sub>. The ink line weights "
-              "it by &delta;<sup>t</sup>.",
-        read="The area under the ink line is the objective, the large number at the top of the bench. A "
-             "dashed level, where drawn, is the regret that remains once everything in use is learned.",
+        key="regret", title="Regret loss each round, at the state drawn for it",
+        draws="The ink line is the loss of each round at its state, &#8467;(x<sub>t</sub>, &ycirc;<sub>t</sub>). "
+              "The grey line weights it by &delta;<sup>t</sup>. The dashed line is the same loss averaged over "
+              "all states.",
+        read="The ink line is zero in a round where the human picks the best move and otherwise as tall as "
+             "that round's state makes the mistake cost. The area under the grey line is the objective on "
+             "this draw. Draw the states again and the ink line changes; the dashed average does not.",
         equations=["regret", "objective"]),
     dict(
         key="value", title="Value gap: the best move's true value minus what the human expects from their choice",
-        draws="One line, g<sub>t</sub>, around a zero line.",
+        draws="The ink line is g<sub>t</sub> at each round's state, around a zero line. The dashed line is "
+              "its average over all states.",
         read="Above zero the human expects too little from the move they pick; below zero, too much. Zero does "
              "not mean the choice is right.",
         equations=["value-gap"]),
@@ -171,7 +184,7 @@ BENCHES = [
                 "to one flip and when it happens.",
         notes=dict(
             beliefs="One panel: there is one feature, and both actions share its learning curve.",
-            choice="For a positive state. For a negative state the choice and the best move both swap.",
+            choice="Both lines swap with the sign of x<sub>t</sub>; they differ exactly in the rounds before the flip.",
             accuracy="0% or 100% here: with one feature the human is right in every state or in none."),
         absent=dict(
             schedule="Not relevant here. There is one feature and two actions and both are in play in every "
@@ -183,23 +196,20 @@ BENCHES = [
         summary="Up to six actions and six features, with a fixed choice of which features are shown and which "
                 "actions are offered. Ranks every fixed subset.",
         notes=dict(
-            schedule="The same every round on this bench.",
-            choice="For the state with every feature at +1."),
+            schedule="The same every round on this bench."),
         absent={}, own=[]),
     dict(
         endpoint="timed", name="Timed hiding",
         summary="The same bench, with windows of rounds in which one feature or one action is held back and "
                 "then brought back.",
-        notes=dict(choice="For the state with every feature at +1."),
-        absent={}, own=[]),
+        notes={}, absent={}, own=[]),
     dict(
         endpoint="correlated_page", name="Correlated features",
         summary="Three features that move together. A hidden feature is filled in from the shown ones, and the "
                 "algorithm may explore before committing to a subset.",
         notes=dict(
             schedule="Every action is offered in every round; only the features change.",
-            choice="For the state with every feature at +1, hidden features filled in from the shown ones.",
-            regret="The dashed line is the best fixed subset, discounted."),
+            choice="Hidden features are filled in from the shown ones before the human scores the actions."),
         absent={},
         own=["What correlated states look like: 300 of the probe states, two features at a time, coloured by the best move",
              "What the human actually weighs: beliefs once hidden features are filled in, <i>H</i>&nbsp;<i>P</i><sub>S</sub>, "

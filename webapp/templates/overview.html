@@ -24,15 +24,16 @@
       <ol>
         <li><b>The algorithm chooses what is in play.</b> It shows a set of features F<sub>t</sub> and offers a set
           of actions A<sub>t</sub>. This choice, over all the rounds, is the policy being tested.</li>
-        <li><b>The human picks an action.</b> A state x is drawn. The human scores each offered action from the
-          shown features with their own weights H<sub>t</sub> and picks the highest ({{ eq_link("choice") }}). The
-          round costs the regret of that pick against the best move ({{ eq_link("regret") }}).</li>
+        <li><b>The human picks an action.</b> The state of the round, x<sub>t</sub>, is drawn
+          ({{ eq_link("value") }}). The human scores each offered action from the shown features with their own
+          weights H<sub>t</sub> and picks the highest ({{ eq_link("choice") }}). The round costs the regret of
+          that pick at x<sub>t</sub>, against the best move there ({{ eq_link("regret") }}).</li>
         <li><b>The human learns.</b> Every weight that was in use closes part of its gap to the truth
           ({{ eq_link("learning") }}). A weight that was held back does not move.</li>
       </ol>
       <dl class="symbols">
         <div><dt>K, n</dt><dd>the number of actions and of features</dd></div>
-        <div><dt>x</dt><dd>the state of a round, one number per feature</dd></div>
+        <div><dt>x<sub>t</sub></dt><dd>the state drawn for round t, one real number per feature</dd></div>
         <div><dt>U</dt><dd>the truth: u<sub>kj</sub> is the weight of feature j in the value of action k</dd></div>
         <div><dt>H<sub>t</sub></dt><dd>what the human believes U is in round t; H<sub>0</sub> is the first belief</dd></div>
         <div><dt>F<sub>t</sub>, A<sub>t</sub></dt><dd>the features shown and the actions offered in round t</dd></div>
@@ -105,10 +106,11 @@
     <ul class="conventions">
       <li><b>Colour is the action.</b> a<sub>1</sub> is always the same blue, a<sub>2</sub> the same orange, and so on,
         in every figure and on every slider. In Fig. 2 each feature's panel uses a slightly lighter shade.</li>
-      <li><b>Dashed is the truth.</b> A dashed line of an action's colour is the true weight its solid line is heading
-        for. A dashed ink line is a reference: the best move, or a level reached once everything in use is learned.</li>
-      <li><b>Grey behind a plot is error.</b> The darker the grey in a round, the larger the share of states in which
-        the human picks the wrong action. It is the same in every figure of a bench.</li>
+      <li><b>Dashed in an action's colour is the truth</b>: the true weight that action's solid line is heading for.</li>
+      <li><b>Grey behind a plot is error over all states.</b> The darker the grey in a round, the larger the share of
+        states in which the human would pick the wrong action. It is the same in every figure of a bench.</li>
+      <li><b>Solid is the draw, dashed ink its average.</b> In Figs. 4 and 5 the solid line is taken at the state drawn
+        in each round, and the dashed line is the same quantity averaged over all states.</li>
       <li><b>Faded means out of use.</b> A faded stretch of a line is a weight that was held back in those rounds, so
         nothing was learned about it.</li>
       <li><b>Dotted vertical rules mark a change of policy</b>: the rounds at which what is shown or offered changes.</li>

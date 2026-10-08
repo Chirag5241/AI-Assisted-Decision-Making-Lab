@@ -148,6 +148,7 @@
     const q = new URLSearchParams({
       K: world.K, n: world.n, U: rows(world.U), H: rows(world.H), F: bits(world.F), A: bits(world.A),
       curve: curve(), p1: inputs("p1")[0].value, T: inputs("T")[0].value, delta: inputs("delta")[0].value,
+      seed: inputs("seed")[0].value,
     });
     if (speeds.param()) q.set("ps", speeds.param());
     if (world.W.length) q.set("W", world.W.map((w) => `${w.kind}${w.index + 1}:${span(w).join("-")}`).join(";"));
@@ -184,8 +185,8 @@
     $("strip-end").textContent = "round " + (data.T - 1);
 
     // Figs. 1 to 6, the standard ones. The regret axis is fixed by the truth alone and the value-gap axis by
-    // the truth and the first beliefs, so neither moves while the policy or the learner changes.
-    const top = data.worst_regret || 1, bound = 1.1 * (data.value_bound || 1);
+    // the truth and the first beliefs, so neither moves while the policy, the learner or the draw changes.
+    const top = data.regret_cap || 1, bound = 1.05 * (data.value_cap || 1);
     StandardFigures.draw(data, {
       regret: { lo: -0.04 * top, hi: 1.04 * top }, value: { lo: -bound, hi: bound },
       refName: "everything shown and offered",
@@ -238,7 +239,7 @@
       const value = document.createElement("span");
       value.textContent = r.discounted.toFixed(2);
       bar.append(fill, value);
-      tr.append(cell(r.rank + (r.current ? "  \u2190 now" : ""), "rank"), members, bar,
+      tr.append(cell(r.rank + (r.current ? "  \u2190 now" : ""), "rank"), members, bar, cell(r.mean.toFixed(2), "num"),
         cell(`${pct(r.start)} \u2192 ${pct(r.end)}`, "num"), cell(r.floor.toFixed(2), "num"));
       const apply = () => { if (r.scheduled) return; choose(r.mask.slice()); drawAll(); run(); };
       tr.addEventListener("click", apply);
@@ -346,6 +347,15 @@
   document.querySelectorAll('input[name="curve"]').forEach((el) =>
     el.addEventListener("change", () => { applyCurve(true); schedule(); }));
 
+  // a fresh draw of the states: another number, picked at random
+  $("redraw").addEventListener("click", () => {
+    const box = inputs("seed")[0], max = parseInt(box.max, 10);
+    let next = Math.floor(Math.random() * (max + 1));
+    if (String(next) === box.value) next = (next + 1) % (max + 1);
+    inputs("seed").forEach((el) => { el.value = next; });
+    schedule();
+  });
+
   if (TIMED) {
     $("add-window").addEventListener("click", () => {
       // hide the last feature in use (or, with one feature, the last action) for a short stretch early on
@@ -388,7 +398,7 @@
     resize(world.K, world.n);
     if (s.curve in SPECS) document.querySelector(`input[name="curve"][value="${s.curve}"]`).checked = true;
     applyCurve(true);
-    for (const key of ["p1", "T", "delta"]) {
+    for (const key of ["p1", "T", "delta", "seed"]) {
       if (s[key] !== undefined && isFinite(s[key])) inputs(key).forEach((el) => { el.value = s[key]; });
     }
     speeds.load(s.ps);

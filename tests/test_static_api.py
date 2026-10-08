@@ -35,6 +35,14 @@ QUERIES = [
     f"/api/world?{W}&W=a4:1-2",                      # no such action
     f"/api/world?{W}&W=f1:9-5",
     f"/api/world?{W}&W=hide%20feature%203",
+    # other draws of the states
+    "/api/run?u1=1.2&u2=1&h1=0&h2=1.5&curve=exponential&p1=0.1&T=400&delta=0.95&seed=999",
+    "/api/run?u1=1&u2=1&h1=2&h2=0&curve=sigmoid&p1=20&T=60&seed=41",
+    f"/api/world?{W}&F=1,1,0&A=1,0,1&curve=exponential&p1=0.05&T=300&delta=0.95&seed=17",
+    "/api/world?K=6&n=6&U=" + ";".join(",".join(str(((i * j) % 5 - 2) / 2) for j in range(6)) for i in range(6))
+    + "&H=" + ";".join(",".join("0" for _ in range(6)) for _ in range(6)) + "&W=f2:3-9;a5:0-20&T=30&seed=123&rank=0",
+    "/api/correlated?K=4&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0;0,0,2&H=0,0,0;0,0,0;0,0,0;0,0,0"
+    "&rho=-0.5,0.3,0.4&k=1&explore=9&C=0,1,0&curve=power%20law&p1=0.5&T=50&delta=0.9&seed=77",
     # a learning speed for each feature
     f"/api/world?{W}&ps=0.02,0.1,0.4&curve=exponential&T=100&delta=0.95",
     f"/api/world?{W}&F=1,0,1&ps=30,8,15&W=f3:10-19;a2:5-30&curve=sigmoid&T=80&delta=0.9",

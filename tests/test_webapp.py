@@ -14,14 +14,29 @@ def test_default_world_flips_at_round_21(client):
     assert data["runs"] == [dict(start=0, stop=21, wrong=True), dict(start=21, stop=80, wrong=False)]
     assert data["stats"][0]["value"] == "88%"
     assert len(data["series"]["h1"]) == 80 and data["series"]["h1"][0] == 0 and data["series"]["h2"][0] == 1.5
-    # regret loss: |du| E|x| = 0.2 * sqrt(2/pi) on each of the 21 wrong rounds, then zero
-    assert data["series"]["regret"][:21] == [0.1596] * 21 and set(data["series"]["regret"][21:]) == {0.0}
-    # Fig. 2 weights round t by delta^t (delta defaults to 0.95), and the headline sums those
+    # the regret of a round is taken at the state drawn for it: |du| |x_t| on each of the 21 wrong rounds, then zero
+    import numpy as np
+    x, regret = np.array(data["series"]["x"]), np.array(data["series"]["regret"])
+    np.testing.assert_allclose(regret[:21], 0.2 * np.abs(x[:21]), atol=2e-4)
+    assert set(regret[21:]) == {0.0} and len(set(regret[:21])) == 21
+    # beside it, the same loss averaged over every state: |du| E|x| = 0.2 * sqrt(2/pi) on a wrong round
+    assert data["series"]["regret_mean"][:21] == [0.1596] * 21 and set(data["series"]["regret_mean"][21:]) == {0.0}
+    # Fig. 4 weights round t by delta^t (delta defaults to 0.95), and the tile sums those on this draw
     assert data["delta"] == 0.95
-    assert data["series"]["discounted"][:3] == [0.1596, round(0.1596 * 0.95, 4), round(0.159577 * 0.95 ** 2, 4)]
+    np.testing.assert_allclose(data["series"]["discounted"], regret * 0.95 ** np.arange(80), atol=1e-4)
     assert abs(sum(data["series"]["discounted"]) - float(data["stats"][3]["value"])) < 0.01
-    # u1 > u2, so action 1 is best; the human picks action 2 until the flip
-    assert data["best"] == 1 and data["series"]["choice"] == [2] * 21 + [1] * 59
+    assert data["stats"][3]["note"].startswith("2.10 averaged over states")
+    # u1 > u2, so action 1 is best in a positive state and action 2 in a negative one; the human picks the
+    # other one until the flip and the best one after it
+    best, choice = np.array(data["series"]["best"]), np.array(data["series"]["choice"])
+    np.testing.assert_array_equal(best, np.where(x > 0, 1, 2))
+    assert (choice[:21] != best[:21]).all() and (choice[21:] == best[21:]).all()
+    # another draw moves the regret but not the beliefs, the flip or the average
+    other = client.get("/api/run?u1=1.2&u2=1&h1=0&h2=1.5&curve=exponential&p1=0.1&T=80&seed=5").get_json()
+    assert other["series"]["x"] != data["series"]["x"] and other["series"]["regret"] != data["series"]["regret"]
+    for key in ("h1", "h2", "regret_mean", "value_gap_mean"):
+        assert other["series"][key] == data["series"][key], key
+    assert other["settle"] == 21 and other["runs"] == data["runs"]
     grid = data["map"]["bins"]
     assert len(grid) == 60 and len(grid[0]) == 60
     assert grid[0][-1] == 0 and grid[-1][0] == 0          # same-sign corners: right from the start
@@ -65,8 +80,9 @@ def test_hiding_a_misjudged_feature_beats_showing_everything(client):
     assert ranking["total"] == 7
     # showing everything is the reference itself, so no reference line; the regret axis ceiling covers the data
     assert len(data["series"]["acc"]) == 100 and data["series"]["ref_acc"] is None
-    assert max(data["series"]["reg"]) <= data["worst_regret"]
-    assert best["mask"] == [True, True, False] and best["discounted"] < now["discounted"]
+    assert 0 <= min(data["series"]["reg"]) and max(data["series"]["reg"]) <= data["regret_cap"]
+    # on this draw and on average over states alike
+    assert best["mask"] == [True, True, False] and best["discounted"] < now["discounted"] and best["mean"] < now["mean"]
     assert now["floor"] == 0 and best["floor"] > 0          # hiding is cheaper now but costs forever
     assert now["end"] > now["start"] and best["end"] == best["start"]
 
@@ -96,7 +112,7 @@ def test_larger_world_page_and_validation(client):
     assert client.get("/api/world?K=2&n=1&U=1;0&H=0;1&F=0").status_code == 400        # nothing shown
     one_by_two = client.get("/api/world?K=2&n=1&U=1;0&H=0;1").get_json()
     assert one_by_two["rankings"]["features"]["total"] == 1
-    assert one_by_two["stats"][0]["value"] == "0%"                                    # wrong sign at round 0
+    assert one_by_two["series"]["acc"][0] == 0                                        # wrong sign at round 0
 
 
 def test_value_gap_matches_a_monte_carlo_average(client):
@@ -108,17 +124,17 @@ def test_value_gap_matches_a_monte_carlo_average(client):
         h_t = np.array([data["series"]["h1"][t], data["series"]["h2"][t]])
         # true best value minus the value the human expects from the action they pick
         sampled = (np.outer(x, u).max(axis=1) - np.outer(x, h_t).max(axis=1)).mean()
-        assert abs(sampled - data["series"]["value_gap"][t]) < 0.01
+        assert abs(sampled - data["series"]["value_gap_mean"][t]) < 0.01
     # a human whose two beliefs are as far apart as the truths, but in the wrong order: wrong choice, zero value gap
     flipped = client.get("/api/run?u1=1&u2=0&h1=0&h2=1&curve=exponential&p1=0.1&T=20").get_json()
-    assert flipped["series"]["value_gap"][0] == 0 and flipped["series"]["regret"][0] > 0
+    assert flipped["series"]["value_gap_mean"][0] == 0 and flipped["series"]["regret"][0] > 0
 
 
 def test_light_answer_matches_the_full_one_for_the_chosen_policy(client):
     query = "/api/world?" + DEFAULT_3X3.replace("A=1,1,1", "A=1,0,1") + "&F=1,1,0"
     full, light = client.get(query).get_json(), client.get(query + "&rank=0").get_json()
     assert full["full"] and not light["full"] and light["rankings"] is None
-    for key in ("numeral", "series", "stats", "acc_limit", "reg_limit", "worst_regret", "value_bound", "beliefs", "choice"):
+    for key in ("numeral", "series", "stats", "acc_limit", "reg_limit", "regret_cap", "value_cap", "beliefs", "choice", "x"):
         assert light[key] == full[key], key
     assert full["sentence"].startswith(light["sentence"])
 
@@ -141,7 +157,7 @@ def test_larger_world_beliefs_value_gap_and_discounting(client):
     assert data["acc_limit"] < 0.9
     series = data["series"]
     np.testing.assert_allclose(series["discounted"], np.array(series["reg"]) * 0.95 ** np.arange(100), atol=1e-4)
-    assert max(abs(v) for v in series["value_gap"]) <= data["value_bound"]
+    assert max(abs(v) for v in series["value_gap_mean"]) <= data["value_cap"]
 
 
 def test_value_gap_of_the_general_scorer_matches_the_one_feature_closed_form():
@@ -153,18 +169,54 @@ def test_value_gap_of_the_general_scorer_matches_the_one_feature_closed_form():
     assert abs(gap - (0.5 - 0.2) * analysis.MEAN_ABS_STD_NORMAL / 2) < 0.005
 
 
-def test_choice_for_the_all_ones_state(client):
+def test_regret_choice_and_value_gap_are_taken_at_the_state_drawn_each_round(client):
     import numpy as np
-    data = client.get("/api/world?" + DEFAULT_3X3 + "&F=1,1,1&rank=0").get_json()
-    U = np.array(data["U"])
-    choice = data["choice"]
-    assert choice["x"] == [1, 1, 1] and choice["best"] == int(U.sum(axis=1).argmax()) + 1 == 1
-    # first beliefs sum to (3, 1, -2) per action, so the human starts on action 1, which is also best here
-    beliefs = np.array(data["beliefs"])                                  # [feature][action][round]
-    np.testing.assert_array_equal(choice["picks"], beliefs.sum(axis=0).argmax(axis=0) + 1)
-    # with action 1 withheld the human can never pick the best move for this state
+    from simlab import draws
+    data = client.get("/api/world?" + DEFAULT_3X3 + "&F=1,1,0&seed=3").get_json()
+    U, x = np.array(data["U"]), np.array(data["x"])                       # x: [round][feature]
+    np.testing.assert_allclose(x, draws.states(3, 100, 3), atol=5e-4)
+    beliefs = np.array(data["beliefs"])                                    # [feature][action][round]
+    choice, series = data["choice"], data["series"]
+    worth = x @ U.T                                                        # [round][action]: what each action is truly worth at x_t
+    scores = np.einsum("jkt,tj->tk", beliefs[:2], x[:, :2])                # the human sees features 1 and 2 only
+    np.testing.assert_array_equal(choice["best"], worth.argmax(axis=1) + 1)
+    np.testing.assert_array_equal(choice["picks"], scores.argmax(axis=1) + 1)
+    picks = np.array(choice["picks"]) - 1
+    # the proposal's loss: max_k (U x_t)_k - (U x_t)_yhat, zero exactly when the pick is the best move
+    regret = worth.max(axis=1) - worth[np.arange(100), picks]
+    np.testing.assert_allclose(series["reg"], regret, atol=5e-3)
+    assert choice["missed"] == (regret > 1e-9).tolist() and 0 < sum(choice["missed"]) < 100
+    np.testing.assert_allclose(series["value_gap"], worth.max(axis=1) - scores.max(axis=1), atol=5e-3)
+    # the headline is the discounted sum on this draw, and the bench's row of each table carries it
+    assert data["numeral"] == f"{sum(series['discounted']):.2f}" == f"{(regret * 0.95 ** np.arange(100)).sum():.2f}"
+    now = next(r for r in data["rankings"]["features"]["rows"] if r["current"])
+    assert f"{now['discounted']:.2f}" == data["numeral"] and f"{now['mean']:.2f}" == data["stats"][0]["value"]
+    # every policy is run on the same draw: the tables sort by that, and carry the average over states beside it
+    rows = data["rankings"]["features"]["rows"]
+    assert [r["discounted"] for r in rows] == sorted(r["discounted"] for r in rows) and all("mean" in r for r in rows)
+    # another draw changes the loss of the rounds, not the beliefs or the averages over states
+    other = client.get("/api/world?" + DEFAULT_3X3 + "&F=1,1,0&seed=4").get_json()
+    assert other["series"]["reg"] != series["reg"] and other["numeral"] != data["numeral"]
+    for key in ("reg_mean", "value_gap_mean", "acc"):
+        assert other["series"][key] == series[key], key
+    assert other["beliefs"] == data["beliefs"] and other["stats"][0] == data["stats"][0]
+    # with action 1 withheld the human can never pick it, whatever the state
     without = client.get("/api/world?" + DEFAULT_3X3.replace("A=1,1,1", "A=0,1,1") + "&F=1,1,1&rank=0").get_json()
-    assert without["choice"]["best"] == 1 and 1 not in without["choice"]["picks"]
+    assert 1 not in without["choice"]["picks"] and 1 in without["choice"]["best"]
+    # beliefs that cannot tell the actions apart share the regret evenly
+    blank = client.get("/api/world?K=2&n=1&U=1;0&H=0;0&T=10&rank=0").get_json()
+    assert abs(blank["series"]["reg"][0] - abs(blank["x"][0][0]) / 2) < 1e-3 and blank["choice"]["picks"][0] == 1
+
+
+def test_the_drawn_states_are_standard_normal_and_reproducible():
+    import numpy as np
+    from simlab import draws
+    x = draws.states(0, 40_000, 3)
+    assert abs(x.mean()) < 0.01 and abs(x.std() - 1) < 0.01
+    assert np.abs(np.corrcoef(x.T) - np.eye(3)).max() < 0.02                       # features are independent
+    assert abs(np.corrcoef(x[:-1, 0], x[1:, 0])[0, 1]) < 0.02                      # and so are rounds
+    np.testing.assert_array_equal(draws.states(7, 5, 2), draws.states(7, 5, 2))
+    assert not np.allclose(draws.states(7, 5, 2), draws.states(8, 5, 2))
 
 
 def test_a_window_pauses_learning_and_it_resumes_where_it_stopped(client):
@@ -305,13 +357,28 @@ def test_overview_sets_out_the_equations_and_the_standard_figures(client):
         guide.EQUATION["regret"]["derivation"] = None
 
 
-def test_correlated_bench_reports_the_choice_for_the_reference_state(client):
+def test_correlated_bench_takes_the_loss_at_the_drawn_state(client):
     import numpy as np
-    data = client.get("/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
-                      "&rho=0,0,0&k=2&explore=0&C=1,1,0&curve=exponential&p1=0.15&T=60&rank=0").get_json()
-    choice, U = data["choice"], np.array(data["U"])
-    assert choice["x"] == [1, 1, 1] and choice["best"] == int(U.sum(axis=1).argmax()) + 1
-    # with independent features a hidden one is filled in as zero, so the scores are the shown beliefs summed
-    beliefs = np.array(data["beliefs"])                              # [feature][action][round]
-    np.testing.assert_array_equal(choice["picks"], beliefs[:2].sum(axis=0).argmax(axis=0) + 1)
-    assert choice["missed"] == [bool(U.sum(axis=1)[k - 1] < U.sum(axis=1).max() - 1e-9) for k in choice["picks"]]
+    from simlab import draws
+    base = ("/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
+            "&k=2&explore=0&C=1,1,0&curve=exponential&p1=0.15&T=60")
+    data = client.get(base + "&rho=0,0,0&rank=0&seed=2").get_json()
+    choice, U, x = data["choice"], np.array(data["U"]), np.array(data["x"])
+    np.testing.assert_allclose(x, draws.states(2, 60, 3), atol=5e-4)          # independent features: the draw itself
+    worth = x @ U.T
+    np.testing.assert_array_equal(choice["best"], worth.argmax(axis=1) + 1)
+    # with independent features a hidden one is filled in as zero, so the human scores with the shown ones alone
+    beliefs = np.array(data["beliefs"])                                        # [feature][action][round]
+    scores = np.einsum("jkt,tj->tk", beliefs[:2], x[:, :2])
+    np.testing.assert_array_equal(choice["picks"], scores.argmax(axis=1) + 1)
+    regret = worth.max(axis=1) - worth[np.arange(60), np.array(choice["picks"]) - 1]
+    np.testing.assert_allclose(data["series"]["reg"], regret, atol=5e-3)
+    assert data["numeral"] == f"{sum(data['series']['discounted']):.2f}" and choice["missed"] == (regret > 1e-9).tolist()
+    # correlated states are the same standard normals, mixed: x_t = L z_t
+    mixed = np.array(client.get(base + "&rho=0.8,0.8,0.6&rank=0&seed=2").get_json()["x"])
+    L = np.linalg.cholesky(np.array([[1, 0.8, 0.8], [0.8, 1, 0.6], [0.8, 0.6, 1]]))
+    np.testing.assert_allclose(mixed, draws.states(2, 60, 3) @ L.T, atol=5e-4)
+    # the ranking is on this draw, with the average over states beside it
+    ranked = client.get(base + "&rho=0.8,0.8,0.6&seed=2").get_json()["ranking"]
+    assert [r["discounted"] for r in ranked["rows"]] == sorted(r["discounted"] for r in ranked["rows"])
+    assert all(r["mean"] >= 0 for r in ranked["rows"])

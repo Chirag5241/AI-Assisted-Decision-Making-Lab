@@ -13,8 +13,10 @@ window.StandardFigures = (function () {
   const UNITS = [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v }));
 
   // data: {T, K, U[k][j], delta, beliefs[j][k][t], schedule: {F[j][t], A[k][t]}, changes: [t], choice: {picks, best, missed},
-  //        series: {reg, discounted, value_gap, acc, ref_acc, ref_discounted}, reg_limit, acc_limit}
-  //   choice.best may be null (no single best move); ref_acc, ref_discounted and the two limits are optional.
+  //        series: {reg, discounted, reg_mean, value_gap, value_gap_mean, acc, ref_acc}, reg_limit, acc_limit}
+  //   choice (picks and best, per round), reg, discounted and value_gap are taken at the state drawn in each round;
+  //   reg_mean and value_gap_mean are their averages over all states and acc the share of states with the best move.
+  //   ref_acc and the two limits are optional.
   // opts: {regret: {lo, hi, yticks}, value: {lo, hi, yticks}   the fixed axes of Figs. 4 and 5
   //        vlines: [{t, label}]   rules to draw instead of one at every change of the schedule
   //        refName   what the grey reference line is
@@ -65,39 +67,40 @@ window.StandardFigures = (function () {
       }));
     }
 
-    // Fig. 3: the choice for one reference state against the best move there
+    // Fig. 3: the choice at the state drawn in each round against the best move there
     if ($("fig-choice")) {
-      const picks = data.choice.picks, best = data.choice.best, missed = data.choice.missed, misses = [];
+      const picks = data.choice.picks, missed = data.choice.missed, misses = [];
       for (let start = 0, t = 1; t <= T; t++) {
         if (t < T && missed[t] === missed[start]) continue;
         if (missed[start]) misses.push([start, t]);
         start = t;
       }
       Charts.line($("fig-choice"), T,
-        (best ? [{ v: picks.map(() => best), cls: "c-ink", dash: true, name: "y* best move" }] : [])
-          .concat([{ v: picks, cls: "c-ink", name: "ŷ human's choice" }]),
+        [{ v: data.choice.best, cls: "c-ink", dash: true, name: "y* best move" }, { v: picks, cls: "c-ink", name: "\u0177 human's choice" }],
         [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * K, lo: 0.5, hi: K + 0.5, vlines,
           yticks: Array.from({ length: K }, (_, k) => ({ v: k + 1, label: "a" + SUB[k], faded: !plan.A[k].some(Boolean) })), fmt: (v) => "action " + v,
-          alt: "Which action the human chooses in each round for the reference state, against the best move" });
+          alt: "Which action the human chooses in each round at that round's state, against the best move there" });
     }
 
-    // Fig. 4: regret of each round, before discounting and weighted by delta^t
+    // Fig. 4: the regret of each round at its drawn state, then weighted by delta^t, over its average across states
     if ($("fig-regret")) {
-      const limit = data.reg_limit === undefined ? [] : [{ y: data.reg_limit, label: "before discounting, once fully learned: " + data.reg_limit.toFixed(2) }];
+      const limit = data.reg_limit === undefined ? [] : [{ y: data.reg_limit, label: "average once fully learned: " + data.reg_limit.toFixed(2) }];
       Charts.line($("fig-regret"), T,
-        [{ v: data.series.reg, cls: "c-ref", name: "before discounting" },
-          { v: data.series.discounted, cls: "c-ink", name: "discounted, δ = " + data.delta }]
-          .concat(data.series.ref_discounted ? [{ v: data.series.ref_discounted, cls: "c-ink", dash: true, name: opts.refName + ", discounted" }] : []),
+        [{ v: data.series.reg, cls: "c-ink", name: "at the drawn state x\u209c" },
+          { v: data.series.discounted, cls: "c-ref", name: "discounted, \u03b4 = " + data.delta },
+          { v: data.series.reg_mean, cls: "c-ink", dash: true, name: "averaged over states" }],
         limit, [], Object.assign({ ylabel: "regret per round", step: true, wrongShare, vlines,
-          alt: "Expected regret loss in each round, before and after discounting" }, opts.regret));
+          alt: "Regret loss in each round at the state drawn for it, before and after discounting, with its average over states" }, opts.regret));
     }
 
-    // Fig. 5: value gap around zero
+    // Fig. 5: value gap at the drawn state, around zero, over its average across states
     if ($("fig-value")) {
-      Charts.line($("fig-value"), T, [{ v: data.series.value_gap, cls: "c-ink", name: "expected value gap" }],
+      Charts.line($("fig-value"), T,
+        [{ v: data.series.value_gap, cls: "c-ink", name: "at the drawn state x\u209c" },
+          { v: data.series.value_gap_mean, cls: "c-ink", dash: true, name: "averaged over states" }],
         [{ y: 0, cls: "zero", label: "zero: expects exactly what the best move is worth" }], [],
-        Object.assign({ ylabel: "value gap per round", wrongShare, vlines,
-          alt: "True best value minus the value the human expects from the chosen action, per round" }, opts.value));
+        Object.assign({ ylabel: "value gap per round", step: true, wrongShare, vlines,
+          alt: "True best value minus the value the human expects from the chosen action, at each round's state" }, opts.value));
     }
 
     // Fig. 6: share of states with the best move picked, against the bench's reference policy

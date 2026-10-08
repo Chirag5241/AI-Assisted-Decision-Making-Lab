@@ -112,7 +112,7 @@
     const q = new URLSearchParams({
       K: world.K, U: rows(world.U), H: rows(world.H), rho: rho().join(","), k: world.k,
       explore: value("explore"), C: world.C.map((on) => (on ? 1 : 0)).join(","),
-      curve: curve(), p1: value("p1"), T: value("T"), delta: value("delta"),
+      curve: curve(), p1: value("p1"), T: value("T"), delta: value("delta"), seed: value("seed"),
     });
     if (speeds.param()) q.set("ps", speeds.param());
     return q;
@@ -165,7 +165,7 @@
 
     // Figs. 1 to 6, the standard ones. Every action is offered in every round here; only the features change.
     // One rule marks the end of exploring, instead of one at every turn of the rotation.
-    const top = data.worst_regret || 1, bound = 1.1 * (data.value_bound || 1);
+    const top = data.regret_cap || 1, bound = 1.05 * (data.value_cap || 1);
     StandardFigures.draw(Object.assign({}, data, { schedule: { F: data.schedule, A: data.U.map(() => Array(data.T).fill(1)) } }), {
       regret: { lo: -0.04 * top, hi: 1.04 * top }, value: { lo: -bound, hi: bound },
       vlines: committed, refName: data.ref_label ? "best fixed subset" : undefined,
@@ -223,7 +223,7 @@
       fill.style.width = (r.discounted / worst) * 100 + "%";
       bar.append(fill, make("span", "", r.discounted.toFixed(2)));
       tr.append(make("td", "rank", r.rank + (r.current ? "  \u2190 now" : "")),
-        make("td", "", r.explore ? r.explore + " rounds" : "no (fixed)"), members, bar,
+        make("td", "", r.explore ? r.explore + " rounds" : "no (fixed)"), members, bar, make("td", "num", r.mean.toFixed(2)),
         make("td", "num", `${pct(r.start)} \u2192 ${pct(r.end)}`), make("td", "num", r.floor.toFixed(2)));
       const apply = () => {
         world.C = r.mask.slice();
@@ -341,6 +341,15 @@
       run();
     }));
 
+  // a fresh draw of the states: another number, picked at random
+  $("redraw").addEventListener("click", () => {
+    const box = inputs("seed")[0], max = parseInt(box.max, 10);
+    let next = Math.floor(Math.random() * (max + 1));
+    if (String(next) === box.value) next = (next + 1) % (max + 1);
+    inputs("seed").forEach((el) => { el.value = next; });
+    schedule();
+  });
+
   document.querySelectorAll("[data-fill]").forEach((button) =>
     button.addEventListener("click", () => {
       const [name, how] = button.dataset.fill.split(":");
@@ -368,7 +377,7 @@
     }
     if (s.curve in SPECS) document.querySelector(`input[name="curve"][value="${s.curve}"]`).checked = true;
     applyCurve(true);
-    for (const name of ["p1", "T", "delta"]) {
+    for (const name of ["p1", "T", "delta", "seed"]) {
       if (s[name] !== undefined && isFinite(s[name])) inputs(name).forEach((el) => { el.value = s[name]; });
     }
     speeds.load(s.ps);

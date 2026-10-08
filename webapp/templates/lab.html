@@ -55,6 +55,17 @@
       </fieldset>
 
       <fieldset class="card">
+        <legend>States <i>x</i><sub>t</sub></legend>
+        <div class="row">
+          <label for="seed"><span class="sym plain">draw</span></label>
+          <input type="range" id="seed" data-key="seed" min="0" max="{{ max_seed }}" step="1" value="0">
+          <input type="number" data-key="seed" min="0" max="{{ max_seed }}" step="1" value="0" aria-label="which draw of the states">
+        </div>
+        <div class="actions"><button type="button" id="redraw">Draw new states</button></div>
+        <p class="hint">Each round has its own state, drawn from N(0, 1). The loss of a round is taken at that state, and everything on this page runs on the same draw. The number picks the draw.</p>
+      </fieldset>
+
+      <fieldset class="card">
         <legend>Discount <i>&delta;</i> and horizon</legend>
         {{ slider("delta", "&delta;", 0.01, 0.99, 0.01, 0.95) }}
         <p class="hint">&delta; is the algorithm's patience: one number in (0, 1), as in the proposal, Noti et al. and Guan et al. Near 0 only the first rounds count; near 1 later rounds count almost as much. It can also be read as the chance, &delta;<sup>t</sup>, that round t happens at all.</p>
@@ -116,14 +127,15 @@
     <p class="formula">&phi;(t) &gt; |&Delta;h<sub>0</sub>| / (|&Delta;h<sub>0</sub>| + |&Delta;u|)</p>
     <p>so the map in Fig. 8 is made of rays through the origin: only the ratio of the two gaps matters. The curve
       belongs to the feature, so both actions always share it and the choice flips at most once.</p>
-    <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; (Ux)<sub>&ycirc;</sub></span>.
-      Here that is <span class="math">|&Delta;u| &middot; |x|</span> when the choice is wrong and zero when it is right;
-      Fig. 4 averages it over <span class="math">x ~ N(0, 1)</span> and weights round <i>t</i> by
-      <span class="math">&delta;<sup>t</sup></span>; the objective is the sum of those bars. For a negative state both the choice in Fig. 3
-      and the best move swap, so the regret is the same.</p>
+    <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub> &minus; (Ux<sub>t</sub>)<sub>&ycirc;</sub></span>,
+      taken at the state <span class="math">x<sub>t</sub> ~ N(0, 1)</span> drawn for that round. Here that is
+      <span class="math">|&Delta;u| &middot; |x<sub>t</sub>|</span> when the choice is wrong and zero when it is right, so in Fig. 4
+      the wrong rounds are as tall as their states are large. Weighted by <span class="math">&delta;<sup>t</sup></span> and summed,
+      it is the objective on this draw. The dashed line is its average over states,
+      <span class="math">|&Delta;u| &middot; E|x|</span>. For a negative state both the choice in Fig. 3 and the best move swap.</p>
     <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>: what the best
       move is truly worth minus what the human expects from the move they pick. Above zero the human expects too
-      little, below zero too much. Averaged over states it equals
+      little, below zero too much. It is taken at each round's state; averaged over states it equals
       <span class="math">(|&Delta;u| &minus; |h<sub>1</sub> &minus; h<sub>2</sub>|) &middot; E|x| / 2</span>,
       so it can sit at zero while the human still picks the wrong action.</p>
   </div>

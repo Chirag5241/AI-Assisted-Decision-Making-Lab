@@ -132,6 +132,17 @@
       </fieldset>
 
       <fieldset class="card">
+        <legend>States <i>x</i><sub>t</sub></legend>
+        <div class="row">
+          <label for="seed"><span class="sym plain">draw</span></label>
+          <input type="range" id="seed" data-key="seed" min="0" max="999" step="1" value="0">
+          <input type="number" data-key="seed" min="0" max="999" step="1" value="0" aria-label="which draw of the states">
+        </div>
+        <div class="actions"><button type="button" id="redraw">Draw new states</button></div>
+        <p class="hint">Each round has its own state, drawn from N(0, &Sigma;). The loss of a round is taken at that state, and everything on this page runs on the same draw. The number picks the draw.</p>
+      </fieldset>
+
+      <fieldset class="card">
         <legend>Discount <i>&delta;</i> and horizon</legend>
         <div class="row">
           <label for="delta"><span class="sym plain">&delta;</span></label>
@@ -197,7 +208,7 @@
 
 
 <figure id="std-choice">
-  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, for one reference state<span class="cap-note">For the state with every feature at +1, hidden features filled in from the shown ones.</span></figcaption>
+  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, at the state drawn each round<span class="cap-note">Hidden features are filled in from the shown ones before the human scores the actions.</span></figcaption>
   
   <div class="chart" id="fig-choice"></div>
   
@@ -208,7 +219,7 @@
 
 
 <figure id="std-regret">
-  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, before and after discounting<span class="cap-note">The dashed line is the best fixed subset, discounted.</span></figcaption>
+  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, at the state drawn for it</figcaption>
   
   <div class="chart" id="fig-regret"></div>
   
@@ -275,8 +286,8 @@
         <h2 class="section-title">Which policy should it follow?</h2>
         <p class="section-sub" id="ranking-sub"></p>
         <div class="table-scroll"><table class="ranking">
-          <thead><tr><th scope="col">Rank</th><th scope="col">Explore</th><th scope="col">Then show</th><th scope="col" class="num">Discounted regret</th>
-            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <thead><tr><th scope="col">Rank</th><th scope="col">Explore</th><th scope="col">Then show</th><th scope="col" class="num">Discounted regret, this draw</th>
+            <th scope="col" class="num">Averaged over states</th><th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
           <tbody id="ranking"></tbody>
         </table></div>
       </div>
@@ -306,8 +317,10 @@
     <p>The ranking runs every fixed subset and every explore-then-commit policy whose exploration is a whole number
       of rotations, up to 20 lengths. Unlike the paper's dynamic program, this search over one family is not
       guaranteed to find the true optimum. Click a row to put that policy on the bench.</p>
-    <p>Each round is scored over 2,000 probe states drawn from <span class="math">N(0, &Sigma;)</span>, built from the
-      same draws as the independent bench, so with &Sigma; = I this page gives that bench's numbers.</p>
+    <p>Each round has its own state <span class="math">x<sub>t</sub> ~ N(0, &Sigma;)</span>, and its regret is taken
+      there. Every policy in the ranking is run on the same draw. The grey in the figures and the &ldquo;averaged over
+      states&rdquo; numbers score each round over 2,000 probe states instead. Both use the same standard normals as the
+      independent bench, so with &Sigma; = I this page gives that bench's numbers.</p>
     <p>Fig. 7 rings the probe states where the human's pick is not the best move. The dashed line is
       <span class="math">E[x<sub>j</sub> | x<sub>i</sub>] = &rho;<sub>ij</sub> x<sub>i</sub></span>, the value the human
       would fill in for the vertical feature from the horizontal one alone.</p>
@@ -318,13 +331,13 @@
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.DEFAULT_WORLD = {"C": [1, 1, 0], "H": [[-1.5, -1.0, 1.5], [-0.5, 0.5, 1.5], [1.5, -1.5, -0.5]], "T": 120, "U": [[-1.5, 0.5, 0.0], [0.5, 1.5, -1.0], [1.0, -1.5, 0.0]], "curve": "exponential", "delta": 0.97, "explore": 12, "k": 2, "p1": 0.15, "rho": [0.8, 0.8, 0.6]};
 </script>
-<script src="webapp/static/charts.js?v=1791492645"></script>
-<script src="webapp/static/figures.js?v=1791493952"></script>
+<script src="webapp/static/charts.js?v=1791496874"></script>
+<script src="webapp/static/figures.js?v=1791496912"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791494594"></script>
-<script src="webapp/static/static-api.js?v=1791493902"></script>
-<script src="webapp/static/correlated.js?v=1791493993"></script>
+<script src="webapp/static/probes.js?v=1791497588"></script>
+<script src="webapp/static/static-api.js?v=1791496803"></script>
+<script src="webapp/static/correlated.js?v=1791496949"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

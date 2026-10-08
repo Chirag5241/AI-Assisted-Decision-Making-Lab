@@ -20,7 +20,7 @@ matplotlib.use("Agg")
 import numpy as np
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
 
-from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, plotting, simulate
+from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, draws, plotting, simulate
 
 from . import guide
 
@@ -31,7 +31,7 @@ RESULTS = ROOT / "results"
 SITE_NAME = "AI-Assisted Decision Making Lab"
 SITE_KICKER = "CS 598 · Helping a learning human pick the best move"
 
-MAX_ACTIONS, MAX_FEATURES, N_PROBES, MAX_WINDOWS = 6, 6, 2000, 12
+MAX_ACTIONS, MAX_FEATURES, N_PROBES, MAX_WINDOWS, MAX_SEED = 6, 6, 2000, 12, 999
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True   # template edits show up on reload, no restart
@@ -46,6 +46,7 @@ def _static_versioning():
     # the standard figures, the equations and the benches are the same lists on every page (webapp/guide.py)
     bench = next((b for b in guide.BENCHES if b["endpoint"] == request.endpoint), None)
     return dict(static_v=static_v, site_name=SITE_NAME, site_kicker=SITE_KICKER, benches=guide.BENCHES, bench=bench,
+                max_seed=MAX_SEED,
                 standard=guide.STANDARD, standard_figures=guide.STANDARD_FIGURES, equations=guide.EQUATIONS,
                 equation=guide.EQUATION)
 
@@ -144,7 +145,7 @@ def _settle_map(learner, u_mid, h_mid, du, dh0, T, G=60):
 
 
 @lru_cache(maxsize=1024)
-def run_world(u1, u2, h1, h2, curve_name, speed, T, delta):
+def run_world(u1, u2, h1, h2, curve_name, speed, T, delta, seed=0):
     spec = CURVE_SPECS[curve_name]
     learner = CountLearner(spec["make"](speed))     # one feature, so one curve for both actions
     du, dh0 = u1 - u2, h1 - h2
@@ -157,24 +158,32 @@ def run_world(u1, u2, h1, h2, curve_name, speed, T, delta):
     settle = analysis.settle_time(correct)[0]
     switches = int(analysis.n_switches(correct)[0])
 
-    # regret loss  max_k (U x)_k - (U x)_yhat  is |du| |x| on a wrong round and 0 on a right one;
-    # averaged over states x ~ N(0, 1) that is |du| E|x| per wrong round
-    wrong_cost = abs(du) * analysis.MEAN_ABS_STD_NORMAL
-    regret_per_round = wrong * wrong_cost
+    # The state of each round is drawn, x_t ~ N(0, 1), and the loss is taken there, as in the proposal:
+    # regret  max_k (U x_t)_k - (U x_t)_yhat  is |du| |x_t| on a wrong round and 0 on a right one.
+    x = draws.states(seed, T, 1)[:, 0]
+    regret_per_round = wrong * abs(du) * np.abs(x)
     # the objective weights round t by delta^t, with delta one constant in (0, 1): the "patience" of
     # Noti et al. (2025) and the discount factor of Guan et al. (2026), as in the proposal
-    discounted_per_round = delta ** np.arange(T) * regret_per_round
+    weights = delta ** np.arange(T)
+    discounted_per_round = weights * regret_per_round
     regret = float(discounted_per_round.sum())
+    # the same loss averaged over every state instead of the one drawn: |du| E|x| per wrong round
+    wrong_cost = abs(du) * analysis.MEAN_ABS_STD_NORMAL
+    mean_regret_per_round = wrong * wrong_cost
+    mean_regret = float((weights * mean_regret_per_round).sum())
     still_wrong = bool(wrong[-1])
 
-    # value gap  max_k (U x)_k - u_hat(y_hat): the true best value minus the value the human expects
-    # from the action they pick, u_hat(y_hat) = max_k h_k x. For x > 0 that is (max u - max h) x and
+    # value gap  max_k (U x_t)_k - u_hat(y_hat): the true best value minus the value the human expects
+    # from the action they pick, u_hat(y_hat) = max_k h_k x_t. For x > 0 that is (max u - max h) x and
     # for x < 0 it is (min u - min h) x, so over x ~ N(0, 1) it averages to (|du| - |h1 - h2|) E|x| / 2.
-    value_gap = (abs(du) - np.abs(gap)) * analysis.MEAN_ABS_STD_NORMAL / 2
+    value_gap = np.maximum(u1 * x, u2 * x) - (H * x[:, None]).max(axis=1)
+    mean_value_gap = (abs(du) - np.abs(gap)) * analysis.MEAN_ABS_STD_NORMAL / 2
 
-    # the choice y_hat = argmax_k h_k x for a positive state (for x < 0 both it and the best move swap)
-    best = None if du == 0 else (0 if du > 0 else 1)
-    choice = H.argmax(axis=1) if best is None else np.where(wrong, 1 - best, best)
+    # the best move y* = argmax_k u_k x_t and the choice y_hat = argmax_k h_k x_t at the drawn state: both
+    # swap with the sign of x_t, and they differ exactly on the wrong rounds
+    best = np.array([u1, u2])[None, :] * x[:, None]
+    best = best.argmax(axis=1)                                  # equally good actions: the first
+    choice = (H * x[:, None]).argmax(axis=1) if du == 0 else np.where(wrong, 1 - best, best)
 
     numeral, numeral_label, sentence = _verdict(du, dh0, wrong, settle, T)
     if du == 0:
@@ -194,16 +203,18 @@ def run_world(u1, u2, h1, h2, curve_name, speed, T, delta):
             dict(label="Learning needed", **needed),
             dict(label="Rounds wrong", value=str(int(wrong.sum())), note=f"out of {T} simulated"),
             dict(label="Choice changes", value=str(switches), note="right/wrong switches"),
-            dict(label="Expected discounted regret", value=f"{regret:.2f}",
-                 note=(f"lower bound: still wrong at round {T}" if still_wrong
-                       else f"δ = {delta:g}, states x ~ N(0, 1)")),
+            dict(label="Discounted regret on this draw", value=f"{regret:.2f}",
+                 note=(f"{mean_regret:.2f} averaged over states; a lower bound, still wrong at round {T}" if still_wrong
+                       else f"{mean_regret:.2f} averaged over states x ~ N(0, 1)")),
         ],
-        # the browser draws the figures from these, so they can follow a slider as it moves
-        series=dict(h1=np.round(H[:, 0], 4).tolist(), h2=np.round(H[:, 1], 4).tolist(),
-                    regret=np.round(regret_per_round, 4).tolist(), choice=(choice + 1).tolist(),
-                    discounted=np.round(discounted_per_round, 4).tolist(),
-                    value_gap=np.round(value_gap, 4).tolist()),
-        wrong_cost=wrong_cost, best=None if best is None else best + 1,
+        # the browser draws the figures from these, so they can follow a slider as it moves; regret,
+        # discounted, value_gap, choice and best are taken at the drawn states x, the *_mean ones averaged
+        series=dict(h1=np.round(H[:, 0], 4).tolist(), h2=np.round(H[:, 1], 4).tolist(), x=np.round(x, 3).tolist(),
+                    regret=np.round(regret_per_round, 4).tolist(), discounted=np.round(discounted_per_round, 4).tolist(),
+                    value_gap=np.round(value_gap, 4).tolist(), choice=(choice + 1).tolist(), best=(best + 1).tolist(),
+                    regret_mean=np.round(mean_regret_per_round, 4).tolist(),
+                    value_gap_mean=np.round(mean_value_gap, 4).tolist()),
+        seed=seed,
         map=_settle_map(learner, (u1 + u2) / 2, (h1 + h2) / 2, du, dh0, T),
     )
 
@@ -229,7 +240,7 @@ def api_run():
     return jsonify(run_world(
         _num("u1", 1.2, -3, 3), _num("u2", 1.0, -3, 3), _num("h1", 0.0, -3, 3), _num("h2", 1.5, -3, 3),
         curve_name, _num("p1", spec["default"], spec["min"], spec["max"]),
-        int(_num("T", 80, 10, 400)), _num("delta", 0.95, 0.01, 0.99),
+        int(_num("T", 80, 10, 400)), _num("delta", 0.95, 0.01, 0.99), _seed(),
     ))
 
 
@@ -277,6 +288,11 @@ def _mask(name, size):
     if len(mask) != size or not any(mask):
         abort(400, f"{name} must switch on at least one of {size}")
     return mask
+
+
+def _seed():
+    """Which draw of the states to run on."""
+    return int(_num("seed", 0, 0, MAX_SEED))
 
 
 def _speeds(spec, n):
@@ -344,9 +360,12 @@ def _subsets(size):
 
 
 @lru_cache(maxsize=512)
-def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=()):
+def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=(), seed=0):
     """Score the chosen policy: the features and actions switched on, minus each window's rounds.
     `speeds` holds one learning speed per feature (all equal when the features share a curve).
+    `seed` picks the draw of the states x_0 .. x_{T-1}: the loss of round t is taken at x_t, as in the
+    proposal, and every policy in the batch is run on the same draw. The average of that loss over all
+    states is kept beside it, as a reference.
     `full` also runs every feature subset and every action subset, each kept every round, for the
     ranking tables; without it only the chosen policy and the show-everything reference run, which
     is fast enough to follow a control while it moves."""
@@ -386,15 +405,21 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
     acc, reg, value_gap = (np.array(series) for series in zip(*per_round))      # each (T, B)
     # once everything shown is learned: the last round's choice, kept up until every weight in use is right
     acc_limit, reg_limit = analysis.evaluate(res.U, U, X, F[-1], A[-1])
-    discounted = ((delta ** np.arange(T))[:, None] * reg).sum(axis=0)
-    # Regret axis: fixed by the truth alone (the expected regret of always picking the worst action),
-    # so it stays put while subsets, beliefs and the learner change.
+    # The round's own loss, at the state drawn for it: regret l(x_t, y_hat_t), value gap, the pick and the
+    # best move, each (T, B). The objective is their discounted sum on this draw; `mean_discounted` is the
+    # same sum of the averages over states.
+    x_draw = draws.states(seed, T, n)                                            # (T, n)
+    real_reg, real_gap, real_pick, real_best = analysis.realized(res.H[:T] * F[:, :, None, :], U, x_draw[:, None, :], A)
+    weights = delta ** np.arange(T)
+    discounted = (weights[:, None] * real_reg).sum(axis=0)
+    mean_discounted = (weights[:, None] * reg).sum(axis=0)
+    # Regret axis: fixed by the truth alone (the largest regret any probe state allows), so it stays put
+    # while the policy, the beliefs, the learner and the draw change.
     payoff = U @ X.T
-    worst_regret = float((payoff.max(axis=0) - payoff.min(axis=0)).mean())
-    # Value-gap axis, fixed the same way: the gap lies between minus the largest value the human can
-    # expect (never more than with everything shown, at the first beliefs or at the truth) and the
-    # true best value.
-    value_bound = float(max(payoff.max(axis=0).mean(), (H0 @ X.T).max(axis=0).mean()))
+    regret_cap = float((payoff.max(axis=0) - payoff.min(axis=0)).max())
+    # Value-gap axis, fixed the same way: by the largest value any probe state is worth, at the truth or
+    # at the first beliefs.
+    value_cap = float(max(payoff.max(axis=0).max(), (H0 @ X.T).max(axis=0).max()))
 
     def ranking(offset, sets, bench, noun):
         """Rank one family of fixed subsets by discounted regret; list the best 8 and the bench. The bench
@@ -412,7 +437,7 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
             rows.append(dict(
                 rank=rank[b], mask=None if scheduled else [bool(v) for v in sets[b - offset]],
                 label="the schedule on the bench" if scheduled else _describe(sets[b - offset], noun),
-                discounted=float(discounted[b]), start=float(acc[0, b]), end=float(acc[-1, b]),
+                discounted=float(discounted[b]), mean=float(mean_discounted[b]), start=float(acc[0, b]), end=float(acc[-1, b]),
                 floor=float(reg_limit[b]), current=b == here, scheduled=scheduled))
         return dict(rows=rows, total=len(ids), rank=rank[here], best=int(fixed[discounted[fixed].argmin()]))
 
@@ -452,49 +477,48 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         kept = " every round" if scheduled else ""       # a fixed subset, against a schedule that changes
         feature_helps = discounted[best_f] < discounted[now] - 1e-9
         if feature_helps:
-            sentence += (f"Showing {_describe(feature_sets[best_f], 'feature')}{kept} instead would cut the discounted "
-                         f"regret to {discounted[best_f]:.2f}. ")
+            sentence += (f"On this draw, showing {_describe(feature_sets[best_f], 'feature')}{kept} instead would cut "
+                         f"the discounted regret to {discounted[best_f]:.2f}. ")
         if discounted[best_a] < discounted[now] - 1e-9:
             offer = f"ffering {_describe(action_sets[best_a - n_f], 'action')}{kept} instead would cut"
             sentence += (f"Separately, o{offer} it to {discounted[best_a]:.2f}." if feature_helps
-                         else f"O{offer} the discounted regret to {discounted[best_a]:.2f}.")
+                         else f"On this draw, o{offer} the discounted regret to {discounted[best_a]:.2f}.")
         elif not feature_helps:
-            sentence += ("No fixed choice of the features alone, or of the actions alone, does better over this horizon."
-                         if scheduled else "Changing only the features, or only the actions, does no better over this horizon.")
+            sentence += ("On this draw, no fixed choice of the features alone, or of the actions alone, does better."
+                         if scheduled else "On this draw, changing only the features, or only the actions, does no better.")
         for r in (by_feature, by_action):
             del r["best"]
         rankings = dict(features=by_feature, actions=by_action)
 
     held_back = not (F_bench.all() and A_bench.all())
 
-    # The human's choice for one reference state, every feature equal to +1 (the "positive state" of
-    # the one-feature bench): y_hat = argmax over offered actions of the shown beliefs times x, against
-    # the best move y* = argmax over all actions of U x. Ties go to the lowest-numbered action.
-    x_ref = np.ones(n)
-    scores = (res.H[:T, now] * F_bench[:, None, :]) @ x_ref            # (T, K)
-    picks = np.where(A_bench, scores, -np.inf).argmax(axis=1)
-    worth = U @ x_ref
-    best_move = int(worth.argmax())
-    missed = worth[picks] < worth.max() - 1e-9      # a pick that ties with the best move is not a miss
+    # The human's choice and the best move at the state drawn in each round. A round is missed when the
+    # pick costs regret there.
+    picks, best_moves, missed = real_pick[:, now], real_best[:, now], real_reg[:, now] > 1e-9
     return dict(
-        K=K, n=n, T=T, numeral=f"{discounted[now]:.2f}", numeral_label="expected discounted regret",
+        K=K, n=n, T=T, seed=seed, numeral=f"{discounted[now]:.2f}", numeral_label="discounted regret on this draw",
         sentence=sentence.strip(), rankings=rankings, full=full,
         stats=[
-            dict(label="Best move picked at round 0", value=f"{acc[0, now]:.0%}",
-                 note="with the human's first beliefs"),
+            dict(label="Averaged over states", value=f"{mean_discounted[now]:.2f}",
+                 note="the same discounted regret, averaged over every state instead of the ones drawn"),
             dict(label=f"Best move picked at round {T - 1}", value=f"{acc[-1, now]:.0%}",
-                 note=f"heading for {acc_limit[now]:.0%} once fully learned"),
+                 note=f"of states; {acc[0, now]:.0%} at round 0, heading for {acc_limit[now]:.0%} once fully learned"),
             dict(label="Regret per round once learned", value=f"{reg_limit[now]:.2f}",
-                 note="the lasting price of what is held back" if reg_limit[now] > 1e-9 else "nothing held back matters"),
+                 note=("on average, the lasting price of what is held back" if reg_limit[now] > 1e-9
+                       else "nothing held back matters")),
             dict(label="Against showing everything", value=f"{discounted[now] - discounted[everything]:+.2f}",
-                 note=(f"discounted regret; showing and offering everything costs {discounted[everything]:.2f}"
+                 note=(f"on this draw; showing and offering everything costs {discounted[everything]:.2f}"
                        if held_back else "this is the show-everything policy")),
         ],
-        # the browser draws the two figures from these
-        series=dict(acc=np.round(acc[:, now], 4).tolist(), reg=np.round(reg[:, now], 4).tolist(),
-                    discounted=np.round(delta ** np.arange(T) * reg[:, now], 4).tolist(),
-                    value_gap=np.round(value_gap[:, now], 4).tolist(),
+        # The browser draws the figures from these. reg, discounted and value_gap are taken at the state
+        # drawn in each round; the *_mean series are their averages over all states, and acc is the share
+        # of states with the best move.
+        series=dict(reg=np.round(real_reg[:, now], 4).tolist(), discounted=np.round(weights * real_reg[:, now], 4).tolist(),
+                    value_gap=np.round(real_gap[:, now], 4).tolist(),
+                    reg_mean=np.round(reg[:, now], 4).tolist(), value_gap_mean=np.round(value_gap[:, now], 4).tolist(),
+                    acc=np.round(acc[:, now], 4).tolist(),
                     ref_acc=np.round(acc[:, everything], 4).tolist() if held_back else None),
+        x=np.round(x_draw, 3).tolist(),                                           # the drawn states, [round][feature]
         # Beliefs over time as [feature][action][round], the same res.H the scores above use: a weight
         # on a hidden feature, or of an action that is not offered, is not learned in that round and
         # keeps its value (the page fades those flat stretches).
@@ -504,9 +528,9 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         # rounds at which that changes
         schedule=dict(F=F_bench.T.astype(int).tolist(), A=A_bench.T.astype(int).tolist()),
         changes=[t for t in range(1, T) if (F_bench[t] != F_bench[t - 1]).any() or (A_bench[t] != A_bench[t - 1]).any()],
-        choice=dict(x=x_ref.tolist(), picks=(picks + 1).tolist(), best=best_move + 1, missed=missed.tolist()),
+        choice=dict(picks=(picks + 1).tolist(), best=(best_moves + 1).tolist(), missed=missed.tolist()),
         acc_limit=float(acc_limit[now]), reg_limit=float(reg_limit[now]),
-        worst_regret=worst_regret, value_bound=value_bound,
+        regret_cap=regret_cap, value_cap=value_cap,
     )
 
 
@@ -542,7 +566,7 @@ def api_world():
             abort(400, f"round {empty[0]} would {problem}")
     return jsonify(run_general(
         _matrix("U", K, n), _matrix("H", K, n), F, A, curve_name, _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
-        full=request.args.get("rank", "1") != "0", windows=windows,
+        full=request.args.get("rank", "1") != "0", windows=windows, seed=_seed(),
     ))
 
 
@@ -568,10 +592,11 @@ def _explore_grid(T, cycle, size=20):
 
 
 @lru_cache(maxsize=256)
-def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, T, delta, full=True):
+def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, T, delta, full=True, seed=0):
     """Score explore-then-commit policies under correlated features. Every policy explores with the same
     rotation, so the exploration rounds are scored once and each policy only adds its committed rounds.
-    `speeds` holds one learning speed per feature."""
+    `speeds` holds one learning speed per feature. `seed` picks the draw of the states x_t ~ N(0, Sigma): the
+    loss of round t is taken at x_t and every policy is run on the same draw, with the average over states beside it."""
     U, H0 = np.array(U_rows), np.array(H_rows)
     K, n = U.shape
     Sigma = correlated.correlation_matrix(*rho)
@@ -583,7 +608,11 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, 
     cycle = correlated.rotation(n, k)
     rot_masks = correlated.explore_then_commit(n, k, T, cycle[0], T + 1)
     rot_counts = correlated.exposure(rot_masks)                       # (T + 1, n): counts before round t
-    rot_scores = score(correlated.beliefs(U, H0, curve, rot_counts[:T]), rot_masks[:T])
+    rot_H = correlated.beliefs(U, H0, curve, rot_counts[:T])
+    rot_scores = score(rot_H, rot_masks[:T])
+    # the state drawn for each round, and the loss there while exploring: regret, value gap, pick, best move
+    x_draw = draws.states(seed, T, n) @ np.linalg.cholesky(Sigma).T               # (T, n)
+    rot_real = analysis.realized(score.effective(rot_H, rot_masks[:T]), U, x_draw)
 
     fixed = [m for m in _subsets(n) if m.sum() <= k]
     policies = [(explore, tuple(commit))] + [(0, tuple(m)) for m in fixed]
@@ -592,23 +621,30 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, 
     policies = list(dict.fromkeys(policies))          # the bench policy may also be on the grid; keep it first
 
     # every committed round of every policy, scored in one batch
-    counts, masks, owner = [], [], []
+    counts, masks, owner, when = [], [], [], []
     for p, (e, m) in enumerate(policies):
         e = min(e, T)
         steps = np.arange(T - e)[:, None]
         counts.append(rot_counts[e] + steps * np.array(m))
         masks.append(np.broadcast_to(m, (T - e, n)))
         owner.append(np.full(T - e, p))
-    counts, masks = np.concatenate(counts), np.concatenate(masks)
-    committed = score(correlated.beliefs(U, H0, curve, counts), masks)
+        when.append(np.arange(e, T))
+    counts, masks, when = np.concatenate(counts), np.concatenate(masks), np.concatenate(when)
+    committed_H = correlated.beliefs(U, H0, curve, counts)
+    committed = score(committed_H, masks)
+    committed_real = analysis.realized(score.effective(committed_H, masks), U, x_draw[when])
 
-    acc, reg, gap = (np.tile(series[:, None], (1, len(policies))) for series in rot_scores)   # (T, policies)
+    # (T, policies): the averages over states, then the same four quantities at the drawn states
+    acc, reg, gap = (np.tile(series[:, None], (1, len(policies))) for series in rot_scores)
+    real_reg, real_gap, real_pick, real_best = (np.tile(series[:, None], (1, len(policies))) for series in rot_real)
     owner = np.concatenate(owner)
     for p, (e, _) in enumerate(policies):
         rounds = np.arange(min(e, T), T)
-        for out, series in zip((acc, reg, gap), committed):
+        for out, series in zip((acc, reg, gap, real_reg, real_gap, real_pick, real_best), committed + committed_real):
             out[rounds, p] = series[owner == p]
-    discounted = ((delta ** np.arange(T))[:, None] * reg).sum(axis=0)
+    weights = delta ** np.arange(T)
+    discounted = (weights[:, None] * real_reg).sum(axis=0)          # the objective, on this draw
+    mean_discounted = (weights[:, None] * reg).sum(axis=0)          # the same, averaged over states
 
     # once the committed features are learned: they reach the truth, the others stay where exploration left them
     policy_masks = np.array([m for _, m in policies])
@@ -616,9 +652,10 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, 
     lim_H = np.where(policy_masks[:, None, :], U, frozen)
     acc_limit, reg_limit, _ = score(lim_H, policy_masks)
 
+    # the axes of the regret and value-gap figures, fixed by the world as on the other benches
     payoff = U @ X.T
-    worst_regret = float((payoff.max(axis=0) - payoff.min(axis=0)).mean())
-    value_bound = float(max(payoff.max(axis=0).mean(), np.abs(rot_scores[2]).max(), np.abs(gap).max()))
+    regret_cap = float((payoff.max(axis=0) - payoff.min(axis=0)).max())
+    value_cap = float(max(payoff.max(axis=0).max(), (H0 @ X.T).max(axis=0).max()))
 
     def label(e, m):
         shown = _describe(np.array(m), "feature")
@@ -627,7 +664,7 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, 
     def row(p, rank=None):
         e, m = policies[p]
         return dict(rank=rank, explore=int(e), mask=[bool(v) for v in m], label=label(e, m),
-                    discounted=float(discounted[p]), floor=float(reg_limit[p]),
+                    discounted=float(discounted[p]), mean=float(mean_discounted[p]), floor=float(reg_limit[p]),
                     start=float(acc[0, p]), end=float(acc[-1, p]), current=p == 0)
 
     fixed_ids = [p for p, (e, _) in enumerate(policies) if e == 0]
@@ -653,9 +690,9 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, 
         best = int(order[0])
         listed = sorted(set(order[:10].tolist()) | {0, best_fixed}, key=rank.get)
         if best != 0 and discounted[best] < discounted[0] - 1e-9:
-            sentence += f"The best policy found is to {label(*policies[best])}, at {discounted[best]:.2f}. "
+            sentence += f"On this draw, the best policy found is to {label(*policies[best])}, at {discounted[best]:.2f}. "
         if policies[best][0] == 0:
-            sentence += "No exploration beats the best fixed subset here."
+            sentence += "On this draw, no exploration beats the best fixed subset."
         else:
             sentence += (f"Never exploring costs at least {discounted[best_fixed]:.2f}, so the best fixed subset keeps "
                          f"only {discounted[best] / discounted[best_fixed]:.0%} of that performance.")
@@ -680,44 +717,44 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, 
     best_move = (U @ Xs.T).argmax(axis=0)
     pick = lambda t: (effective(t) @ Xs.T).argmax(axis=0)
 
-    # The human's choice for the reference state, every feature at +1, as on the other benches: the shown
-    # features are seen, the hidden ones filled in, so the scores are H_t P_S x. Ties go to the lowest action.
-    x_ref = np.ones(n)
-    picks = (score.effective(bench_H, bench_masks) @ x_ref).argmax(axis=1)          # (T,)
-    worth = U @ x_ref
-    missed = worth[picks] < worth.max() - 1e-9
+    # the human's choice and the best move at the state drawn in each round, for the policy on the bench
+    picks, best_moves, missed = real_pick[:, 0], real_best[:, 0], real_reg[:, 0] > 1e-9
 
     ref = None if bench_is_fixed and best_fixed == 0 else best_fixed
     return dict(
         K=K, n=n, T=T, k=k, delta=delta, rho=list(rho), Sigma=Sigma.round(4).tolist(),
-        numeral=f"{discounted[0]:.2f}", numeral_label="expected discounted regret",
+        seed=seed, numeral=f"{discounted[0]:.2f}", numeral_label="discounted regret on this draw",
         sentence=sentence.strip(), full=full, ranking=ranking,
         stats=[
-            dict(label=f"Best move picked at round {T - 1}", value=f"{acc[-1, 0]:.0%}",
-                 note=f"heading for {acc_limit[0]:.0%} once the committed features are learned"),
+            dict(label="Averaged over states", value=f"{mean_discounted[0]:.2f}",
+                 note="the same discounted regret, averaged over every state instead of the ones drawn"),
             dict(label="Regret per round once learned", value=f"{reg_limit[0]:.2f}",
-                 note="what wrongly filled-in features keep costing" if reg_limit[0] > 1e-9 else "nothing is lost for good"),
+                 note=("on average, what wrongly filled-in features keep costing" if reg_limit[0] > 1e-9
+                       else "nothing is lost for good")),
             dict(label="Best fixed subset", value=f"{discounted[best_fixed]:.2f}",
-                 note=f"discounted regret showing {_describe(np.array(policies[best_fixed][1]), 'feature')} every round"),
+                 note=f"on this draw, showing {_describe(np.array(policies[best_fixed][1]), 'feature')} every round"),
             dict(label="Against the best fixed subset", value=f"{discounted[0] - discounted[best_fixed]:+.2f}",
-                 note="this is the best fixed subset" if ref is None else "discounted regret, negative is better"),
+                 note="this is the best fixed subset" if ref is None else "on this draw; negative is better"),
         ],
-        series=dict(acc=np.round(acc[:, 0], 4).tolist(), reg=np.round(reg[:, 0], 4).tolist(),
-                    discounted=np.round(delta ** np.arange(T) * reg[:, 0], 4).tolist(),
-                    value_gap=np.round(gap[:, 0], 4).tolist(),
-                    ref_acc=None if ref is None else np.round(acc[:, ref], 4).tolist(),
-                    ref_discounted=None if ref is None else np.round(delta ** np.arange(T) * reg[:, ref], 4).tolist()),
+        # reg, discounted and value_gap are taken at the state drawn in each round; the *_mean series are their
+        # averages over all states, and acc is the share of states with the best move
+        series=dict(reg=np.round(real_reg[:, 0], 4).tolist(), discounted=np.round(weights * real_reg[:, 0], 4).tolist(),
+                    value_gap=np.round(real_gap[:, 0], 4).tolist(),
+                    reg_mean=np.round(reg[:, 0], 4).tolist(), value_gap_mean=np.round(gap[:, 0], 4).tolist(),
+                    acc=np.round(acc[:, 0], 4).tolist(),
+                    ref_acc=None if ref is None else np.round(acc[:, ref], 4).tolist()),
+        x=np.round(x_draw, 3).tolist(),                                                   # [round][feature]
         ref_label=None if ref is None else label(*policies[ref]),
         schedule=bench_masks.astype(int).T.tolist(),                                      # [feature][round]
         beliefs=np.round(bench_H.transpose(2, 1, 0), 3).tolist(),                          # [feature][action][round]
         U=U.tolist(), C=commit.tolist(), explore=explore,
-        choice=dict(x=x_ref.tolist(), picks=(picks + 1).tolist(), best=int(worth.argmax()) + 1, missed=missed.tolist()),
+        choice=dict(picks=(picks + 1).tolist(), best=(best_moves + 1).tolist(), missed=missed.tolist()),
         effective=dict(first=np.round(effective(0), 3).tolist(), last=np.round(effective(T - 1), 3).tolist(),
                        truth=np.round(truth_eff, 3).tolist(), first_mask=bench_masks[0].tolist()),
         scatter=dict(x=np.round(Xs, 3).tolist(), best=(best_move + 1).tolist(),
                      first=(pick(0) + 1).tolist(), last=(pick(T - 1) + 1).tolist()),
         acc_limit=float(acc_limit[0]), reg_limit=float(reg_limit[0]),
-        worst_regret=worst_regret, value_bound=value_bound,
+        regret_cap=regret_cap, value_cap=value_cap,
     )
 
 
@@ -755,7 +792,7 @@ def api_correlated():
     return jsonify(run_correlated(
         _matrix("U", K, n), _matrix("H", K, n), _rho(), k, int(_num("explore", 0, 0, T)), commit, curve_name,
         _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
-        full=request.args.get("rank", "1") != "0",
+        full=request.args.get("rank", "1") != "0", seed=_seed(),
     ))
 
 
