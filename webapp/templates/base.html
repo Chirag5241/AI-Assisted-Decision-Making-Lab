@@ -18,6 +18,9 @@
     <nav class="mast-nav" aria-label="Sections">
       <a href="{{ url_for('lab') }}" {% if page == 'lab' %}aria-current="page"{% endif %}>1 feature, 2 actions</a>
       <a href="{{ url_for('worlds') }}" {% if page == 'worlds' %}aria-current="page"{% endif %}>More actions and features</a>
+      {%- if not config.STATIC_BUILD %}
+      <a href="{{ url_for('correlated_page') }}" {% if page == 'correlated' %}aria-current="page"{% endif %}>Correlated features</a>
+      {%- endif %}
       <a href="{{ url_for('experiments') }}" {% if page == 'experiments' %}aria-current="page"{% endif %}>Experiment 1 figures</a>
     </nav>
   </header>

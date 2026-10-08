@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791356344">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791366213">
 </head>
 <body>
   <header class="mast">
@@ -192,8 +192,8 @@
     <p>Each table runs every subset as a fixed policy. The first varies the features and keeps the chosen actions; the
       second varies the actions and keeps the chosen features. Click a row to put that subset on the bench.</p>
     <p>Fig. 2 is the one-feature beliefs chart, once per feature: each line is one action's weight on that feature,
-      heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: they show
-      how the weight would be learned if it were in use, while the regret figures treat it as never learned.</p>
+      heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: that weight
+      is never learned, so its line stays flat at the first belief.</p>
     <p>The value gap in Fig. 4 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>, averaged
       over the probe states: above zero the human expects too little from their pick, below zero too much.</p>
     <p>Fig. 1 follows one state, every feature at +1: the action the human picks there each round against the best
@@ -207,10 +207,11 @@
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "curve": "exponential", "delta": 0.95, "p1": 0.05};
 </script>
-<script src="webapp/static/charts.js?v=1791355970"></script>
-<script src="webapp/static/probes.js?v=1791359938"></script>
-<script src="webapp/static/static-api.js?v=1791359937"></script>
-<script src="webapp/static/worlds.js?v=1791356344"></script>
+<script src="webapp/static/charts.js?v=1791365931"></script>
+<script src="webapp/static/matrix.js?v=1791365885"></script>
+<script src="webapp/static/probes.js?v=1791491643"></script>
+<script src="webapp/static/static-api.js?v=1791491637"></script>
+<script src="webapp/static/worlds.js?v=1791365902"></script>
 
 </body>
 </html>

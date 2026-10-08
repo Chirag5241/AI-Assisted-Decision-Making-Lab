@@ -43,6 +43,7 @@ def versioned(name):
 
 def build():
     write_probes()
+    app.config["STATIC_BUILD"] = True    # pages the static copy has no stand-in for drop out of the navigation
     client = app.test_client()
     for route, filename in PAGES.items():
         html = client.get(route).data.decode()

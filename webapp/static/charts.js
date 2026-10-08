@@ -26,7 +26,8 @@ window.Charts = (function () {
   const fmtTick = (v, step) => v.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2);
 
   // series: [{v, cls, name, dash}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
-  // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare}
+  // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare,
+  //        xlabel, xscale (point i sits at x = i * xscale), vlines: [{t, label}]}
   function line(host, T, series, hlines, shade, opts) {
     const W = opts.width || 560, H = opts.height || 340, L = 54, R = 12, TOP = 10, B = opts.noXLabel ? 22 : 40, pw = W - L - R, ph = H - TOP - B;
     let lo = opts.lo, hi = opts.hi;
@@ -65,11 +66,16 @@ window.Charts = (function () {
       svg.append(svgEl("line", { class: "grid", x1: L, x2: L + pw, y1: Y(tick.v), y2: Y(tick.v) }),
         text({ x: L - 8, y: Y(tick.v) + 4, "text-anchor": "end", class: tick.faded ? "faded" : "" }, tick.label));
     }
-    for (const v of niceTicks(0, T - 1, 8).ticks) {
-      svg.append(svgEl("line", { class: "grid", x1: X(v), x2: X(v), y1: TOP, y2: TOP + ph }),
-        text({ x: X(v), y: TOP + ph + 16, "text-anchor": "middle" }, v));
+    const xscale = opts.xscale || 1, xname = opts.xlabel || "round t";
+    for (const v of niceTicks(0, (T - 1) * xscale, 8).ticks) {
+      svg.append(svgEl("line", { class: "grid", x1: X(v / xscale), x2: X(v / xscale), y1: TOP, y2: TOP + ph }),
+        text({ x: X(v / xscale), y: TOP + ph + 16, "text-anchor": "middle" }, v));
     }
-    if (!opts.noXLabel) svg.append(text({ x: L + pw / 2, y: H - 4, "text-anchor": "middle" }, "round t"));
+    if (!opts.noXLabel) svg.append(text({ x: L + pw / 2, y: H - 4, "text-anchor": "middle" }, xname));
+    for (const v of opts.vlines || []) {
+      svg.append(svgEl("line", { class: "vline", x1: edge(v.t - 0.5), x2: edge(v.t - 0.5), y1: TOP, y2: TOP + ph }));
+      if (v.label) svg.append(text({ x: edge(v.t - 0.5) + 4, y: TOP + 12, class: "vline-label" }, v.label));
+    }
     svg.append(text({ x: 12, y: TOP + ph / 2, "text-anchor": "middle", transform: `rotate(-90 12 ${TOP + ph / 2})` }, opts.ylabel));
     for (const h of hlines) {
       svg.append(svgEl("line", { class: h.cls || "hline", x1: L, x2: L + pw, y1: Y(h.y), y2: Y(h.y) }));
@@ -114,7 +120,7 @@ window.Charts = (function () {
       const box = svg.getBoundingClientRect(), sx = (e.clientX - box.left) * (W / box.width);
       const t = Math.min(Math.max(Math.round(((sx - L) / pw) * (T - 1)), 0), T - 1);
       cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
-      tip.replaceChildren(el("b", "", "round " + t));
+      tip.replaceChildren(el("b", "", opts.xlabel ? xname + " " + t * xscale : "round " + t));
       for (const s of series) tip.append(document.createElement("br"), s.name + "  " + fmt(s.v[t]));
       tip.hidden = false;
       const left = (X(t) / W) * box.width, onLeft = left < box.width / 2;
@@ -162,5 +168,52 @@ window.Charts = (function () {
     }));
   }
 
-  return { line, heat };
+  // points: [{x, y, cls, ring}] on a square plot over [-lim, lim]^2; lines: [{slope, cls, label}] through the origin
+  function scatter(host, points, lines, opts) {
+    const S = 300, L = 40, TOP = 8, P = S - L - 10, lim = opts.lim || 3;
+    const X = (v) => L + ((clamp(v, -lim, lim) + lim) / (2 * lim)) * P, Y = (v) => TOP + ((lim - clamp(v, -lim, lim)) / (2 * lim)) * P;
+    const svg = svgEl("svg", { viewBox: `0 0 ${S} ${TOP + P + 36}`, role: "img", "aria-label": opts.alt });
+    for (const v of [-2, 0, 2]) {
+      svg.append(svgEl("line", { class: v ? "grid" : "zero", x1: X(v), x2: X(v), y1: TOP, y2: TOP + P }),
+        svgEl("line", { class: v ? "grid" : "zero", x1: L, x2: L + P, y1: Y(v), y2: Y(v) }),
+        svgEl("text", { x: X(v), y: TOP + P + 14, "text-anchor": "middle" }, v),
+        svgEl("text", { x: L - 6, y: Y(v) + 4, "text-anchor": "end" }, v));
+    }
+    for (const p of points) svg.append(svgEl("circle", { class: "pt " + p.cls, cx: X(p.x), cy: Y(p.y), r: 2.6 }));
+    for (const p of points) if (p.ring) svg.append(svgEl("circle", { class: "pt-ring", cx: X(p.x), cy: Y(p.y), r: 4.6 }));
+    for (const ln of lines) {
+      // clip y = slope * x to the plot square
+      const x1 = Math.abs(ln.slope) > 1 ? lim / Math.abs(ln.slope) : lim;
+      svg.append(svgEl("line", { class: "fit " + (ln.cls || ""), x1: X(-x1), y1: Y(-x1 * ln.slope), x2: X(x1), y2: Y(x1 * ln.slope) }));
+      if (ln.label) svg.append(svgEl("text", { x: L + 4, y: TOP + 12, class: "fit-label" }, ln.label));
+    }
+    svg.append(svgEl("text", { x: L + P / 2, y: TOP + P + 32, "text-anchor": "middle", class: "axis-name" }, opts.xname),
+      svgEl("text", { x: 10, y: TOP + P / 2, "text-anchor": "middle", class: "axis-name", transform: `rotate(-90 10 ${TOP + P / 2})` }, opts.yname));
+    host.replaceChildren(svg);
+  }
+
+  // rows: [{name, on: [bool per round]}]; marks: [{t, label}] drawn as vertical rules before round t
+  function schedule(host, T, rows, marks, alt) {
+    const W = 1120, L = 54, R = 12, TOP = 6, row = 22, gap = 6, ph = rows.length * (row + gap) - gap, pw = W - L - R;
+    const X = (t) => L + (t / T) * pw;
+    const svg = svgEl("svg", { viewBox: `0 0 ${W} ${TOP + ph + 40}`, role: "img", "aria-label": alt });
+    rows.forEach((r, i) => {
+      const y = TOP + i * (row + gap);
+      svg.append(svgEl("rect", { class: "sched-off", x: L, y, width: pw, height: row }),
+        svgEl("text", { x: L - 8, y: y + row / 2 + 4, "text-anchor": "end", class: "sched-name" }, r.name));
+      for (let start = 0, t = 1; t <= T; t++) {
+        if (t < T && r.on[t] === r.on[start]) continue;
+        if (r.on[start]) svg.append(svgEl("rect", { class: "sched-on", x: X(start), y, width: Math.max(0.5, X(t) - X(start) - 0.6), height: row }));
+        start = t;
+      }
+    });
+    for (const v of niceTicks(0, T - 1, 8).ticks) svg.append(svgEl("text", { x: X(v + 0.5), y: TOP + ph + 16, "text-anchor": "middle" }, v));
+    svg.append(svgEl("text", { x: L + pw / 2, y: TOP + ph + 34, "text-anchor": "middle" }, "round t"));
+    for (const m of marks) {
+      svg.append(svgEl("line", { class: "vline", x1: X(m.t), x2: X(m.t), y1: TOP - 4, y2: TOP + ph + 4 }));
+    }
+    host.replaceChildren(svg);
+  }
+
+  return { line, heat, scatter, schedule };
 })();

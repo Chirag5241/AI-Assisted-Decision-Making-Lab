@@ -120,10 +120,15 @@ def test_larger_world_beliefs_value_gap_and_discounting(client):
     beliefs = np.array(data["beliefs"])                      # [feature][action][round]
     assert beliefs.shape == (3, 3, 100)
     np.testing.assert_allclose(beliefs[:, :, 0].T, [[1, 0.5, 1.5], [0, 1, 0], [-0.5, 0, -1.5]])
-    # every weight is drawn along its learning curve, the hidden feature 3 included (the page fades it)
-    assert data["F"] == [True, True, False] and np.ptp(beliefs[2], axis=1).min() > 0.4
-    np.testing.assert_allclose(beliefs[:, :, -1].T, np.array(data["U"]), atol=0.02)
-    # ... but the scores still treat feature 3 as hidden: the human never gets everything right
+    # the shown features are learned; the hidden feature 3 never is, so its weights stay at the first beliefs
+    assert data["F"] == [True, True, False]
+    np.testing.assert_allclose(beliefs[:2, :, -1].T, np.array(data["U"])[:, :2], atol=0.02)
+    np.testing.assert_array_equal(beliefs[2], np.repeat(beliefs[2][:, :1], 100, axis=1))
+    # the same holds for an action that is not offered: none of its weights move
+    dropped = np.array(client.get("/api/world?" + DEFAULT_3X3.replace("A=1,1,1", "A=1,0,1") + "&rank=0").get_json()["beliefs"])
+    np.testing.assert_array_equal(dropped[:, 1], np.repeat(dropped[:, 1, :1], 100, axis=1))
+    assert np.ptp(dropped[2, [0, 2]], axis=1).min() > 0.4     # feature 3 is the misjudged one, and is learned where offered
+    # the scores treat feature 3 as hidden too: the human never gets everything right
     assert data["acc_limit"] < 0.9
     series = data["series"]
     np.testing.assert_allclose(series["discounted"], np.array(series["reg"]) * 0.95 ** np.arange(100), atol=1e-4)

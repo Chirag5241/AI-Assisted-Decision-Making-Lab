@@ -165,8 +165,8 @@
     <p>Each table runs every subset as a fixed policy. The first varies the features and keeps the chosen actions; the
       second varies the actions and keeps the chosen features. Click a row to put that subset on the bench.</p>
     <p>Fig. 2 is the one-feature beliefs chart, once per feature: each line is one action's weight on that feature,
-      heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: they show
-      how the weight would be learned if it were in use, while the regret figures treat it as never learned.</p>
+      heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: that weight
+      is never learned, so its line stays flat at the first belief.</p>
     <p>The value gap in Fig. 4 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>, averaged
       over the probe states: above zero the human expects too little from their pick, below zero too much.</p>
     <p>Fig. 1 follows one state, every feature at +1: the action the human picks there each round against the best
@@ -181,5 +181,6 @@
   window.DEFAULT_WORLD = {{ default_world|tojson }};
 </script>
 <script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('matrix.js') }}"></script>
 <script src="{{ static_v('worlds.js') }}"></script>
 {% endblock %}

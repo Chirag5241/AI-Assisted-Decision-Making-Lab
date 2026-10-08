@@ -33,104 +33,11 @@
 
   // ---- drawing the inputs ------------------------------------------------
 
-  // Each feature's panel and sliders use a slightly lighter shade of the action colours than the one before.
-  const SHADES = ["100%", "88%", "76%", "66%", "57%", "50%"];
+  const SHADES = MatrixEditor.SHADES;
 
-  // One weight: its symbol, a slider, and a number box with up and down arrows (hold to repeat).
-  function entryRow(name, k, j) {
-    const make = (tag, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; return e; };
-    const what = `${name === "U" ? "true" : "believed"} weight of feature ${j + 1} for action ${k + 1}`;
-    const row = make("div", "row entry e-a" + (k + 1) + (world.F[j] && world.A[k] ? "" : " off"));
-
-    const label = make("label"), sym = make("span", "sym dot"), letter = make("span"), index = make("sub");
-    index.textContent = `${k + 1}${j + 1}`;
-    letter.append(name === "U" ? "u" : "h", index);
-    sym.append(letter);
-    label.append(sym);
-
-    const slider = make("input");
-    slider.type = "range"; slider.min = "-3"; slider.max = "3"; slider.step = "0.1";
-    slider.id = `s${name}-${k}-${j}`;
-    slider.value = world[name][k][j];
-    slider.setAttribute("aria-label", what);
-    label.htmlFor = slider.id;
-
-    const cell = make("div", "cell"), input = make("input");
-    input.type = "number"; input.step = "0.1"; input.min = "-3"; input.max = "3";
-    input.id = `m${name}-${k}-${j}`;
-    input.value = world[name][k][j];
-    input.setAttribute("aria-label", what + ", exact value");
-    cell.append(input);
-
-    const set = (value, from) => {
-      world[name][k][j] = clamp(value, -3, 3);
-      if (from !== slider) slider.value = world[name][k][j];
-      if (from !== input) input.value = world[name][k][j];
-      $(`v${name}-${k}-${j}`).textContent = shortNumber(world[name][k][j]);   // the snapshot follows the slider
-      schedule();
-    };
-    slider.addEventListener("input", () => set(parseFloat(slider.value), slider));
-    input.addEventListener("input", () => { const v = parseFloat(input.value); if (!isNaN(v)) set(v, input); });
-    input.addEventListener("change", () => { input.value = world[name][k][j]; });
-    for (const dir of [1, -1]) {
-      const arrow = make("button", dir > 0 ? "up" : "down");
-      arrow.type = "button";
-      arrow.tabIndex = -1;   // the arrow keys already step the focused slider or box
-      arrow.setAttribute("aria-label", (dir > 0 ? "Raise the " : "Lower the ") + what);
-      const step = () => set(Math.round((world[name][k][j] + 0.1 * dir) * 10) / 10, null);
-      let wait = null, repeat = null;
-      const stop = () => { clearTimeout(wait); clearInterval(repeat); };
-      arrow.addEventListener("pointerdown", (event) => {
-        event.preventDefault();
-        stop();
-        step();
-        wait = setTimeout(() => { repeat = setInterval(step, 70); }, 350);
-      });
-      for (const end of ["pointerup", "pointerleave", "pointercancel"]) arrow.addEventListener(end, stop);
-      cell.append(arrow);
-    }
-    row.append(label, slider, cell);
-    return row;
-  }
-
-  const shortNumber = (v) => String(Math.round(v * 100) / 100);
-
-  // The whole matrix at a glance: one row per action, one column per feature. Clicking a value jumps to its slider.
-  function snapshot(name) {
-    const make = (tag, cls, text) => { const e = document.createElement(tag); e.className = cls; if (text !== undefined) e.textContent = text; return e; };
-    const columns = `repeat(${world.n}, minmax(0, 1fr))`;
-    const grid = make("div", "snapshot"), cols = make("div", "cols"), sides = make("div", "sides"), bracket = make("div", "bracket");
-    grid.classList.toggle("dense", world.n >= 5);   // five or six columns: smaller figures so neighbours stay apart
-    grid.setAttribute("role", "group");
-    grid.setAttribute("aria-label", (name === "U" ? "The truth matrix U" : "The first-belief matrix H0") + ", rows are actions and columns are features");
-    cols.style.gridTemplateColumns = columns;
-    bracket.style.gridTemplateColumns = columns;
-    world.F.forEach((shown, j) => cols.append(make("span", "head" + (shown ? "" : " off"), "x" + SUB[j])));
-    world.A.forEach((offered, k) => {
-      sides.append(make("span", "head" + (offered ? "" : " off"), "a" + SUB[k]));
-      world.F.forEach((shown, j) => {
-        const value = make("span", "value" + (shown && offered ? "" : " off"), shortNumber(world[name][k][j]));
-        value.id = `v${name}-${k}-${j}`;
-        value.title = "Go to this weight's slider";
-        value.addEventListener("click", () => { const slider = $(`s${name}-${k}-${j}`); slider.scrollIntoView({ block: "center" }); slider.focus(); });
-        bracket.append(value);
-      });
-    });
-    grid.append(make("span", ""), cols, sides, bracket);
-    return grid;
-  }
-
-  // One matrix: its snapshot, then its weights as sliders grouped by feature like the panels of the beliefs figure.
   function drawMatrix(name) {
-    $("matrix-" + name).replaceChildren(snapshot(name), ...world.F.map((shown, j) => {
-      const group = document.createElement("div"), head = document.createElement("p");
-      group.className = "entry-group";
-      group.style.setProperty("--shade", SHADES[j]);
-      head.className = "group-label";
-      head.textContent = "weights on x" + SUB[j] + (shown ? "" : "  (hidden)");
-      group.append(head, ...world.A.map((_, k) => entryRow(name, k, j)));
-      return group;
-    }));
+    MatrixEditor.draw($("matrix-" + name), world, name,
+      { featureOn: (j) => world.F[j], actionOn: (k) => world.A[k], onChange: schedule });
   }
 
   function drawChips(id, mask, prefix, noun) {

@@ -1,7 +1,7 @@
-// The static build of the site (GitHub Pages) has no Python server. This file answers the two
-// data endpoints, /api/run and /api/world, in the browser, with the same JSON that webapp/app.py
-// returns, so the pages, stylesheet and scripts are exactly the ones the Flask site uses.
-// Keep it in step with app.py; tests/test_static_api.py compares the two.
+// The static build of the site (GitHub Pages) has no Python server. This file answers the
+// data endpoints, /api/run, /api/world and /api/correlated, in the browser, with the same JSON
+// that webapp/app.py returns, so the pages, stylesheet and scripts are exactly the ones the Flask
+// site uses. Keep it in step with app.py; tests/test_static_api.py compares the two.
 (function (root) {
   "use strict";
 
@@ -359,12 +359,326 @@
         value_gap: now.vgap.map((v) => round(v, 4)),
         ref_acc: heldBack ? everything.acc.map((v) => round(v, 4)) : null,
       },
-      // every weight's learning curve as [feature][action][round]; the page fades the unused ones
-      beliefs: Array.from({ length: n }, (_, j) => U.map((row, k) => phis.map((f) => round(row[j] + (H0[k][j] - row[j]) * (1 - f), 3)))),
+      // Every weight over time as [feature][action][round]. A weight on a hidden feature, or of an action
+      // that is not offered, is never learned: it stays at its first value (the page fades those flat lines).
+      beliefs: Array.from({ length: n }, (_, j) => U.map((row, k) => phis.map((f) =>
+        round(row[j] + (H0[k][j] - row[j]) * (1 - (Fnow[j] && Anow[k] ? f : 0)), 3)))),
       U, F: Fnow, A: Anow, delta,
       choice: { x: Array(n).fill(1), picks: picks.map((k) => k + 1), best: bestMove + 1, missed: picks.map((k) => worth[k] < top - 1e-9) },
       acc_limit: now.accLimit, reg_limit: now.regLimit,
       worst_regret: worstRegret, value_bound: Math.max(vTrue, vBelief),
+    };
+  }
+
+  // ---- /api/correlated: three features drawn from N(0, Sigma) --------------------
+
+  const CORR_N = 3, CORR_SCATTER = 300;
+
+  // Lower-triangular L with L L^T = Sigma, the same factor numpy.linalg.cholesky returns.
+  function cholesky3(S) {
+    const L = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j <= i; j++) {
+        let s = S[i][j];
+        for (let k = 0; k < j; k++) s -= L[i][k] * L[j][k];
+        L[i][j] = i === j ? Math.sqrt(s) : s / L[j][j];
+      }
+    }
+    return L;
+  }
+
+  // P with x_hat = P x: shown features pass through, hidden ones get E[x_hidden | x_shown].
+  function imputation(Sigma, shown) {
+    const P = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+    const S = [], hidden = [];
+    shown.forEach((on, i) => (on ? S : hidden).push(i));
+    S.forEach((i) => { P[i][i] = 1; });
+    if (!S.length || !hidden.length) return P;
+    const sub = (rows, cols) => rows.map((r) => cols.map((c) => Sigma[r][c]));
+    const M = sub(S, S);
+    let inv;
+    if (S.length === 1) inv = [[1 / M[0][0]]];
+    else {
+      const d = M[0][0] * M[1][1] - M[0][1] * M[1][0];
+      inv = [[M[1][1] / d, -M[0][1] / d], [-M[1][0] / d, M[0][0] / d]];
+    }
+    const cross = sub(hidden, S);                 // Sigma_hidden,shown @ inv(Sigma_shown)
+    hidden.forEach((h, a) => S.forEach((s, b) => {
+      let v = 0;
+      for (let c = 0; c < S.length; c++) v += cross[a][c] * inv[c][b];
+      P[h][s] = v;
+    }));
+    return P;
+  }
+
+  // Every size-k subset in turn, in itertools.combinations order.
+  function rotation(k) {
+    const sets = [];
+    const walk = (start, chosen) => {
+      if (chosen.length === k) { sets.push(chosen.slice()); return; }
+      for (let i = start; i < CORR_N; i++) { chosen.push(i); walk(i + 1, chosen); chosen.pop(); }
+    };
+    walk(0, []);
+    return sets.map((set) => { const m = [false, false, false]; set.forEach((i) => { m[i] = true; }); return m; });
+  }
+
+  // How often each feature was shown in the first t rounds of the rotation.
+  function rotationCounts(cycle, t) {
+    const C = cycle.length, full = Math.floor(t / C), rem = t % C, counts = [0, 0, 0];
+    for (let j = 0; j < CORR_N; j++) {
+      let per = 0, extra = 0;
+      for (let i = 0; i < C; i++) if (cycle[i][j]) { per++; if (i < rem) extra++; }
+      counts[j] = full * per + extra;
+    }
+    return counts;
+  }
+
+  function exploreGrid(T, cycle) {
+    const step = cycle * Math.max(1, Math.ceil(T / (cycle * 20)));
+    const lengths = [];
+    for (let e = step; e < T; e += step) lengths.push(e);
+    return lengths;
+  }
+
+  function maskCode(m) { return (m[0] ? 4 : 0) + (m[1] ? 2 : 0) + (m[2] ? 1 : 0); }
+  const sameMask = (a, b) => a.every((v, i) => v === b[i]);
+
+  function parseRho(q) {
+    const raw = q.get("rho");
+    const parts = raw === null ? [] : raw.split(",");
+    const rho = parts.map((v) => (v.trim() === "" ? NaN : Number(v)));
+    if (rho.length !== 3 || rho.some((r) => !Number.isFinite(r))) throw new BadRequest("rho must be three numbers");
+    if (rho.some((r) => Math.abs(r) > 0.95)) throw new BadRequest("rho must be three correlations in [-0.95, 0.95]");
+    const [a, b, c] = rho, det = 1 + 2 * a * b * c - a * a - b * b - c * c;
+    if (!(1 - a * a > 1e-6 && det > 1e-6)) throw new BadRequest("these three correlations cannot occur together");
+    return rho;
+  }
+
+  async function correlated(q, signal) {
+    const curveName = q.has("curve") ? q.get("curve") : "exponential";
+    if (!(curveName in CURVES)) throw new BadRequest("unknown curve");
+    const spec = CURVES[curveName];
+    const K = Math.trunc(num(q, "K", 3, 2, MAX_ACTIONS));
+    const U = matrix(q, "U", K, CORR_N), H0 = matrix(q, "H", K, CORR_N);
+    const rho = parseRho(q);
+    const k = Math.trunc(num(q, "k", 2, 1, CORR_N - 1));
+    const T = Math.trunc(num(q, "T", 120, 10, 300)), delta = num(q, "delta", 0.95, 0.01, 0.99);
+    const explore = Math.trunc(num(q, "explore", 0, 0, T));
+    const commit = mask(q, "C", CORR_N);
+    if (commit.filter(Boolean).length > k) throw new BadRequest(`at most ${k} features can be shown per round`);
+    const speed = num(q, "p1", spec.def, spec.min, spec.max);
+    const full = q.get("rank") !== "0";
+    const phi = (m) => spec.phi(speed, m);
+
+    const Sigma = [[1, rho[0], rho[1]], [rho[0], 1, rho[2]], [rho[1], rho[2], 1]];
+    const L = cholesky3(Sigma);
+    const Z = probes(CORR_N), P = Z.length / CORR_N;
+    const X = new Float64Array(Z.length);
+    for (let p = 0; p < P; p++) for (let j = 0; j < CORR_N; j++) {
+      let s = 0;
+      for (let c = 0; c < CORR_N; c++) s += Z[p * CORR_N + c] * L[j][c];   // Z @ L^T
+      X[p * CORR_N + j] = s;
+    }
+
+    // one imputation matrix per on/off mask, indexed like itertools.product([False, True], repeat=3)
+    const Pmats = Array.from({ length: 8 }, (_, code) => imputation(Sigma, [Boolean(code & 4), Boolean(code & 2), Boolean(code & 1)]));
+    const matmul = (H, code) => Pmats[code].map((_, j) => null) && H.map((row) => {
+      const out = [0, 0, 0];
+      for (let j = 0; j < CORR_N; j++) for (let i = 0; i < CORR_N; i++) out[j] += row[i] * Pmats[code][i][j];
+      return out;
+    });
+
+    const pay = new Float64Array(P * K), bestTrue = new Float64Array(P);
+    let worstRegret = 0, bestMean = 0;
+    for (let p = 0; p < P; p++) {
+      let hi = -Infinity, lo = Infinity;
+      for (let a = 0; a < K; a++) {
+        let v = 0;
+        for (let j = 0; j < CORR_N; j++) v += U[a][j] * X[p * CORR_N + j];
+        pay[p * K + a] = v;
+        if (v > hi) hi = v;
+        if (v < lo) lo = v;
+      }
+      bestTrue[p] = hi;
+      worstRegret += (hi - lo) / P; bestMean += hi / P;
+    }
+
+    // Accuracy, regret and value gap of effective beliefs E (K x 3) on the probe states.
+    // Actions the human cannot tell apart (identical effective weights) are split evenly.
+    function scoreE(E) {
+      const group = E.map((row, a) => E.reduce((g, other, b) => (other.every((v, j) => v === row[j]) ? g.concat(b) : g), []) && null);
+      const alike = E.map((row) => {
+        const g = [];
+        for (let b = 0; b < K; b++) if (E[b].every((v, j) => v === row[j])) g.push(b);
+        return g;
+      });
+      let acc = 0, reg = 0, gap = 0;
+      for (let p = 0; p < P; p++) {
+        let pick = 0, top = -Infinity;
+        const scores = new Array(K);
+        for (let a = 0; a < K; a++) {
+          let s = 0;
+          for (let j = 0; j < CORR_N; j++) s += E[a][j] * X[p * CORR_N + j];
+          scores[a] = s;
+          if (s > top) { top = s; pick = a; }
+        }
+        const tied = alike[pick];
+        let sumR = 0, sumOk = 0;
+        for (const a of tied) {
+          const r = bestTrue[p] - pay[p * K + a];
+          sumR += r; sumOk += r <= 1e-12 ? 1 : 0;
+        }
+        acc += sumOk / tied.length; reg += sumR / tied.length; gap += bestTrue[p] - top;
+      }
+      return [acc / P, reg / P, gap / P];
+    }
+    void group;
+
+    const belief = (counts) => U.map((row, a) => counts.map((c, j) => row[j] + (H0[a][j] - row[j]) * (1 - phi(c))));
+    const at = (counts, m) => scoreE(matmul(belief(counts), maskCode(m)));
+
+    const cycle = rotation(k);
+    const rot = [];
+    for (let t = 0; t < T; t++) rot.push(at(rotationCounts(cycle, t), cycle[t % cycle.length]));
+    const rotAcc = rot.map((s) => s[0]), rotReg = rot.map((s) => s[1]), rotGap = rot.map((s) => s[2]);
+
+    const fixed = subsets(CORR_N).filter((m) => m.filter(Boolean).length <= k);
+    let policies = [[explore, commit]].concat(fixed.map((m) => [0, m]));
+    if (full) for (const e of exploreGrid(T, cycle.length)) for (const m of fixed) policies.push([e, m]);
+    const seen = new Set();
+    policies = policies.filter(([e, m]) => {
+      const key = e + m.map((v) => (v ? 1 : 0)).join("");
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+
+    let lastPause = Date.now();
+    const breathe = async () => {
+      if (signal && signal.aborted) throw aborted();
+      if (Date.now() - lastPause < 24) return;
+      await nextTask();
+      lastPause = Date.now();
+      if (signal && signal.aborted) throw aborted();
+    };
+
+    // committed rounds: counts grow only for the features the policy keeps showing
+    const acc = policies.map(() => rotAcc.slice()), reg = policies.map(() => rotReg.slice()), gap = policies.map(() => rotGap.slice());
+    let maxAbsGap = 0;
+    for (const g of rotGap) if (Math.abs(g) > maxAbsGap) maxAbsGap = Math.abs(g);
+    for (let p = 0; p < policies.length; p++) {
+      const e = Math.min(policies[p][0], T), m = policies[p][1], base = rotationCounts(cycle, e);
+      for (let t = e; t < T; t++) {
+        const [a, r, g] = at(base.map((c, j) => c + (m[j] ? t - e : 0)), m);
+        acc[p][t] = a; reg[p][t] = r; gap[p][t] = g;
+        if (Math.abs(g) > maxAbsGap) maxAbsGap = Math.abs(g);
+      }
+      if (p % 2 === 1) await breathe();
+    }
+    const discounted = reg.map((series) => series.reduce((sum, r, t) => sum + Math.pow(delta, t) * r, 0));
+
+    const limit = policies.map(([e, m]) => {
+      const frozen = belief(rotationCounts(cycle, Math.min(e, T)));
+      const H = frozen.map((row, a) => row.map((v, j) => (m[j] ? U[a][j] : v)));
+      return scoreE(matmul(H, maskCode(m)));
+    });
+
+    const labelOf = (e, m) => (e === 0 ? `show ${describe(m, "feature")} every round`
+      : `explore ${e} rounds, then show ${describe(m, "feature")}`);
+    const rowOf = (p, rank) => ({ rank, explore: policies[p][0], mask: policies[p][1].slice(), label: labelOf(...policies[p]),
+      discounted: discounted[p], floor: limit[p][1], start: acc[p][0], end: acc[p][T - 1], current: p === 0 });
+
+    const fixedIds = policies.reduce((ids, [e], p) => (e === 0 ? ids.concat(p) : ids), []);
+    const bestFixed = fixedIds.reduce((best, p) => (discounted[p] < discounted[best] ? p : best));
+
+    let sentence = (explore ? `Exploring for ${explore} round${explore === 1 ? "" : "s"} and then showing ${describe(commit, "feature")}`
+      : `Showing ${describe(commit, "feature")} every round`)
+      + `, the human picks the best move ${pct(acc[0][0])} of the time at round 0 and ${pct(acc[0][T - 1])} by round ${T - 1}. `;
+    const hidden = commit.map((on) => !on);
+    if (limit[0][1] > 1e-9 && hidden.some(Boolean)) {
+      sentence += `${describe(hidden, "feature").replace(/^./, (c) => c.toUpperCase())} ${hidden.filter(Boolean).length === 1 ? "is" : "are"} filled in `
+        + `from what is shown, using beliefs that are never corrected, so ${f2(limit[0][1])} of utility is lost every round for good. `;
+    } else if (limit[0][1] <= 1e-9) {
+      sentence += "Once the committed features are learned, the human always picks the best move. ";
+    }
+
+    let ranking = null;
+    if (full) {
+      const order = policies.map((_, p) => p).sort((a, b) => discounted[a] - discounted[b] || a - b);
+      const place = {};
+      order.forEach((p, i) => { place[p] = i + 1; });
+      const best = order[0];
+      const listed = [...new Set(order.slice(0, 10).concat([0, bestFixed]))].sort((a, b) => place[a] - place[b]);
+      if (best !== 0 && discounted[best] < discounted[0] - 1e-9) sentence += `The best policy found is to ${labelOf(...policies[best])}, at ${f2(discounted[best])}. `;
+      sentence += policies[best][0] === 0 ? "No exploration beats the best fixed subset here."
+        : `Never exploring costs at least ${f2(discounted[bestFixed])}, so the best fixed subset keeps only ${pct(discounted[best] / discounted[bestFixed])} of that performance.`;
+      const lengths = [0].concat(exploreGrid(T, cycle.length));
+      const where = {};
+      policies.forEach(([e, m], p) => { where[e + m.map((v) => (v ? 1 : 0)).join("")] = p; });
+      ranking = {
+        rows: listed.map((p) => rowOf(p, place[p])), total: policies.length, rank: place[0],
+        best: rowOf(best, 1), best_fixed: rowOf(bestFixed, place[bestFixed]),
+        retained: discounted[bestFixed] > 1e-12 ? discounted[best] / discounted[bestFixed] : 1,
+        sweep: { lengths, curves: fixed.map((m) => ({ mask: m.slice(), label: describe(m, "feature"),
+          discounted: lengths.map((e) => discounted[where[e + m.map((v) => (v ? 1 : 0)).join("")]]) })) },
+      };
+    }
+
+    const benchMask = (t) => (t < explore ? cycle[t % cycle.length] : commit);
+    const benchCounts = (t) => (t < explore ? rotationCounts(cycle, t)
+      : rotationCounts(cycle, explore).map((c, j) => c + (commit[j] ? t - explore : 0)));
+    const roundM = (M, digits) => M.map((row) => row.map((v) => round(v, digits)));
+    const E0 = matmul(belief(benchCounts(0)), maskCode(benchMask(0)));
+    const ET = matmul(belief(benchCounts(T - 1)), maskCode(benchMask(T - 1)));
+    const ETU = matmul(U, maskCode(commit));
+    const argmax = (E, p) => {
+      let pick = 0, top = -Infinity;
+      for (let a = 0; a < K; a++) {
+        let s = 0;
+        for (let j = 0; j < CORR_N; j++) s += E[a][j] * X[p * CORR_N + j];
+        if (s > top) { top = s; pick = a; }
+      }
+      return pick;
+    };
+
+    const ref = explore === 0 && bestFixed === 0 ? null : bestFixed;
+    return {
+      K, n: CORR_N, T, k, delta, rho, Sigma: Sigma.map((row) => row.map((v) => round(v, 4))),
+      numeral: f2(discounted[0]), numeral_label: "expected discounted regret",
+      sentence: sentence.trim(), full, ranking,
+      stats: [
+        { label: `Best move picked at round ${T - 1}`, value: pct(acc[0][T - 1]),
+          note: `heading for ${pct(limit[0][0])} once the committed features are learned` },
+        { label: "Regret per round once learned", value: f2(limit[0][1]),
+          note: limit[0][1] > 1e-9 ? "what wrongly filled-in features keep costing" : "nothing is lost for good" },
+        { label: "Best fixed subset", value: f2(discounted[bestFixed]),
+          note: `discounted regret showing ${describe(policies[bestFixed][1], "feature")} every round` },
+        { label: "Against the best fixed subset", value: signed2(discounted[0] - discounted[bestFixed]),
+          note: ref === null ? "this is the best fixed subset" : "discounted regret, negative is better" },
+      ],
+      series: {
+        acc: acc[0].map((v) => round(v, 4)), reg: reg[0].map((v) => round(v, 4)),
+        discounted: reg[0].map((r, t) => round(Math.pow(delta, t) * r, 4)),
+        value_gap: gap[0].map((v) => round(v, 4)),
+        ref_acc: ref === null ? null : acc[ref].map((v) => round(v, 4)),
+        ref_discounted: ref === null ? null : reg[ref].map((r, t) => round(Math.pow(delta, t) * r, 4)),
+      },
+      ref_label: ref === null ? null : labelOf(...policies[ref]),
+      schedule: [0, 1, 2].map((j) => Array.from({ length: T }, (_, t) => (benchMask(t)[j] ? 1 : 0))),
+      beliefs: [0, 1, 2].map((j) => U.map((row, a) => Array.from({ length: T }, (_, t) => round(row[j] + (H0[a][j] - row[j]) * (1 - phi(benchCounts(t)[j])), 3)))),
+      U, C: commit.slice(), explore,
+      effective: { first: roundM(E0, 3), last: roundM(ET, 3), truth: roundM(ETU, 3), first_mask: benchMask(0).slice() },
+      scatter: {
+        x: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => [0, 1, 2].map((j) => round(X[p * CORR_N + j], 3))),
+        best: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => {
+          let pick = 0;
+          for (let a = 1; a < K; a++) if (pay[p * K + a] > pay[p * K + pick]) pick = a;
+          return pick + 1;
+        }),
+        first: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => argmax(E0, p) + 1),
+        last: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => argmax(ET, p) + 1),
+      },
+      acc_limit: limit[0][0], reg_limit: limit[0][1],
+      worst_regret: worstRegret, value_bound: Math.max(bestMean, maxAbsGap),
     };
   }
 

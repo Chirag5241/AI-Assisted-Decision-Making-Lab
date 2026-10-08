@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import numpy as np
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
 
-from simlab import CountLearner, FixedMasks, analysis, curves, plotting, simulate
+from simlab import CountLearner, FixedMasks, analysis, correlated, curves, plotting, simulate
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results"
@@ -396,10 +396,10 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speed, T, delta, full=
                     discounted=np.round(delta ** np.arange(T) * reg[:, now], 4).tolist(),
                     value_gap=np.round(value_gap[:, now], 4).tolist(),
                     ref_acc=np.round(acc[:, everything], 4).tolist() if held_back else None),
-        # Beliefs over time as [feature][action][round], drawn as the learning curve of every weight.
-        # A hidden feature or an action that is not offered is never actually learned (the scores above
-        # use res.H, where it stays put); the page fades those lines instead of flattening them.
-        beliefs=np.round(learner.trajectory(U, H0, T).transpose(2, 1, 0), 3).tolist(),
+        # Beliefs over time as [feature][action][round], the same res.H the scores above use: a weight
+        # on a hidden feature, or of an action that is not offered, is never learned and stays at its
+        # first value (the page fades those flat lines).
+        beliefs=np.round(res.H[:T, now].transpose(2, 1, 0), 3).tolist(),
         U=U.tolist(), F=F_now.tolist(), A=A_now.tolist(), delta=delta,
         choice=dict(x=x_ref.tolist(), picks=(picks + 1).tolist(), best=best_move + 1, missed=missed.tolist()),
         acc_limit=float(acc_limit[now]), reg_limit=float(reg_limit[now]),
@@ -425,6 +425,210 @@ def api_world():
         _matrix("U", K, n), _matrix("H", K, n), _mask("F", n), _mask("A", K), curve_name,
         _num("p1", spec["default"], spec["min"], spec["max"]),
         int(_num("T", 100, 10, 300)), _num("delta", 0.95, 0.01, 0.99),
+        full=request.args.get("rank", "1") != "0",
+    ))
+
+
+# ---------------------------------------------------------------------------
+# Correlated features (Guan et al. 2026): three features, a budget of k per round
+# ---------------------------------------------------------------------------
+
+CORR_FEATURES, CORR_SCATTER = 3, 300
+
+DEFAULT_CORRELATED = dict(
+    # Features 1 and 2 are the pair to commit to, but feature 3 moves with both and is misjudged, so it is
+    # filled in wrongly forever unless it is shown first: 12 rounds of exploring halve the discounted regret.
+    U=[[-1.5, 0.5, 0.0], [0.5, 1.5, -1.0], [1.0, -1.5, 0.0]],
+    H=[[-1.5, -1.0, 1.5], [-0.5, 0.5, 1.5], [1.5, -1.5, -0.5]],
+    rho=[0.8, 0.8, 0.6], k=2, explore=12, C=[1, 1, 0], curve="exponential", p1=0.15, T=120, delta=0.97,
+)
+
+
+def _explore_grid(T, cycle, size=20):
+    """Exploration lengths the ranking tries: whole rotations, at most `size` of them, within the horizon."""
+    step = cycle * max(1, math.ceil(T / (cycle * size)))
+    return list(range(step, T, step))
+
+
+@lru_cache(maxsize=256)
+def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speed, T, delta, full=True):
+    """Score explore-then-commit policies under correlated features. Every policy explores with the same
+    rotation, so the exploration rounds are scored once and each policy only adds its committed rounds."""
+    U, H0 = np.array(U_rows), np.array(H_rows)
+    K, n = U.shape
+    Sigma = correlated.correlation_matrix(*rho)
+    X = correlated.probes(Sigma, N_PROBES)
+    score = correlated.Scorer(U, Sigma, X)
+    curve = CURVE_SPECS[curve_name]["make"](speed)
+    commit = np.array(commit)
+
+    cycle = correlated.rotation(n, k)
+    rot_masks = correlated.explore_then_commit(n, k, T, cycle[0], T + 1)
+    rot_counts = correlated.exposure(rot_masks)                       # (T + 1, n): counts before round t
+    rot_scores = score(correlated.beliefs(U, H0, curve, rot_counts[:T]), rot_masks[:T])
+
+    fixed = [m for m in _subsets(n) if m.sum() <= k]
+    policies = [(explore, tuple(commit))] + [(0, tuple(m)) for m in fixed]
+    if full:
+        policies += [(e, tuple(m)) for e in _explore_grid(T, len(cycle)) for m in fixed]
+    policies = list(dict.fromkeys(policies))          # the bench policy may also be on the grid; keep it first
+
+    # every committed round of every policy, scored in one batch
+    counts, masks, owner = [], [], []
+    for p, (e, m) in enumerate(policies):
+        e = min(e, T)
+        steps = np.arange(T - e)[:, None]
+        counts.append(rot_counts[e] + steps * np.array(m))
+        masks.append(np.broadcast_to(m, (T - e, n)))
+        owner.append(np.full(T - e, p))
+    counts, masks = np.concatenate(counts), np.concatenate(masks)
+    committed = score(correlated.beliefs(U, H0, curve, counts), masks)
+
+    acc, reg, gap = (np.tile(series[:, None], (1, len(policies))) for series in rot_scores)   # (T, policies)
+    owner = np.concatenate(owner)
+    for p, (e, _) in enumerate(policies):
+        rounds = np.arange(min(e, T), T)
+        for out, series in zip((acc, reg, gap), committed):
+            out[rounds, p] = series[owner == p]
+    discounted = ((delta ** np.arange(T))[:, None] * reg).sum(axis=0)
+
+    # once the committed features are learned: they reach the truth, the others stay where exploration left them
+    policy_masks = np.array([m for _, m in policies])
+    frozen = correlated.beliefs(U, H0, curve, np.array([rot_counts[min(e, T)] for e, _ in policies]))
+    lim_H = np.where(policy_masks[:, None, :], U, frozen)
+    acc_limit, reg_limit, _ = score(lim_H, policy_masks)
+
+    payoff = U @ X.T
+    worst_regret = float((payoff.max(axis=0) - payoff.min(axis=0)).mean())
+    value_bound = float(max(payoff.max(axis=0).mean(), np.abs(rot_scores[2]).max(), np.abs(gap).max()))
+
+    def label(e, m):
+        shown = _describe(np.array(m), "feature")
+        return f"show {shown} every round" if e == 0 else f"explore {e} rounds, then show {shown}"
+
+    def row(p, rank=None):
+        e, m = policies[p]
+        return dict(rank=rank, explore=int(e), mask=[bool(v) for v in m], label=label(e, m),
+                    discounted=float(discounted[p]), floor=float(reg_limit[p]),
+                    start=float(acc[0, p]), end=float(acc[-1, p]), current=p == 0)
+
+    fixed_ids = [p for p, (e, _) in enumerate(policies) if e == 0]
+    best_fixed = min(fixed_ids, key=lambda p: (discounted[p], p))
+    bench_is_fixed = explore == 0
+
+    sentence = (f"Exploring for {explore} round{'s' if explore != 1 else ''} and then showing "
+                f"{_describe(commit, 'feature')}" if explore else f"Showing {_describe(commit, 'feature')} every round")
+    sentence += (f", the human picks the best move {acc[0, 0]:.0%} of the time at round 0 and "
+                 f"{acc[-1, 0]:.0%} by round {T - 1}. ")
+    hidden = ~commit
+    if reg_limit[0] > 1e-9 and hidden.any():
+        sentence += (f"{_describe(hidden, 'feature').capitalize()} {'is' if hidden.sum() == 1 else 'are'} filled in "
+                     f"from what is shown, using beliefs that are never corrected, so {reg_limit[0]:.2f} of utility "
+                     "is lost every round for good. ")
+    elif reg_limit[0] <= 1e-9:
+        sentence += "Once the committed features are learned, the human always picks the best move. "
+
+    ranking = None
+    if full:
+        order = np.argsort(discounted, kind="stable")
+        rank = {int(p): i + 1 for i, p in enumerate(order)}
+        best = int(order[0])
+        listed = sorted(set(order[:10].tolist()) | {0, best_fixed}, key=rank.get)
+        if best != 0 and discounted[best] < discounted[0] - 1e-9:
+            sentence += f"The best policy found is to {label(*policies[best])}, at {discounted[best]:.2f}. "
+        if policies[best][0] == 0:
+            sentence += "No exploration beats the best fixed subset here."
+        else:
+            sentence += (f"Never exploring costs at least {discounted[best_fixed]:.2f}, so the best fixed subset keeps "
+                         f"only {discounted[best] / discounted[best_fixed]:.0%} of that performance.")
+        # discounted regret against the exploration length, one curve per committed subset
+        lengths = [0] + _explore_grid(T, len(cycle))
+        where = {pol: p for p, pol in enumerate(policies)}
+        sweep = [dict(mask=[bool(v) for v in m], label=_describe(m, "feature"),
+                      discounted=[float(discounted[where[(e, tuple(m))]]) for e in lengths]) for m in fixed]
+        ranking = dict(rows=[row(p, rank[p]) for p in listed], total=len(policies), rank=rank[0],
+                       best=row(best, 1), best_fixed=row(best_fixed, rank[best_fixed]),
+                       retained=float(discounted[best] / discounted[best_fixed]) if discounted[best_fixed] > 1e-12 else 1.0,
+                       sweep=dict(lengths=lengths, curves=sweep))
+
+    # the bench policy, round by round
+    bench_masks = correlated.explore_then_commit(n, k, explore, commit, T)
+    bench_H = correlated.beliefs(U, H0, curve, correlated.exposure(bench_masks))           # (T, K, n)
+    effective = lambda t: score.effective(bench_H[t], bench_masks[t])
+    truth_eff = score.effective(U, commit)
+
+    # a sample of the probe states, with the best move and the human's pick at the first and last round
+    Xs = X[:CORR_SCATTER]
+    best_move = (U @ Xs.T).argmax(axis=0)
+    pick = lambda t: (effective(t) @ Xs.T).argmax(axis=0)
+
+    ref = None if bench_is_fixed and best_fixed == 0 else best_fixed
+    return dict(
+        K=K, n=n, T=T, k=k, delta=delta, rho=list(rho), Sigma=Sigma.round(4).tolist(),
+        numeral=f"{discounted[0]:.2f}", numeral_label="expected discounted regret",
+        sentence=sentence.strip(), full=full, ranking=ranking,
+        stats=[
+            dict(label=f"Best move picked at round {T - 1}", value=f"{acc[-1, 0]:.0%}",
+                 note=f"heading for {acc_limit[0]:.0%} once the committed features are learned"),
+            dict(label="Regret per round once learned", value=f"{reg_limit[0]:.2f}",
+                 note="what wrongly filled-in features keep costing" if reg_limit[0] > 1e-9 else "nothing is lost for good"),
+            dict(label="Best fixed subset", value=f"{discounted[best_fixed]:.2f}",
+                 note=f"discounted regret showing {_describe(np.array(policies[best_fixed][1]), 'feature')} every round"),
+            dict(label="Against the best fixed subset", value=f"{discounted[0] - discounted[best_fixed]:+.2f}",
+                 note="this is the best fixed subset" if ref is None else "discounted regret, negative is better"),
+        ],
+        series=dict(acc=np.round(acc[:, 0], 4).tolist(), reg=np.round(reg[:, 0], 4).tolist(),
+                    discounted=np.round(delta ** np.arange(T) * reg[:, 0], 4).tolist(),
+                    value_gap=np.round(gap[:, 0], 4).tolist(),
+                    ref_acc=None if ref is None else np.round(acc[:, ref], 4).tolist(),
+                    ref_discounted=None if ref is None else np.round(delta ** np.arange(T) * reg[:, ref], 4).tolist()),
+        ref_label=None if ref is None else label(*policies[ref]),
+        schedule=bench_masks.astype(int).T.tolist(),                                      # [feature][round]
+        beliefs=np.round(bench_H.transpose(2, 1, 0), 3).tolist(),                          # [feature][action][round]
+        U=U.tolist(), C=commit.tolist(), explore=explore,
+        effective=dict(first=np.round(effective(0), 3).tolist(), last=np.round(effective(T - 1), 3).tolist(),
+                       truth=np.round(truth_eff, 3).tolist(), first_mask=bench_masks[0].tolist()),
+        scatter=dict(x=np.round(Xs, 3).tolist(), best=(best_move + 1).tolist(),
+                     first=(pick(0) + 1).tolist(), last=(pick(T - 1) + 1).tolist()),
+        acc_limit=float(acc_limit[0]), reg_limit=float(reg_limit[0]),
+        worst_regret=worst_regret, value_bound=value_bound,
+    )
+
+
+def _rho():
+    try:
+        rho = tuple(float(v) for v in request.args.get("rho", "").split(","))
+    except ValueError:
+        abort(400, "rho must be three numbers")
+    if len(rho) != 3 or not all(math.isfinite(r) and abs(r) <= 0.95 for r in rho):
+        abort(400, "rho must be three correlations in [-0.95, 0.95]")
+    if not correlated.is_valid(correlated.correlation_matrix(*rho)):
+        abort(400, "these three correlations cannot occur together")
+    return rho
+
+
+@app.route("/correlated")
+def correlated_page():
+    specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
+    return render_template("correlated.html", curve_specs=specs, default_world=DEFAULT_CORRELATED, page="correlated",
+                           max_actions=MAX_ACTIONS)
+
+
+@app.route("/api/correlated")
+def api_correlated():
+    curve_name = request.args.get("curve", "exponential")
+    if curve_name not in CURVE_SPECS:
+        abort(400, "unknown curve")
+    spec = CURVE_SPECS[curve_name]
+    K, n = int(_num("K", 3, 2, MAX_ACTIONS)), CORR_FEATURES
+    k = int(_num("k", 2, 1, n - 1))
+    T = int(_num("T", 120, 10, 300))
+    commit = _mask("C", n)
+    if sum(commit) > k:
+        abort(400, f"at most {k} features can be shown per round")
+    return jsonify(run_correlated(
+        _matrix("U", K, n), _matrix("H", K, n), _rho(), k, int(_num("explore", 0, 0, T)), commit, curve_name,
+        _num("p1", spec["default"], spec["min"], spec["max"]), T, _num("delta", 0.95, 0.01, 0.99),
         full=request.args.get("rank", "1") != "0",
     ))
 
