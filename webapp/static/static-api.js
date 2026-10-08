@@ -6,7 +6,7 @@
   "use strict";
 
   const MEAN_ABS_X = Math.sqrt(2 / Math.PI);          // E|x| for x ~ N(0, 1)
-  const MAX_ACTIONS = 6, MAX_FEATURES = 6;
+  const MAX_ACTIONS = 6, MAX_FEATURES = 6, MAX_WINDOWS = 12;
 
   const sigmoid = (p, m) => {
     const w = p / 5, s = 1 / (1 + Math.exp(-(m - p) / w)), s0 = 1 / (1 + Math.exp(p / w));
@@ -72,20 +72,17 @@
     const curveName = q.has("curve") ? q.get("curve") : "exponential";
     if (!(curveName in CURVES)) throw new BadRequest("unknown curve");
     const spec = CURVES[curveName];
-    let split = q.get("split") === "1";
-    const p1 = num(q, "p1", spec.def, spec.min, spec.max);
-    const p2 = split ? num(q, "p2", spec.def, spec.min, spec.max) : p1;
-    split = split && p1 !== p2;           // equal speeds are one shared curve
+    const speed = num(q, "p1", spec.def, spec.min, spec.max);   // one feature, so one curve for both actions
     const u1 = num(q, "u1", 1.2, -3, 3), u2 = num(q, "u2", 1.0, -3, 3);
     const h1 = num(q, "h1", 0.0, -3, 3), h2 = num(q, "h2", 1.5, -3, 3);
     const T = Math.trunc(num(q, "T", 80, 10, 400)), delta = num(q, "delta", 0.95, 0.01, 0.99);
     const du = u1 - u2, dh0 = h1 - h2;
 
     // everything is shown every round, so the beliefs follow the learning curve in closed form
-    const left1 = [], left2 = [], b1 = [], b2 = [], gap = [], wrong = [];
+    const left = [], b1 = [], b2 = [], gap = [], wrong = [];
     for (let t = 0; t < T; t++) {
-      left1.push(1 - spec.phi(p1, t)); left2.push(1 - spec.phi(p2, t));
-      b1.push(u1 + (h1 - u1) * left1[t]); b2.push(u2 + (h2 - u2) * left2[t]);
+      left.push(1 - spec.phi(speed, t));
+      b1.push(u1 + (h1 - u1) * left[t]); b2.push(u2 + (h2 - u2) * left[t]);
       gap.push(b1[t] - b2[t]);
       wrong.push(du !== 0 && !(gap[t] * du > 0));
     }
@@ -112,17 +109,13 @@
     } else if (!Number.isFinite(settle)) {
       [numeral, label, sentence] = ["never", `within ${T} rounds`,
         `With a ${gaps}, the human is still picking the wrong action at the end of the horizon. Lengthen the horizon or speed up the learner to see the flip.`];
-    } else if (switches <= 1) {
+    } else {      // the shared curve lets the belief gap cross zero only once
       [numeral, label, sentence] = [String(settle), "round of the flip",
         `The human starts with the wrong sign (${gaps}), picks the wrong action for ${nWrong} round${nWrong !== 1 ? "s" : ""}, and is right from round ${settle} on.`];
-    } else {
-      [numeral, label, sentence] = [String(settle), "round of the final flip",
-        `The choice changes ${switches} times. The human ${wrong[0] ? "" : "starts right, "}goes wrong at round ${wrong.indexOf(true)}, is wrong on ${nWrong} rounds in total, and is right for good from round ${settle}.`];
     }
 
     let needed;
-    if (split) needed = { value: "varies", note: "each action has its own curve, so no single threshold" };
-    else if (du === 0) needed = { value: "—", note: "the actions are equally good" };
+    if (du === 0) needed = { value: "—", note: "the actions are equally good" };
     else {
       const phiStar = du * dh0 > 0 ? 0 : Math.abs(dh0) / (Math.abs(dh0) + Math.abs(du));
       needed = { value: pct(phiStar), note: "of the belief-to-truth gap must close before the sign is right" };
@@ -148,7 +141,7 @@
         const e1 = (hMid + gh / 2) - (uMid + gu / 2), e2 = (hMid - gh / 2) - (uMid - gu / 2);
         let lastWrong = -1;
         for (let t = 0; t < T; t++) {
-          const g = (uMid + gu / 2 + e1 * left1[t]) - (uMid - gu / 2 + e2 * left2[t]);
+          const g = (uMid + gu / 2 + e1 * left[t]) - (uMid - gu / 2 + e2 * left[t]);
           if (!(g * gu > 0)) lastWrong = t;
         }
         row.push(scale.bin(lastWrong === T - 1 ? Infinity : lastWrong + 1));
@@ -163,7 +156,7 @@
       stats: [
         Object.assign({ label: "Learning needed" }, needed),
         { label: "Rounds wrong", value: String(nWrong), note: `out of ${T} simulated` },
-        { label: "Choice changes", value: String(switches), note: switches > 1 ? "more than one means the choice un-flipped" : "right/wrong switches" },
+        { label: "Choice changes", value: String(switches), note: "right/wrong switches" },
         { label: "Expected discounted regret", value: f2(regret),
           note: wrong[T - 1] ? `lower bound: still wrong at round ${T}` : `δ = ${delta}, states x ~ N(0, 1)` },
       ],
@@ -203,23 +196,63 @@
     if (m.length !== size || !m.some(Boolean)) throw new BadRequest(`${name} must switch on at least one of ${size}`);
     return m;
   }
+  // The learning speed of each feature: ps='0.05,0.1,0.2' gives every feature its own, otherwise all share p1.
+  function speedsOf(q, spec, n) {
+    const raw = (q.get("ps") || "").trim();
+    if (!raw) return Array(n).fill(num(q, "p1", spec.def, spec.min, spec.max));
+    const speeds = raw.split(",").map((v) => (v.trim() === "" ? NaN : Number(v)));
+    if (speeds.some((v) => Number.isNaN(v))) throw new BadRequest("ps must be numbers");
+    if (speeds.length !== n || !speeds.every(Number.isFinite)) throw new BadRequest(`ps must be ${n} speeds, one per feature`);
+    return speeds.map((v) => Math.min(Math.max(v, spec.min), spec.max));
+  }
+
   // every non-empty on/off mask, in the order of Python's itertools.product([False, True], repeat=size)
   const subsets = (size) => Array.from({ length: (1 << size) - 1 }, (_, m) =>
     Array.from({ length: size }, (_, j) => Boolean(((m + 1) >> (size - 1 - j)) & 1)));
+
+  // W='f3:20-25;a1:40-60': feature 3 hidden in rounds 20 to 25, action 1 not offered in rounds 40 to 60,
+  // both ends included; cut to the horizon.
+  function parseWindows(q, K, n, T) {
+    const raw = (q.get("W") || "").trim();
+    if (!raw) return [];
+    const parts = raw.split(";");
+    if (parts.length > MAX_WINDOWS) throw new BadRequest(`at most ${MAX_WINDOWS} windows`);
+    const windows = [];
+    for (const part of parts) {
+      const match = /^([fa])(\d{1,4}):(\d{1,4})-(\d{1,4})$/.exec(part.trim());
+      if (!match) throw new BadRequest("W must look like f3:20-25;a1:40-60");
+      const kind = match[1], index = Number(match[2]), first = Number(match[3]), last = Number(match[4]);
+      if (index < 1 || index > (kind === "f" ? n : K) || first > last) {
+        throw new BadRequest("a window names an existing feature or action and a first round no later than its last");
+      }
+      if (first < T) windows.push({ kind, index: index - 1, first, last: Math.min(last, T - 1) });
+    }
+    return windows;
+  }
 
   async function world(q, signal) {
     const curveName = q.has("curve") ? q.get("curve") : "exponential";
     if (!(curveName in CURVES)) throw new BadRequest("unknown curve");
     const spec = CURVES[curveName];
     const K = Math.trunc(num(q, "K", 3, 2, MAX_ACTIONS)), n = Math.trunc(num(q, "n", 3, 1, MAX_FEATURES));
+    const T = Math.trunc(num(q, "T", 100, 10, 300));
+    const Fbase = mask(q, "F", n), Abase = mask(q, "A", K), windows = parseWindows(q, K, n, T);
+    // what is shown and what is offered in each round: the base mask, switched off inside each window
+    const scheduleOf = (base, kind) => Array.from({ length: T }, (_, t) =>
+      base.map((on, i) => on && !windows.some((w) => w.kind === kind && w.index === i && w.first <= t && t <= w.last)));
+    const Fbench = scheduleOf(Fbase, "f"), Abench = scheduleOf(Abase, "a");
+    for (const [rounds, problem] of [[Fbench, "show no feature"], [Abench, "offer no action"]]) {
+      const empty = rounds.findIndex((m) => !m.some(Boolean));
+      if (empty >= 0) throw new BadRequest(`round ${empty} would ${problem}`);
+    }
     const U = matrix(q, "U", K, n), H0 = matrix(q, "H", K, n);
-    const Fnow = mask(q, "F", n), Anow = mask(q, "A", K);
-    const speed = num(q, "p1", spec.def, spec.min, spec.max);
-    const T = Math.trunc(num(q, "T", 100, 10, 300)), delta = num(q, "delta", 0.95, 0.01, 0.99);
+    const speeds = speedsOf(q, spec, n);
+    const delta = num(q, "delta", 0.95, 0.01, 0.99);
     const full = q.get("rank") !== "0";
 
     const X = probes(n), P = X.length / n;
-    const phis = Array.from({ length: T }, (_, t) => spec.phi(speed, t));
+    // phis[j][m]: how much of feature j's gap is closed after m rounds in use
+    const phis = speeds.map((speed) => Array.from({ length: T + 1 }, (_, m) => spec.phi(speed, m)));
 
     // what every action is truly worth in every probe state, and the regret of picking it
     const regretOf = new Float64Array(P * K), bestTrue = new Float64Array(P);
@@ -239,38 +272,70 @@
       worstRegret += (hi - lo) / P; vTrue += hi / P; vBelief += believed / P;
     }
 
-    // One fixed policy (features shown, actions offered). Shown weights move from H0 to U along the
-    // curve, so the human's score in a probe state is a blend of two fixed scores.
-    function score(F, A) {
-      const ks = [];
-      for (let k = 0; k < K; k++) if (A[k]) ks.push(k);
-      const e0 = new Float64Array(P * K), e1 = new Float64Array(P * K);
-      for (let p = 0; p < P; p++) for (const k of ks) {
-        let s0 = 0, s1 = 0;
-        for (let j = 0; j < n; j++) if (F[j]) { const x = X[p * n + j]; s0 += H0[k][j] * x; s1 += U[k][j] * x; }
-        e0[p * K + k] = s0; e1[p * K + k] = s1;
-      }
-      const at = (f) => {
-        let acc = 0, reg = 0, gap = 0;
-        for (let p = 0; p < P; p++) {
-          let top = -Infinity, sumR = 0, sumOk = 0, count = 0;
-          for (const k of ks) {
-            const i = p * K + k, v = e0[i] + f * (e1[i] - e0[i]), r = regretOf[i];
-            if (v > top) { top = v; sumR = r; sumOk = r <= 1e-12 ? 1 : 0; count = 1; }
-            else if (v === top) { sumR += r; sumOk += r <= 1e-12 ? 1 : 0; count++; }   // ties are split evenly
-          }
-          acc += sumOk / count; reg += sumR / count; gap += bestTrue[p] - top;
+    // Every action's score in every probe state for one set of shown features, from the first beliefs
+    // (e0) and from the truth (e1). A weight in use moves from H0 to U along its feature's curve, so while
+    // an action's shown weights are all equally far along, its score is a blend of the two.
+    const blends = new Map();
+    function blend(F) {
+      const key = F.map((on) => (on ? 1 : 0)).join("");
+      if (!blends.has(key)) {
+        const e0 = new Float64Array(P * K), e1 = new Float64Array(P * K);
+        for (let p = 0; p < P; p++) for (let k = 0; k < K; k++) {
+          let s0 = 0, s1 = 0;
+          for (let j = 0; j < n; j++) if (F[j]) { const x = X[p * n + j]; s0 += H0[k][j] * x; s1 += U[k][j] * x; }
+          e0[p * K + k] = s0; e1[p * K + k] = s1;
         }
-        return [acc / P, reg / P, gap / P];
-      };
-      const acc = [], reg = [], vgap = [];
+        blends.set(key, { e0, e1 });
+      }
+      return blends.get(key);
+    }
+
+    // Accuracy, regret and value gap of one round: features F shown, actions A offered, and N[k][j]
+    // rounds of learning behind each weight (no N: everything in use is fully learned).
+    function evaluate(F, A, N) {
+      const ks = [], js = [];
+      A.forEach((on, k) => { if (on) ks.push(k); });
+      F.forEach((on, j) => { if (on) js.push(j); });
+      let even = !N || js.every((j) => speeds[j] === speeds[js[0]]);
+      const f = ks.map((k) => {
+        if (!N) return 1;
+        if (js.some((j) => N[k][j] !== N[k][js[0]])) even = false;
+        return phis[js[0]][N[k][js[0]]];
+      });
+      const mix = even ? blend(F) : null;
+      // separate speeds, or windows, have left an action's shown weights at different stages: score from the weights themselves
+      const weights = even ? null : ks.map((k) => js.map((j) => U[k][j] + (H0[k][j] - U[k][j]) * (1 - phis[j][N[k][j]])));
+      let acc = 0, reg = 0, gap = 0;
+      for (let p = 0; p < P; p++) {
+        let top = -Infinity, sumR = 0, sumOk = 0, count = 0;
+        for (let a = 0; a < ks.length; a++) {
+          const i = p * K + ks[a], r = regretOf[i];
+          let v = 0;
+          if (even) v = mix.e0[i] + f[a] * (mix.e1[i] - mix.e0[i]);
+          else for (let b = 0; b < js.length; b++) v += weights[a][b] * X[p * n + js[b]];
+          if (v > top) { top = v; sumR = r; sumOk = r <= 1e-12 ? 1 : 0; count = 1; }
+          else if (v === top) { sumR += r; sumOk += r <= 1e-12 ? 1 : 0; count++; }   // ties are split evenly
+        }
+        acc += sumOk / count; reg += sumR / count; gap += bestTrue[p] - top;
+      }
+      return [acc / P, reg / P, gap / P];
+    }
+
+    // One policy: the features shown and the actions offered in each round. With `keep`, the beliefs
+    // of every round are returned too, as [round][action][feature].
+    function score(Ft, At, keep) {
+      const N = U.map((row) => row.map(() => 0));
+      const acc = [], reg = [], vgap = [], beliefs = [];
       let disc = 0;
       for (let t = 0; t < T; t++) {
-        const [a, r, g] = at(phis[t]);
+        const [a, r, g] = evaluate(Ft[t], At[t], N);
         acc.push(a); reg.push(r); vgap.push(g); disc += Math.pow(delta, t) * r;
+        if (keep) beliefs.push(U.map((row, k) => row.map((u, j) => u + (H0[k][j] - u) * (1 - phis[j][N[k][j]]))));
+        for (let k = 0; k < K; k++) if (At[t][k]) for (let j = 0; j < n; j++) if (Ft[t][j]) N[k][j]++;
       }
-      const [accLimit, regLimit] = at(1);
-      return { acc, reg, vgap, disc, accLimit, regLimit };
+      // once everything shown is learned: the last round's choice, kept up until every weight in use is right
+      const [accLimit, regLimit] = evaluate(Ft[T - 1], At[T - 1], null);
+      return { acc, reg, vgap, disc, accLimit, regLimit, beliefs };
     }
 
     // Ranking every subset can take a while for large worlds: give the page a turn now and then,
@@ -284,45 +349,76 @@
       if (signal && signal.aborted) throw aborted();
     };
 
-    const allF = Array(n).fill(true), allA = Array(K).fill(true);
-    const now = score(Fnow, Anow);
-    const heldBack = !(Fnow.every(Boolean) && Anow.every(Boolean));
-    const everything = heldBack ? score(allF, allA) : now;
+    const same = (a, b) => a.every((v, i) => v === b[i]);
+    const every = (set) => Array(T).fill(set);                    // a fixed subset, the same every round
+    const steady = (rounds) => rounds.every((m) => same(m, rounds[0]));
+    const now = score(Fbench, Abench, true);
+    const heldBack = !(Fbench.every((m) => m.every(Boolean)) && Abench.every((m) => m.every(Boolean)));
+    const everything = heldBack ? score(every(Array(n).fill(true)), every(Array(K).fill(true))) : now;
 
-    const hidden = [], offF = Fnow.map((v) => !v), offA = Anow.map((v) => !v);
-    if (offF.some(Boolean)) hidden.push(describe(offF, "feature") + (offF.filter(Boolean).length === 1 ? " stays" : " stay") + " hidden");
-    if (offA.some(Boolean)) hidden.push(describe(offA, "action") + (offA.filter(Boolean).length === 1 ? " is" : " are") + " never offered");
-    let sentence = `Showing ${describe(Fnow, "feature")} and offering ${describe(Anow, "action")}, the human picks the best move ${pct(now.acc[0])} of the time at round 0 and ${pct(now.acc[T - 1])} by round ${T - 1}. `;
-    sentence += now.regLimit > 1e-9
-      ? `Even after learning everything shown, ${f2(now.regLimit)} of utility is lost per round` + (hidden.length ? ` because ${humanList(hidden)}. ` : ". ")
-      : "Once everything shown is learned, the human always picks the best move. ";
+    // What the last round holds back decides the lasting loss. Usually that is what was held back all
+    // along; a window that runs to the end of the horizon leaves something out that was in use before.
+    const Fend = Fbench[T - 1], Aend = Abench[T - 1];
+    const used = (rounds) => rounds[0].map((_, i) => rounds.some((m) => m[i]));
+    const settled = same(used(Fbench), Fend) && same(used(Abench), Aend);
+    const scheduled = !(steady(Fbench) && steady(Abench));
+    const hidden = [], offF = Fend.map((v) => !v), offA = Aend.map((v) => !v);
+    if (offF.some(Boolean)) {
+      const one = offF.filter(Boolean).length === 1;
+      hidden.push(describe(offF, "feature") + (settled ? (one ? " stays" : " stay") + " hidden" : (one ? " is" : " are") + " hidden at the end"));
+    }
+    if (offA.some(Boolean)) {
+      hidden.push(describe(offA, "action") + (offA.filter(Boolean).length === 1 ? " is" : " are") + (settled ? " never offered" : " not offered at the end"));
+    }
+    const live = windows.filter((w) => (w.kind === "f" ? Fbase : Abase)[w.index]);
+    const windowText = !live.length ? "" : live.length > 2 ? `, with ${live.length} timed windows`
+      : ", with " + live.map((w) => `${w.kind === "f" ? "feature" : "action"} ${w.index + 1} ${w.kind === "f" ? "hidden" : "not offered"} in `
+        + (w.first === w.last ? `round ${w.first}` : `rounds ${w.first}–${w.last}`)).join(" and ");
+    let sentence = `Showing ${describe(Fbase, "feature")} and offering ${describe(Abase, "action")}${windowText}, the human picks the best move ${pct(now.acc[0])} of the time at round 0 and ${pct(now.acc[T - 1])} by round ${T - 1}. `;
+    if (now.regLimit > 1e-9) {
+      sentence += (settled ? `Even after learning everything shown, ${f2(now.regLimit)} of utility is lost per round`
+        : `If the last round's choice carried on until everything shown is learned, ${f2(now.regLimit)} of utility would still be lost per round`)
+        + (hidden.length ? ` because ${humanList(hidden)}. ` : ". ");
+    } else {
+      sentence += settled ? "Once everything shown is learned, the human always picks the best move. "
+        : "Once everything shown at the end is learned, the human always picks the best move. ";
+    }
 
     let rankings = null;
     if (full) {
-      const same = (a, b) => a.every((v, i) => v === b[i]);
-      const rank = async (sets, chosen, noun, policy) => {
-        const results = [];
-        for (const set of sets) { results.push(same(set, chosen) ? now : score(...policy(set))); await breathe(); }
-        const order = sets.map((_, i) => i).sort((a, b) => results[a].disc - results[b].disc || a - b);
+      // Rank one family of fixed subsets; the bench is one of them unless its windows change this
+      // family over the rounds, and then it is ranked as an extra row.
+      const rank = async (sets, bench, noun, policy) => {
+        const fixed = steady(bench), results = [];
+        for (const set of sets) { results.push(fixed && same(set, bench[0]) ? now : score(...policy(set))); await breathe(); }
+        if (!fixed) results.push(now);
+        const order = results.map((_, i) => i).sort((a, b) => results[a].disc - results[b].disc || a - b);
         const place = {};
         order.forEach((i, r) => { place[i] = r + 1; });
-        const current = sets.findIndex((set) => same(set, chosen));
-        const listed = [...new Set(order.slice(0, 8).concat([current]))].sort((a, b) => place[a] - place[b]);
+        const here = fixed ? sets.findIndex((set) => same(set, bench[0])) : sets.length;
+        const listed = [...new Set(order.slice(0, 8).concat([here]))].sort((a, b) => place[a] - place[b]);
+        const best = order.find((i) => i < sets.length);
         return {
-          rows: listed.map((i) => ({ rank: place[i], mask: sets[i], label: describe(sets[i], noun), discounted: results[i].disc,
-            start: results[i].acc[0], end: results[i].acc[T - 1], floor: results[i].regLimit, current: i === current })),
-          total: sets.length, rank: place[current], best: { set: sets[order[0]], disc: results[order[0]].disc },
+          rows: listed.map((i) => {
+            const extra = i === sets.length;
+            return { rank: place[i], mask: extra ? null : sets[i], label: extra ? "the schedule on the bench" : describe(sets[i], noun),
+              discounted: results[i].disc, start: results[i].acc[0], end: results[i].acc[T - 1], floor: results[i].regLimit,
+              current: i === here, scheduled: extra };
+          }),
+          total: results.length, rank: place[here], best: { set: sets[best], disc: results[best].disc },
         };
       };
-      const byFeature = await rank(subsets(n), Fnow, "feature", (set) => [set, Anow]);
-      const byAction = await rank(subsets(K), Anow, "action", (set) => [Fnow, set]);
+      const byFeature = await rank(subsets(n), Fbench, "feature", (set) => [every(set), Abench]);
+      const byAction = await rank(subsets(K), Abench, "action", (set) => [Fbench, every(set)]);
+      const kept = scheduled ? " every round" : "";       // a fixed subset, against a schedule that changes
       const featureHelps = byFeature.best.disc < now.disc - 1e-9;
-      if (featureHelps) sentence += `Showing ${describe(byFeature.best.set, "feature")} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
+      if (featureHelps) sentence += `Showing ${describe(byFeature.best.set, "feature")}${kept} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
       if (byAction.best.disc < now.disc - 1e-9) {
-        const offer = `ffering ${describe(byAction.best.set, "action")} instead would cut`;
+        const offer = `ffering ${describe(byAction.best.set, "action")}${kept} instead would cut`;
         sentence += featureHelps ? `Separately, o${offer} it to ${f2(byAction.best.disc)}.` : `O${offer} the discounted regret to ${f2(byAction.best.disc)}.`;
       } else if (!featureHelps) {
-        sentence += "Changing only the features, or only the actions, does no better over this horizon.";
+        sentence += scheduled ? "No fixed choice of the features alone, or of the actions alone, does better over this horizon."
+          : "Changing only the features, or only the actions, does no better over this horizon.";
       }
       delete byFeature.best; delete byAction.best;
       rankings = { features: byFeature, actions: byAction };
@@ -331,16 +427,19 @@
     // the choice for the state with every feature at +1: shown beliefs summed per offered action
     const worth = U.map((row) => row.reduce((a, b) => a + b, 0));
     const top = Math.max(...worth), bestMove = worth.indexOf(top);
-    const picks = phis.map((f) => {
+    const picks = now.beliefs.map((H, t) => {
       let pick = -1, bestScore = -Infinity;
       for (let k = 0; k < K; k++) {
-        if (!Anow[k]) continue;
+        if (!Abench[t][k]) continue;
         let v = 0;
-        for (let j = 0; j < n; j++) if (Fnow[j]) v += U[k][j] + (H0[k][j] - U[k][j]) * (1 - f);
+        for (let j = 0; j < n; j++) if (Fbench[t][j]) v += H[k][j];
         if (v > bestScore) { bestScore = v; pick = k; }     // ties go to the lowest-numbered action
       }
       return pick;
     });
+    const changed = (rounds, t) => !same(rounds[t], rounds[t - 1]);
+    const changes = [];
+    for (let t = 1; t < T; t++) if (changed(Fbench, t) || changed(Abench, t)) changes.push(t);
 
     return {
       K, n, T, numeral: f2(now.disc), numeral_label: "expected discounted regret",
@@ -359,11 +458,15 @@
         value_gap: now.vgap.map((v) => round(v, 4)),
         ref_acc: heldBack ? everything.acc.map((v) => round(v, 4)) : null,
       },
-      // Every weight over time as [feature][action][round]. A weight on a hidden feature, or of an action
-      // that is not offered, is never learned: it stays at its first value (the page fades those flat lines).
-      beliefs: Array.from({ length: n }, (_, j) => U.map((row, k) => phis.map((f) =>
-        round(row[j] + (H0[k][j] - row[j]) * (1 - (Fnow[j] && Anow[k] ? f : 0)), 3)))),
-      U, F: Fnow, A: Anow, delta,
+      // Every weight over time as [feature][action][round]. A weight on a hidden feature, or of an action that is
+      // not offered, is not learned in that round and keeps its value (the page fades those flat stretches).
+      beliefs: Array.from({ length: n }, (_, j) => U.map((_, k) => now.beliefs.map((H) => round(H[k][j], 3)))),
+      U, F: Fbase, A: Abase, delta,
+      // what is shown and offered round by round, as [feature][round] and [action][round], and the rounds at which that changes
+      schedule: {
+        F: Fbase.map((_, j) => Fbench.map((m) => (m[j] ? 1 : 0))), A: Abase.map((_, k) => Abench.map((m) => (m[k] ? 1 : 0))),
+      },
+      changes,
       choice: { x: Array(n).fill(1), picks: picks.map((k) => k + 1), best: bestMove + 1, missed: picks.map((k) => worth[k] < top - 1e-9) },
       acc_limit: now.accLimit, reg_limit: now.regLimit,
       worst_regret: worstRegret, value_bound: Math.max(vTrue, vBelief),
@@ -466,9 +569,9 @@
     const explore = Math.trunc(num(q, "explore", 0, 0, T));
     const commit = mask(q, "C", CORR_N);
     if (commit.filter(Boolean).length > k) throw new BadRequest(`at most ${k} features can be shown per round`);
-    const speed = num(q, "p1", spec.def, spec.min, spec.max);
+    const speeds = speedsOf(q, spec, CORR_N);
     const full = q.get("rank") !== "0";
-    const phi = (m) => spec.phi(speed, m);
+    const phi = (m, j) => spec.phi(speeds[j], m);       // feature j's own curve
 
     const Sigma = [[1, rho[0], rho[1]], [rho[0], 1, rho[2]], [rho[1], rho[2], 1]];
     const L = cholesky3(Sigma);
@@ -532,7 +635,7 @@
       return [acc / P, reg / P, gap / P];
     }
 
-    const belief = (counts) => U.map((row, a) => counts.map((c, j) => row[j] + (H0[a][j] - row[j]) * (1 - phi(c))));
+    const belief = (counts) => U.map((row, a) => counts.map((c, j) => row[j] + (H0[a][j] - row[j]) * (1 - phi(c, j))));
     const at = (counts, m) => scoreE(matmul(belief(counts), maskCode(m)));
 
     const cycle = rotation(k);
@@ -638,6 +741,16 @@
       return pick;
     };
 
+    // the choice for the state with every feature at +1: shown features seen, hidden ones filled in
+    const worth = U.map((row) => row.reduce((a, b) => a + b, 0));
+    const topWorth = Math.max(...worth);
+    const refPicks = Array.from({ length: T }, (_, t) => {
+      const E = matmul(belief(benchCounts(t)), maskCode(benchMask(t)));
+      let pick = 0, bestScore = -Infinity;
+      E.forEach((row, a) => { const v = row[0] + row[1] + row[2]; if (v > bestScore) { bestScore = v; pick = a; } });   // ties go to the lowest-numbered action
+      return pick;
+    });
+
     const ref = explore === 0 && bestFixed === 0 ? null : bestFixed;
     return {
       K, n: CORR_N, T, k, delta, rho, Sigma: Sigma.map((row) => row.map((v) => round(v, 4))),
@@ -662,8 +775,9 @@
       },
       ref_label: ref === null ? null : labelOf(...policies[ref]),
       schedule: [0, 1, 2].map((j) => Array.from({ length: T }, (_, t) => (benchMask(t)[j] ? 1 : 0))),
-      beliefs: [0, 1, 2].map((j) => U.map((row, a) => Array.from({ length: T }, (_, t) => round(row[j] + (H0[a][j] - row[j]) * (1 - phi(benchCounts(t)[j])), 3)))),
+      beliefs: [0, 1, 2].map((j) => U.map((row, a) => Array.from({ length: T }, (_, t) => round(row[j] + (H0[a][j] - row[j]) * (1 - phi(benchCounts(t)[j], j)), 3)))),
       U, C: commit.slice(), explore,
+      choice: { x: [1, 1, 1], picks: refPicks.map((a) => a + 1), best: worth.indexOf(topWorth) + 1, missed: refPicks.map((a) => worth[a] < topWorth - 1e-9) },
       effective: { first: roundM(E0, 3), last: roundM(ET, 3), truth: roundM(ETU, 3), first_mask: benchMask(0).slice() },
       scatter: {
         x: Array.from({ length: Math.min(CORR_SCATTER, P) }, (_, p) => [0, 1, 2].map((j) => round(X[p * CORR_N + j], 3))),

@@ -48,6 +48,17 @@ class FixedMasks:
         return np.broadcast_to(self.F, (B, n)), np.broadcast_to(self.A, (B, K))
 
 
+class ScheduledMasks:
+    """A policy that changes over the rounds: bool masks F (T, B, n) and A (T, B, K), one pair per
+    round, so a feature or an action can be held back for a stretch and brought back later."""
+
+    def __init__(self, F, A):
+        self.F, self.A = np.asarray(F, dtype=bool), np.asarray(A, dtype=bool)
+
+    def __call__(self, t, H, x, rng):
+        return self.F[t], self.A[t]
+
+
 def standard_normal(rng, B, n):
     return rng.standard_normal((B, n))
 

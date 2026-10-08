@@ -1,18 +1,25 @@
 // Bench for K actions and n features. The browser holds the inputs (two matrices and
 // two on/off masks); every number comes back from /api/world (simlab) and is drawn here.
+// The "Timed hiding" page is the same bench with one more input: windows of rounds in
+// which one feature or one action is held back.
 (function () {
   const SPECS = window.CURVE_SPECS;
   const $ = (id) => document.getElementById(id);
   const bench = $("bench");
   const SUB = ["₁", "₂", "₃", "₄", "₅", "₆"];
 
-  const world = { K: 3, n: 3, U: [], H: [], F: [], A: [] };
-  const REMEMBER = "decision-lab:worlds";
+  const TIMED = Boolean(window.TIMED_BENCH), MAX_WINDOWS = window.MAX_WINDOWS || 0, LAST_ROUND = 299;
+  // W: the windows, each {kind: "f" or "a", index, from, to}; hidden from round `from` to round `to`, both included
+  // S: null while every feature learns at the one speed p1, otherwise one speed per feature
+  const world = { K: 3, n: 3, U: [], H: [], F: [], A: [], W: [], S: null };
+  const REMEMBER = TIMED ? "decision-lab:timed" : "decision-lab:worlds";
 
   const randomWeight = () => Math.round((Math.random() * 4 - 2) * 10) / 10;
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
   const inputs = (key) => document.querySelectorAll(`[data-key="${key}"]`);
   const curve = () => document.querySelector('input[name="curve"]:checked').value;
+  const horizon = () => parseInt(inputs("T")[0].value, 10);
+  const span = (w) => [Math.min(w.from, w.to), Math.max(w.from, w.to)];   // either box may hold the earlier round
 
   // ---- world state -------------------------------------------------------
 
@@ -27,13 +34,17 @@
     world.A = Array.from({ length: K }, (_, k) => (world.A[k] !== undefined ? world.A[k] : true));
     if (!world.F.some(Boolean)) world.F[0] = true;
     if (!world.A.some(Boolean)) world.A[0] = true;
+    world.W = world.W.filter((w) => w.index >= 0 && w.index < (w.kind === "f" ? n : K));   // windows on what is gone go with it
     world.K = K;
     world.n = n;
   }
 
   // ---- drawing the inputs ------------------------------------------------
 
-  const SHADES = MatrixEditor.SHADES;
+  const speeds = Speeds.attach({
+    state: world, count: () => world.n, spec: () => SPECS[curve()], shared: () => parseFloat(inputs("p1")[0].value),
+    onChange: () => schedule(), onToggle: () => run(),
+  });
 
   function drawMatrix(name) {
     MatrixEditor.draw($("matrix-" + name), world, name,
@@ -58,10 +69,62 @@
     }));
   }
 
+  // One row per window: what it hides, its first and last round, and a button to remove it.
+  function drawWindows() {
+    if (!TIMED) return;
+    $("windows").replaceChildren(...world.W.map((w, at) => {
+      const row = document.createElement("div"), target = document.createElement("select");
+      row.className = "window";
+      target.setAttribute("aria-label", `Window ${at + 1}: what it hides`);
+      for (const [kind, count, prefix] of [["f", world.n, "x"], ["a", world.K, "a"]]) {
+        for (let i = 0; i < count; i++) target.add(new Option(prefix + SUB[i], kind + i, false, w.kind === kind && w.index === i));
+      }
+      target.addEventListener("change", () => { w.kind = target.value[0]; w.index = Number(target.value.slice(1)); run(); });
+      const boxes = {};
+      for (const [key, label] of [["from", "first"], ["to", "last"]]) {
+        const box = boxes[key] = document.createElement("input");
+        box.type = "number"; box.min = "0"; box.max = String(LAST_ROUND); box.step = "1";
+        box.value = w[key];
+        box.setAttribute("aria-label", `Window ${at + 1}: ${label} round`);
+        box.addEventListener("input", () => {
+          const v = parseInt(box.value, 10);
+          if (isNaN(v)) return;
+          w[key] = clamp(v, 0, LAST_ROUND);
+          schedule();
+        });
+        // once typing stops, put the earlier round first
+        box.addEventListener("change", () => { [w.from, w.to] = span(w); boxes.from.value = w.from; boxes.to.value = w.to; });
+      }
+      const to = document.createElement("span"), remove = document.createElement("button");
+      to.textContent = "to";
+      remove.type = "button";
+      remove.className = "remove";
+      remove.textContent = "\u00d7";
+      remove.setAttribute("aria-label", `Remove window ${at + 1}`);
+      remove.addEventListener("click", () => { world.W.splice(at, 1); drawWindows(); run(); });
+      row.append(target, boxes.from, to, boxes.to, remove);
+      return row;
+    }));
+    $("add-window").disabled = world.W.length >= MAX_WINDOWS;
+  }
+
+  // The first round the windows would leave with no feature to show or no action to offer, as a message.
+  function windowProblem() {
+    for (const [kind, mask, nothing] of [["f", world.F, "no feature to show"], ["a", world.A, "no action to offer"]]) {
+      for (let t = 0, T = horizon(); t < T; t++) {
+        const left = mask.some((on, i) => on && !world.W.some((w) => w.kind === kind && w.index === i && span(w)[0] <= t && t <= span(w)[1]));
+        if (!left) return `Round ${t} would have ${nothing}. Shorten a window or switch something else on.`;
+      }
+    }
+    return null;
+  }
+
   function drawAll() {
     document.querySelectorAll("[data-size]").forEach((el) => { el.value = world[el.dataset.size]; });
     drawChips("feature-chips", world.F, "x", "feature");
     drawChips("action-chips", world.A, "a", "action");
+    drawWindows();
+    speeds.fit();
     drawMatrix("U");
     drawMatrix("H");
   }
@@ -74,6 +137,7 @@
     });
     $("p1-label").textContent = spec.param;
     $("curve-hint").textContent = spec.param + ": " + spec.hint;
+    if (resetValue) speeds.reset(); else speeds.draw();
   }
 
   // ---- talking to Python -------------------------------------------------
@@ -81,10 +145,13 @@
   function query() {
     const bits = (mask) => mask.map((on) => (on ? 1 : 0)).join(",");
     const rows = (M) => M.map((row) => row.join(",")).join(";");
-    return new URLSearchParams({
+    const q = new URLSearchParams({
       K: world.K, n: world.n, U: rows(world.U), H: rows(world.H), F: bits(world.F), A: bits(world.A),
       curve: curve(), p1: inputs("p1")[0].value, T: inputs("T")[0].value, delta: inputs("delta")[0].value,
     });
+    if (speeds.param()) q.set("ps", speeds.param());
+    if (world.W.length) q.set("W", world.W.map((w) => `${w.kind}${w.index + 1}:${span(w).join("-")}`).join(";"));
+    return q;
   }
 
   // CSS polygon for a step area: the hatched part of each round's column is that round's share
@@ -116,71 +183,19 @@
     $("strip-wrong").style.clipPath = stepArea(wrongShare);
     $("strip-end").textContent = "round " + (data.T - 1);
 
-    // Fig. 1: the one-feature beliefs chart, once per feature; one line per action, heading for its dashed truth
-    const key = (cls, text) => { const item = document.createElement("span"); const i = document.createElement("i"); i.className = cls; item.append(i, text); return item; };
-    $("beliefs-legend").replaceChildren(
-      ...data.U.map((_, k) => key("bg-a" + (k + 1), "a" + SUB[k])),
-      key("truth-key", "truth u"), key("start", "starting belief"), key("faded-key", "hidden or not offered"),
-      key("box share", "grey: share of states with the wrong action"));
-    $("fig-beliefs").replaceChildren(...data.beliefs.map((byAction, j) => {
-      const panel = document.createElement("div"), title = document.createElement("p"), host = document.createElement("div");
-      title.className = "panel-title";
-      title.textContent = "x" + SUB[j];
-      if (!data.F[j]) { const note = document.createElement("small"); note.textContent = "hidden"; title.append(note); }
-      host.className = "chart";
-      host.style.setProperty("--shade", SHADES[j]);   // same action colours, a shade per feature
-      panel.append(title, host);
-      const shown = (k) => data.F[j] && data.A[k];
-      Charts.line(host, data.T,
-        byAction.map((v, k) => ({ v, cls: "c-a" + (k + 1), name: "a" + SUB[k], dot: true, faded: !shown(k) })),
-        data.U.map((row, k) => ({ y: row[j], cls: "truth c-a" + (k + 1) + (shown(k) ? "" : " faded") })), [],
-        { ylabel: "weight on x" + SUB[j], height: 250, lo: -3.25, hi: 3.25, noLegend: true, dotRadius: 5, wrongShare,
-          yticks: [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v })),
-          alt: "Each action's believed weight on feature " + (j + 1) + " over the rounds, against the true weights" });
-      return panel;
-    }));
-
-    // Fig. 2: regret weighted by delta^t; its axis is fixed by the truth alone
-    const top = data.worst_regret || 1;
-    Charts.line($("fig-regret"), data.T,
-      [{ v: data.series.reg, cls: "c-ref", name: "before discounting" },
-        { v: data.series.discounted, cls: "c-ink", name: "discounted, \u03b4 = " + data.delta }],
-      [{ y: data.reg_limit, label: "before discounting, once fully learned: " + data.reg_limit.toFixed(2) }], [],
-      { ylabel: "regret per round", step: true, lo: -0.04 * top, hi: 1.04 * top, wrongShare,
-        alt: "Expected regret loss in each round, before and after discounting" });
-
-    // Fig. 3: value gap; its axis is fixed by the truth and the first beliefs
-    const bound = 1.1 * (data.value_bound || 1);
-    Charts.line($("fig-value"), data.T, [{ v: data.series.value_gap, cls: "c-ink", name: "expected value gap" }],
-      [{ y: 0, cls: "zero", label: "zero: expects exactly what the best move is worth" }], [],
-      { ylabel: "value gap per round", lo: -bound, hi: bound, wrongShare,
-        alt: "True best value minus the value the human expects from the chosen action, per round" });
-
-    // Fig. 4: share of states with the best move picked, against showing and offering everything
-    const pct = (v) => Math.round(v * 100) + "%";
-    Charts.line($("fig-accuracy"), data.T,
-      (data.series.ref_acc ? [{ v: data.series.ref_acc, cls: "c-ref", name: "everything shown and offered" }] : [])
-        .concat([{ v: data.series.acc, cls: "c-a1", name: "what is shown now" }]),
-      [{ y: data.acc_limit, label: "once fully learned: " + pct(data.acc_limit) }], [],
-      { ylabel: "states with the best move picked", pct: true, lo: -0.03, hi: 1.08, width: 1120, height: 300, wrongShare,
-        alt: "Share of states in which the human picks the best move, per round" });
-
-    // Fig. 5: the choice for one reference state (every feature at +1) against the best move there
-    const picks = data.choice.picks, bestMove = data.choice.best, missed = data.choice.missed, misses = [];
-    for (let start = 0, t = 1; t <= data.T; t++) {
-      if (t < data.T && missed[t] === missed[start]) continue;
-      if (missed[start]) misses.push([start, t]);
-      start = t;
-    }
-    Charts.line($("fig-choice"), data.T,
-      [{ v: picks.map(() => bestMove), cls: "c-ink", dash: true, name: "y* best move" }, { v: picks, cls: "c-ink", name: "\u0177 human's choice" }],
-      [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * data.K, lo: 0.5, hi: data.K + 0.5,
-        yticks: Array.from({ length: data.K }, (_, k) => ({ v: k + 1, label: "a" + SUB[k], faded: !data.A[k] })), fmt: (v) => "action " + v,
-        alt: "Which action the human chooses each round for the state with every feature at +1, against the best move" });
+    // Figs. 1 to 6, the standard ones. The regret axis is fixed by the truth alone and the value-gap axis by
+    // the truth and the first beliefs, so neither moves while the policy or the learner changes.
+    const top = data.worst_regret || 1, bound = 1.1 * (data.value_bound || 1);
+    StandardFigures.draw(data, {
+      regret: { lo: -0.04 * top, hi: 1.04 * top }, value: { lo: -bound, hi: bound },
+      refName: "everything shown and offered",
+    });
 
     if (data.rankings) {   // only the full answer ranks every subset
-      renderRanking("features", data.rankings.features, "x", "feature", (mask) => { world.F = mask; });
-      renderRanking("actions", data.rankings.actions, "a", "action", (mask) => { world.A = mask; });
+      // a fixed subset put on the bench replaces that family's windows as well as its chips
+      const fixed = (name, kind) => (mask) => { world[name] = mask; world.W = world.W.filter((w) => w.kind !== kind); };
+      renderRanking("features", data.rankings.features, "x", "feature", fixed("F", "f"));
+      renderRanking("actions", data.rankings.actions, "a", "action", fixed("A", "a"));
       rankings.classList.remove("stale");
     }
   }
@@ -188,17 +203,19 @@
   function renderRanking(key, ranking, prefix, noun, choose) {
     const { rows, total } = ranking;
     const other = noun === "feature" ? "actions" : "features";
-    $("ranking-" + key + "-sub").textContent = total === 1
+    const subsets = total - (rows.some((r) => r.scheduled) ? 1 : 0);   // the bench's own schedule can be an extra row
+    $("ranking-" + key + "-sub").textContent = (subsets === 1
       ? `With one ${noun} there is only one subset.`
-      : `All ${total} ${noun} subsets, each run with the chosen ${other}.` +
-        (rows.length < total ? ` The best ${Math.min(8, rows.length)} and the one on the bench are listed.` : "");
+      : TIMED ? `All ${subsets} ${noun} subsets, each kept every round, with the ${other} as scheduled on the bench.`
+        : `All ${subsets} ${noun} subsets, each run with the chosen ${other}.`)
+      + (rows.length < total ? ` The best ${Math.min(8, rows.length)} and the one on the bench are listed.` : "");
     const worst = Math.max(...rows.map((r) => r.discounted), 1e-9);
     const pct = (v) => Math.round(v * 100) + "%";
     $("ranking-" + key).replaceChildren(...rows.map((r) => {
       const tr = document.createElement("tr");
       if (r.current) tr.className = "current";
       tr.tabIndex = 0;
-      tr.title = r.current ? "On the bench now" : "Put this subset on the bench";
+      tr.title = r.current ? "On the bench now" : TIMED ? `Put this subset on the bench, in place of the ${noun} windows` : "Put this subset on the bench";
       const cell = (text, cls) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
@@ -206,7 +223,8 @@
         return td;
       };
       const members = document.createElement("td");
-      r.mask.forEach((on, j) => {
+      if (r.scheduled) members.textContent = "the windows on the bench";
+      else r.mask.forEach((on, j) => {
         const dot = document.createElement("span");
         dot.className = "feat" + (on ? " on" : "");
         dot.textContent = prefix + SUB[j];
@@ -222,7 +240,7 @@
       bar.append(fill, value);
       tr.append(cell(r.rank + (r.current ? "  \u2190 now" : ""), "rank"), members, bar,
         cell(`${pct(r.start)} \u2192 ${pct(r.end)}`, "num"), cell(r.floor.toFixed(2), "num"));
-      const apply = () => { choose(r.mask.slice()); drawAll(); run(); };
+      const apply = () => { if (r.scheduled) return; choose(r.mask.slice()); drawAll(); run(); };
       tr.addEventListener("click", apply);
       tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apply(); } });
       return tr;
@@ -240,6 +258,12 @@
   let fullRequest = null;
 
   async function request(full) {
+    if (TIMED) {
+      const problem = windowProblem();
+      $("window-problem").textContent = problem || "";
+      $("window-problem").hidden = !problem;
+      if (problem) return;     // the figures keep the last world that could be run
+    }
     const q = query();
     history.replaceState(null, "", "?" + q.toString());
     try { sessionStorage.setItem(REMEMBER, q.toString()); } catch (error) { /* storage unavailable: nothing to remember */ }
@@ -322,6 +346,18 @@
   document.querySelectorAll('input[name="curve"]').forEach((el) =>
     el.addEventListener("change", () => { applyCurve(true); schedule(); }));
 
+  if (TIMED) {
+    $("add-window").addEventListener("click", () => {
+      // hide the last feature in use (or, with one feature, the last action) for a short stretch early on
+      const last = (mask) => mask.lastIndexOf(true);
+      const [kind, index] = world.F.filter(Boolean).length > 1 || world.A.filter(Boolean).length < 2 ? ["f", last(world.F)] : ["a", last(world.A)];
+      const T = horizon();
+      world.W.push({ kind, index, from: Math.round(0.2 * T), to: Math.round(0.25 * T) });
+      drawWindows();
+      run();
+    });
+  }
+
   document.querySelectorAll("[data-fill]").forEach((button) =>
     button.addEventListener("click", () => {
       const [name, how] = button.dataset.fill.split(":");
@@ -344,12 +380,18 @@
     world.F = s.F ? mask(s.F) : []; world.A = s.A ? mask(s.A) : [];
     if (world.F.length !== world.n) world.F = [];
     if (world.A.length !== world.K) world.A = [];
+    world.W = [];
+    for (const part of TIMED && typeof s.W === "string" ? s.W.split(";").slice(0, MAX_WINDOWS) : []) {
+      const m = /^([fa])(\d{1,4}):(\d{1,4})-(\d{1,4})$/.exec(part);
+      if (m) world.W.push({ kind: m[1], index: Number(m[2]) - 1, from: Math.min(Number(m[3]), LAST_ROUND), to: Math.min(Number(m[4]), LAST_ROUND) });
+    }
     resize(world.K, world.n);
     if (s.curve in SPECS) document.querySelector(`input[name="curve"][value="${s.curve}"]`).checked = true;
     applyCurve(true);
     for (const key of ["p1", "T", "delta"]) {
       if (s[key] !== undefined && isFinite(s[key])) inputs(key).forEach((el) => { el.value = s[key]; });
     }
+    speeds.load(s.ps);
     return true;
   }
 

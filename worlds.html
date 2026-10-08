@@ -8,19 +8,33 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791366213">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791494390">
 </head>
 <body>
   <header class="mast">
     <div class="mast-title">
-      <p class="kicker">CS 598 · Helping a learning human pick the best move</p>
-      <h1>AI-Assisted Decision Making Lab</h1>
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
     </div>
-    <nav class="mast-nav" aria-label="Sections">
-      <a href="index.html" >1 feature, 2 actions</a>
-      <a href="worlds.html" aria-current="page">More actions and features</a>
-      <a href="correlated.html" >Correlated features</a>
-      <a href="experiments.html" >Experiment 1 figures</a>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" >Overview</a>
+      <details class="mast-menu">
+        <summary class="current" title="Go to an experiment">More actions and features</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" aria-current="page">More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html"  class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
     </nav>
   </header>
   
@@ -33,7 +47,9 @@
         <div class="chips" id="feature-chips"></div>
         <p class="group-label">Actions it offers</p>
         <div class="chips" id="action-chips"></div>
+        
         <p class="hint">The same subsets are shown every round. Regret is always measured against the best of all actions.</p>
+        
       </fieldset>
 
       <fieldset class="card">
@@ -83,7 +99,9 @@
           <input type="range" id="p1" data-key="p1">
           <input type="number" data-key="p1" aria-label="learning speed">
         </div>
+        <div id="speed-rows"></div>
         <p class="hint" id="curve-hint"></p>
+        <label class="check"><input type="checkbox" id="each-speed"> A separate speed for each feature</label>
       </fieldset>
 
       <fieldset class="card">
@@ -120,38 +138,79 @@
 
     <section class="tiles" id="tiles"></section>
 
-    <section class="figs one">
-      <figure>
-        <figcaption><b>Fig. 1</b> The human's choice &ycirc; for the state with every feature at +1</figcaption>
-        <div class="chart" id="fig-choice"></div>
-      </figure>
-    </section>
+    
+<header class="set-head">
+  <h2>Standard figures</h2>
+  <p>The same six on every bench, under the same numbers. <a href="overview.html#figures">How to read them</a></p>
+</header>
+<section class="figs one">
 
-    <section class="figs one">
-      <figure>
-        <figcaption><b>Fig. 2</b> What the human believes: the weight of each feature in each action's value, one panel per feature</figcaption>
-        <div class="legend" id="beliefs-legend"></div>
-        <div class="belief-grid" id="fig-beliefs"></div>
-      </figure>
-    </section>
 
-    <section class="figs">
-      <figure>
-        <figcaption><b>Fig. 3</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;</figcaption>
-        <div class="chart" id="fig-regret"></div>
-      </figure>
-      <figure>
-        <figcaption><b>Fig. 4</b> Value gap: the best move's true value minus what the human expects from their choice</figcaption>
-        <div class="chart" id="fig-value"></div>
-      </figure>
-    </section>
+<figure id="std-schedule">
+  <figcaption><b><a href="overview.html#fig-1" title="How to read this figure">Fig. 1</a></b>What the algorithm shows and offers, round by round<span class="cap-note">The same every round on this bench.</span></figcaption>
+  
+  <div class="legend"><span><i class="on-key"></i>shown or offered</span><span><i class="off-key"></i>held back</span></div>
+  <div class="chart" id="fig-schedule"></div>
+  
+</figure>
 
-    <section class="figs one">
-      <figure>
-        <figcaption><b>Fig. 5</b> How often the human picks the best move</figcaption>
-        <div class="chart" id="fig-accuracy"></div>
-      </figure>
-    </section>
+</section>
+<section class="figs one">
+
+
+<figure id="std-beliefs">
+  <figcaption><b><a href="overview.html#fig-2" title="How to read this figure">Fig. 2</a></b>What the human believes: each action's weight on each feature</figcaption>
+  
+  <div class="legend" id="beliefs-legend"></div>
+  <div class="belief-grid" id="fig-beliefs" data-fig="2"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-choice">
+  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, for one reference state<span class="cap-note">For the state with every feature at +1.</span></figcaption>
+  
+  <div class="chart" id="fig-choice"></div>
+  
+</figure>
+
+</section>
+<section class="figs">
+
+
+<figure id="std-regret">
+  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, before and after discounting</figcaption>
+  
+  <div class="chart" id="fig-regret"></div>
+  
+</figure>
+
+
+
+
+<figure id="std-value">
+  <figcaption><b><a href="overview.html#fig-5" title="How to read this figure">Fig. 5</a></b>Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+  
+  <div class="chart" id="fig-value"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-accuracy">
+  <figcaption><b><a href="overview.html#fig-6" title="How to read this figure">Fig. 6</a></b>How often the human picks the best move</figcaption>
+  
+  <div class="chart" id="fig-accuracy"></div>
+  
+</figure>
+
+</section>
+
 
     <section class="rankings">
       <div>
@@ -179,10 +238,12 @@
 <footer class="reading">
   <div class="reading-lead">
     <h2>Reading this bench</h2>
+    
     <p class="callout"><mark>Hiding what the human misjudges trades early mistakes for a loss that never goes away.</mark></p>
     <p class="callout-sub">Showing a misjudged feature costs regret now but lets the human learn it. The tables rank every
       subset by the proposal's objective, the discounted regret, so you can see which side of that trade wins for this
       world, learner and discount.</p>
+    
   </div>
   <div class="reading-body notes">
     <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
@@ -190,29 +251,49 @@
       <span class="math">N(0, I)</span>.</p>
     <p>Actions work like features: dropping one the human misjudges removes those mistakes, but it can never be picked
       when it is the best move, and it is never learned.</p>
+    
     <p>Each table runs every subset as a fixed policy. The first varies the features and keeps the chosen actions; the
       second varies the actions and keeps the chosen features. Click a row to put that subset on the bench.</p>
     <p>Fig. 2 is the one-feature beliefs chart, once per feature: each line is one action's weight on that feature,
       heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: that weight
       is never learned, so its line stays flat at the first belief.</p>
-    <p>The value gap in Fig. 4 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>, averaged
+    
+    <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>, averaged
       over the probe states: above zero the human expects too little from their pick, below zero too much.</p>
-    <p>Fig. 1 follows one state, every feature at +1: the action the human picks there each round against the best
+    <p>Fig. 3 follows one state, every feature at +1: the action the human picks there each round against the best
       move, with a grey box over the rounds where they differ. Other states can flip at other times, which is what
       the bar at the top and the lighter grey in the other figures add up.</p>
-    <p>Features here are independent, and every weight follows the chosen learning curve on the rounds it is shown.</p>
+    <p>Features here are independent, and every weight follows the chosen learning curve on the rounds it is shown.
+      Learning speed belongs to the feature: all features share one speed, or each has its own, and an action's
+      weights on a feature always move at that feature's speed.</p>
   </div>
 </footer>
 
 <script>
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "curve": "exponential", "delta": 0.95, "p1": 0.05};
+  window.TIMED_BENCH = false;
+  window.MAX_WINDOWS = 12;
 </script>
-<script src="webapp/static/charts.js?v=1791365931"></script>
+<script src="webapp/static/charts.js?v=1791492645"></script>
+<script src="webapp/static/figures.js?v=1791493952"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
-<script src="webapp/static/probes.js?v=1791491725"></script>
-<script src="webapp/static/static-api.js?v=1791491680"></script>
-<script src="webapp/static/worlds.js?v=1791365902"></script>
+<script src="webapp/static/speeds.js?v=1791492951"></script>
+<script src="webapp/static/probes.js?v=1791494594"></script>
+<script src="webapp/static/static-api.js?v=1791493902"></script>
+<script src="webapp/static/worlds.js?v=1791493993"></script>
 
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
 </body>
 </html>

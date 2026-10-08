@@ -1,6 +1,6 @@
 from . import analysis, curves
 from .learners import CountLearner, DeltaRuleLearner
-from .sim import FixedMasks, FixedSubset, Result, ShowAll, simulate
+from .sim import FixedMasks, FixedSubset, Result, ScheduledMasks, ShowAll, simulate
 
 __all__ = [
     "analysis",
@@ -10,6 +10,7 @@ __all__ = [
     "FixedMasks",
     "FixedSubset",
     "Result",
+    "ScheduledMasks",
     "ShowAll",
     "simulate",
 ]

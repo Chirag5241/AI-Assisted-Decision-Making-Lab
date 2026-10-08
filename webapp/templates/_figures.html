@@ -1,0 +1,56 @@
+{# The figures of a bench. The six standard ones come first, in the same order and under the same numbers on
+   every bench (webapp/guide.py lists them; webapp/static/figures.js draws them). A bench that cannot draw one
+   still lists it, with the reason. The bench's own figures follow, numbered on from the standard ones. #}
+
+{% macro caption(figure, note=None) -%}
+<figcaption><b><a href="{{ url_for('overview') }}#fig-{{ figure.n }}" title="How to read this figure">Fig. {{ figure.n }}</a></b>{{ figure.title|safe }}
+  {%- if note %}<span class="cap-note">{{ note|safe }}</span>{% endif %}</figcaption>
+{%- endmacro %}
+
+{% macro one(key) %}
+{% set figure = standard[key] %}
+{% if key in bench.absent %}
+<figure class="absent" id="std-{{ key }}">
+  {{ caption(figure) }}
+  <p class="absent-note"><b>Not drawn on this bench</b>{{ bench.absent[key]|safe }}</p>
+</figure>
+{% else %}
+<figure id="std-{{ key }}">
+  {{ caption(figure, bench.notes.get(key)) }}
+  {% if key == "schedule" %}
+  <div class="legend"><span><i class="on-key"></i>shown or offered</span><span><i class="off-key"></i>held back</span></div>
+  <div class="chart" id="fig-schedule"></div>
+  {% elif key == "beliefs" %}
+  <div class="legend" id="beliefs-legend"></div>
+  <div class="belief-grid" id="fig-beliefs" data-fig="{{ figure.n }}"></div>
+  {% else %}
+  <div class="chart" id="fig-{{ key }}"></div>
+  {% endif %}
+</figure>
+{% endif %}
+{% endmacro %}
+
+{# the six, laid out the same way everywhere: 1, 2 and 3 across the page, 4 beside 5, then 6 #}
+{% macro standard_set() %}
+<header class="set-head">
+  <h2>Standard figures</h2>
+  <p>The same six on every bench, under the same numbers. <a href="{{ url_for('overview') }}#figures">How to read them</a></p>
+</header>
+<section class="figs one">{{ one("schedule") }}</section>
+<section class="figs one">{{ one("beliefs") }}</section>
+<section class="figs one">{{ one("choice") }}</section>
+<section class="figs">{{ one("regret") }}{{ one("value") }}</section>
+<section class="figs one">{{ one("accuracy") }}</section>
+{% endmacro %}
+
+{# the heading above a bench's own figures, and the caption of its i-th one (from 1) #}
+{% macro own_head() %}
+<header class="set-head">
+  <h2>Only on this bench</h2>
+  <p>Figures this experiment needs and the others do not.</p>
+</header>
+{% endmacro %}
+
+{% macro own(i) -%}
+<figcaption><b>Fig. {{ standard_figures|length + i }}</b>{{ bench.own[i - 1]|safe }}</figcaption>
+{%- endmacro %}

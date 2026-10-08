@@ -25,7 +25,8 @@ window.Charts = (function () {
   }
   const fmtTick = (v, step) => v.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2);
 
-  // series: [{v, cls, name, dash}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
+  // series: [{v, cls, name, dash, faded, off: [bool per round]}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
+  // A series with `off` is faded from each round marked off to the next one: the stretch where its value is not in use.
   // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare,
   //        xlabel, xscale (point i sits at x = i * xscale), vlines: [{t, label}]}
   function line(host, T, series, hlines, shade, opts) {
@@ -87,6 +88,18 @@ window.Charts = (function () {
       }
     }
     for (const s of series) {
+      const cls = "line " + s.cls + (s.dash ? " dashed" : "");
+      if (s.off && !opts.step) {
+        // one path per run of rounds that are all in use or all off, each reaching the next run's first point
+        for (let start = 0, t = 1; t < T; t++) {
+          if (t < T - 1 && s.off[t] === s.off[start]) continue;
+          let d = "";
+          for (let i = start; i <= t; i++) d += `${i > start ? "L" : "M"}${X(i).toFixed(1)} ${Y(s.v[i]).toFixed(1)}`;
+          svg.append(svgEl("path", { class: cls + (s.off[start] ? " faded" : ""), d }));
+          start = t;
+        }
+        continue;
+      }
       let d = "";
       for (let t = 0; t < T; t++) {
         const y = Y(s.v[t]).toFixed(1);
@@ -94,7 +107,7 @@ window.Charts = (function () {
         d += opts.step ? `${t ? "L" : "M"}${edge(t - 0.5).toFixed(1)} ${y}L${edge(t + 0.5).toFixed(1)} ${y}`
           : `${t ? "L" : "M"}${X(t).toFixed(1)} ${y}`;
       }
-      svg.append(svgEl("path", { class: "line " + s.cls + (s.dash ? " dashed" : "") + (s.faded ? " faded" : ""), d }));
+      svg.append(svgEl("path", { class: cls + (s.faded ? " faded" : ""), d }));
     }
     // a large dot on the value at round 0: the starting point the user sets
     for (const s of series) if (s.dot) svg.append(svgEl("circle", { class: "dot " + s.cls + (s.faded ? " faded" : ""), cx: X(0), cy: Y(s.v[0]), r: opts.dotRadius || 6.5 }));
@@ -192,13 +205,17 @@ window.Charts = (function () {
     host.replaceChildren(svg);
   }
 
-  // rows: [{name, on: [bool per round]}]; marks: [{t, label}] drawn as vertical rules before round t
+  // rows: [{name, on: [bool per round], group}]; marks: [{t, label}] drawn as vertical rules before round t.
+  // A row marked `group` starts a new group of rows and is set a little apart from the ones above it.
   function schedule(host, T, rows, marks, alt) {
-    const W = 1120, L = 54, R = 12, TOP = 6, row = 22, gap = 6, ph = rows.length * (row + gap) - gap, pw = W - L - R;
+    const W = 1120, L = 54, R = 12, TOP = 6, row = 22, gap = 6, apart = 10, pw = W - L - R;
+    const tops = [];
+    let ph = 0;
+    rows.forEach((r, i) => { ph += i ? gap + (r.group ? apart : 0) : 0; tops.push(TOP + ph); ph += row; });
     const X = (t) => L + (t / T) * pw;
     const svg = svgEl("svg", { viewBox: `0 0 ${W} ${TOP + ph + 40}`, role: "img", "aria-label": alt });
     rows.forEach((r, i) => {
-      const y = TOP + i * (row + gap);
+      const y = tops[i];
       svg.append(svgEl("rect", { class: "sched-off", x: L, y, width: pw, height: row }),
         svgEl("text", { x: L - 8, y: y + row / 2 + 4, "text-anchor": "end", class: "sched-name" }, r.name));
       for (let start = 0, t = 1; t <= T; t++) {

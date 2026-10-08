@@ -8,26 +8,39 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791366213">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791494390">
 </head>
 <body>
   <header class="mast">
     <div class="mast-title">
-      <p class="kicker">CS 598 · Helping a learning human pick the best move</p>
-      <h1>AI-Assisted Decision Making Lab</h1>
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
     </div>
-    <nav class="mast-nav" aria-label="Sections">
-      <a href="index.html" >1 feature, 2 actions</a>
-      <a href="worlds.html" >More actions and features</a>
-      <a href="correlated.html" >Correlated features</a>
-      <a href="experiments.html" aria-current="page">Experiment 1 figures</a>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" >Overview</a>
+      <details class="mast-menu">
+        <summary class="current" title="Go to an experiment">Experiment 1 figures</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" >More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html" aria-current="page" class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
     </nav>
   </header>
   
 <main class="report">
   <header class="report-head">
-    <p class="kicker">Experiment 1</p>
-    <h2>One feature, two actions, feature always shown</h2>
+    <h2>Experiment 1: one feature, two actions, feature always shown</h2>
     <p>The human's beliefs are guaranteed to converge. These figures ask when the choice becomes right, and what
       the wait costs. They are written by the batch script, which sweeps thousands of worlds at once:</p>
     <pre><code>python -m experiments.exp01_single_feature_flip</code></pre>
@@ -35,7 +48,7 @@
 
   
   <figure class="plate">
-    <figcaption><b>Fig. 1</b> What a flip looks like</figcaption>
+    <figcaption><b>Plate 1</b> What a flip looks like</figcaption>
     
     <img src="results/exp01/fig1_trajectories.png" alt="What a flip looks like" loading="lazy">
     
@@ -43,7 +56,7 @@
   </figure>
   
   <figure class="plate">
-    <figcaption><b>Fig. 2</b> Flip time over every (true gap, belief gap) pair</figcaption>
+    <figcaption><b>Plate 2</b> Flip time over every (true gap, belief gap) pair</figcaption>
     
     <img src="results/exp01/fig2_flip_time_heatmap.png" alt="Flip time over every (true gap, belief gap) pair" loading="lazy">
     
@@ -51,7 +64,7 @@
   </figure>
   
   <figure class="plate">
-    <figcaption><b>Fig. 3</b> How the learning curve sets the flip time and its cost</figcaption>
+    <figcaption><b>Plate 3</b> How the learning curve sets the flip time and its cost</figcaption>
     
     <img src="results/exp01/fig3_ratio_and_regret.png" alt="How the learning curve sets the flip time and its cost" loading="lazy">
     
@@ -60,5 +73,17 @@
   
 </main>
 
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
 </body>
 </html>

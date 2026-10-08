@@ -16,7 +16,7 @@ pytestmark = pytest.mark.skipif(shutil.which("node") is None or not (STATIC / "p
 W = "K=3&n=3&U=1,0.5,0;0,1,0.5;-0.5,0,1&H=1,0.5,1.5;0,1,0;-0.5,0,-1.5"
 QUERIES = [
     "/api/run?u1=1.2&u2=1&h1=0&h2=1.5&curve=exponential&p1=0.1&T=80&delta=0.95",
-    "/api/run?u1=1&u2=0.5&h1=3&h2=2.8&curve=exponential&p1=0.3&p2=0.03&split=1&T=80&delta=0.9",
+    "/api/run?u1=1&u2=0.5&h1=3&h2=2.8&curve=exponential&p1=0.3&p2=0.03&split=1&T=80&delta=0.9",   # p2 and split are ignored
     "/api/run?u1=2&u2=0&h1=0.5&h2=0&curve=sigmoid&p1=20&T=120",
     "/api/run?u1=-0.4&u2=1.1&h1=2.5&h2=-2&curve=power%20law&p1=0.5&T=400&delta=0.5",
     "/api/run?u1=1&u2=1&h1=0&h2=2&curve=hyperbolic&p1=5&T=40",
@@ -25,12 +25,30 @@ QUERIES = [
     f"/api/world?{W}&F=1,0,1&A=1,1,1&curve=sigmoid&p1=20&T=60&delta=0.8&rank=0",
     "/api/world?K=2&n=1&U=1;0&H=0;1&curve=hyperbolic&p1=5&T=50",
     "/api/world?K=4&n=2&U=1,2;-1,0.5;0,0;2,-2&H=0,0;0,0;0,0;0,0&F=1,1&A=1,1,0,1&curve=power%20law&p1=0.5&T=40",
+    # windows of rounds in which a feature or an action is held back
+    f"/api/world?{W}&W=f3:20-25&curve=exponential&p1=0.05&T=100&delta=0.95",
+    f"/api/world?{W}&F=1,1,1&A=1,1,1&W=f3:20-25;a1:40-60;f1:55-70&curve=exponential&p1=0.05&T=100&delta=0.95",
+    f"/api/world?{W}&W=a2:0-9;f3:80-400;f2:300-310&curve=hyperbolic&p1=5&T=90&delta=0.9",
+    f"/api/world?{W}&F=1,1,0&W=f3:5-9;f1:0-299;a3:12-12;a1:30-44;a3:40-50&curve=sigmoid&p1=20&T=60&rank=0",
+    "/api/world?K=4&n=2&U=1,2;-1,0.5;0,0;2,-2&H=0,0;0,0;0,0;0,0&A=1,1,0,1&W=a1:3-20;f2:10-25&curve=power%20law&p1=0.5&T=40",
+    f"/api/world?{W}&W=f1:5-9;f2:7-12;f3:0-7",       # round 7 would show nothing: both sides refuse it
+    f"/api/world?{W}&W=a4:1-2",                      # no such action
+    f"/api/world?{W}&W=f1:9-5",
+    f"/api/world?{W}&W=hide%20feature%203",
+    # a learning speed for each feature
+    f"/api/world?{W}&ps=0.02,0.1,0.4&curve=exponential&T=100&delta=0.95",
+    f"/api/world?{W}&F=1,0,1&ps=30,8,15&W=f3:10-19;a2:5-30&curve=sigmoid&T=80&delta=0.9",
+    f"/api/world?{W}&ps=1,25,999&curve=hyperbolic&T=40&rank=0",
+    f"/api/world?{W}&ps=0.1,0.2",                    # one speed short
+    f"/api/world?{W}&ps=0.1,fast,0.2",
     "/api/world?K=2&n=2&U=1,2;3,4&H=0,0",          # wrong shape: both sides refuse it
     "/api/run?curve=bogus",
     "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
     "&rho=0.8,0.8,0.6&k=2&explore=12&C=1,1,0&curve=exponential&p1=0.15&T=40&delta=0.97",
     "/api/correlated?K=2&U=1,0,0;0,1,0&H=0,0,0;0,0,0&rho=0,0,0&k=1&explore=0&C=0,0,1"
     "&curve=hyperbolic&p1=5&T=30&delta=0.9&rank=0",
+    "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
+    "&rho=0.8,0.8,0.6&k=2&explore=12&C=1,1,0&curve=exponential&ps=0.3,0.15,0.02&T=120&delta=0.97",
     "/api/correlated?rho=0.9,0.9,-0.9",            # not a correlation matrix: both sides refuse it
 ]
 

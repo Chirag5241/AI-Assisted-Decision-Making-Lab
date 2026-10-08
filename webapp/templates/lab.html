@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_figures.html" import standard_set, own_head, own with context %}
 
 {% macro slider(key, label, min, max, step, value, swatch="") %}
 <div class="row">
@@ -49,13 +50,8 @@
           <input type="range" id="p1-range" data-key="p1">
           <input type="number" data-key="p1" aria-label="learning speed">
         </div>
-        <div class="row" id="p2-row" hidden>
-          <label for="p2-range"><span class="sym a2" id="p2-label">rate</span></label>
-          <input type="range" id="p2-range" data-key="p2">
-          <input type="number" data-key="p2" aria-label="learning speed for action 2">
-        </div>
         <p class="hint" id="curve-hint"></p>
-        <label class="check"><input type="checkbox" id="split"> A separate speed for each action</label>
+        <p class="hint">Learning speed belongs to the feature. With one feature there is one curve, shared by both actions.</p>
       </fieldset>
 
       <fieldset class="card">
@@ -84,39 +80,19 @@
 
     <section class="tiles" id="tiles"></section>
 
+    {{ standard_set() }}
+
+    {{ own_head() }}
     <section class="figs">
       <figure>
-        <figcaption><b>Fig. 1</b> What the human believes each action is worth</figcaption>
-        <div class="chart" id="fig-beliefs"></div>
+        {{ own(1) }}
+        <div class="chart" id="fig-gap"></div>
       </figure>
-      <div class="fig-stack">
-        <figure>
-          <figcaption><b>Fig. 2</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;</figcaption>
-          <div class="chart" id="fig-regret"></div>
-        </figure>
-        <figure>
-          <figcaption><b>Fig. 3</b> The human's choice &ycirc; for a positive state</figcaption>
-          <div class="chart" id="fig-choice"></div>
-        </figure>
-      </div>
-    </section>
-
-    <section class="map">
       <figure>
-        <figcaption><b>Fig. 4</b> Every nearby world at once; the ring is the one on the bench</figcaption>
+        {{ own(2) }}
         <div class="chart" id="fig-map"></div>
         <div class="heat-key" id="fig-map-key"></div>
       </figure>
-      <div class="side">
-        <figure>
-          <figcaption><b>Fig. 5</b> Value gap: the best move's true value minus what the human expects from their choice</figcaption>
-          <div class="chart" id="fig-value"></div>
-        </figure>
-        <figure>
-          <figcaption><b>Fig. 6</b> The flip: when the belief gap lands on the side of the true gap</figcaption>
-          <div class="chart" id="fig-gap"></div>
-        </figure>
-      </div>
     </section>
   </main>
 </div>
@@ -135,14 +111,14 @@
   <div class="reading-body notes">
     <p>With one feature, the state <i>x</i> scales both actions alike, so the human is right exactly when
       <span class="math">h<sub>1</sub> &minus; h<sub>2</sub></span> has the same sign as
-      <span class="math">u<sub>1</sub> &minus; u<sub>2</sub></span>, whatever <i>x</i> turns out to be. Fig. 6 follows that gap.</p>
-    <p>When both actions share one learning curve <span class="math">&phi;</span>, a human who starts on the wrong side flips as soon as</p>
+      <span class="math">u<sub>1</sub> &minus; u<sub>2</sub></span>, whatever <i>x</i> turns out to be. Fig. 7 follows that gap.</p>
+    <p>Both actions share the feature's learning curve <span class="math">&phi;</span>, so a human who starts on the wrong side flips as soon as</p>
     <p class="formula">&phi;(t) &gt; |&Delta;h<sub>0</sub>| / (|&Delta;h<sub>0</sub>| + |&Delta;u|)</p>
-    <p>so the map in Fig. 4 is made of rays through the origin. Give each action its own speed and that picture
-      breaks: the map then depends on the levels too, and a human who starts right can go wrong before coming back.</p>
+    <p>so the map in Fig. 8 is made of rays through the origin: only the ratio of the two gaps matters. The curve
+      belongs to the feature, so both actions always share it and the choice flips at most once.</p>
     <p>The regret loss of a round is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; (Ux)<sub>&ycirc;</sub></span>.
       Here that is <span class="math">|&Delta;u| &middot; |x|</span> when the choice is wrong and zero when it is right;
-      Fig. 2 averages it over <span class="math">x ~ N(0, 1)</span> and weights round <i>t</i> by
+      Fig. 4 averages it over <span class="math">x ~ N(0, 1)</span> and weights round <i>t</i> by
       <span class="math">&delta;<sup>t</sup></span>; the objective is the sum of those bars. For a negative state both the choice in Fig. 3
       and the best move swap, so the regret is the same.</p>
     <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span>: what the best
@@ -158,5 +134,6 @@
   window.PRESETS = {{ presets|tojson }};
 </script>
 <script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('figures.js') }}"></script>
 <script src="{{ static_v('lab.js') }}"></script>
 {% endblock %}

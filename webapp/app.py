@@ -10,6 +10,7 @@ from __future__ import annotations
 import itertools
 import math
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -19,7 +20,9 @@ matplotlib.use("Agg")
 import numpy as np
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
 
-from simlab import CountLearner, FixedMasks, analysis, correlated, curves, plotting, simulate
+from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, plotting, simulate
+
+from . import guide
 
 ROOT = Path(__file__).resolve().parent.parent
 RESULTS = ROOT / "results"
@@ -28,7 +31,7 @@ RESULTS = ROOT / "results"
 SITE_NAME = "AI-Assisted Decision Making Lab"
 SITE_KICKER = "CS 598 · Helping a learning human pick the best move"
 
-MAX_ACTIONS, MAX_FEATURES, N_PROBES = 6, 6, 2000
+MAX_ACTIONS, MAX_FEATURES, N_PROBES, MAX_WINDOWS = 6, 6, 2000, 12
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True   # template edits show up on reload, no restart
@@ -40,9 +43,14 @@ def _static_versioning():
     def static_v(filename):
         mtime = int((Path(app.static_folder) / filename).stat().st_mtime)
         return url_for("static", filename=filename, v=mtime)
-    return dict(static_v=static_v, site_name=SITE_NAME, site_kicker=SITE_KICKER)
+    # the standard figures, the equations and the benches are the same lists on every page (webapp/guide.py)
+    bench = next((b for b in guide.BENCHES if b["endpoint"] == request.endpoint), None)
+    return dict(static_v=static_v, site_name=SITE_NAME, site_kicker=SITE_KICKER, benches=guide.BENCHES, bench=bench,
+                standard=guide.STANDARD, standard_figures=guide.STANDARD_FIGURES, equations=guide.EQUATIONS,
+                equation=guide.EQUATION)
 
-# One "speed" parameter per curve; a (2, 1) array gives each action its own speed.
+# One "speed" parameter per curve. Learning speed belongs to the feature, not the action: an array
+# with one speed per feature gives each feature its own curve.
 CURVE_SPECS = {
     "exponential": dict(
         label="Exponential", param="rate", min=0.01, max=0.5, step=0.01, default=0.1,
@@ -64,13 +72,11 @@ CURVE_SPECS = {
 
 PRESETS = [
     dict(name="A", title="Wrong start, large true gap",
-         u1=2.0, u2=0.0, h1=0.0, h2=1.0, curve="exponential", p1=0.1, p2=0.1, split=0),
+         u1=2.0, u2=0.0, h1=0.0, h2=1.0, curve="exponential", p1=0.1),
     dict(name="B", title="Wrong start, small true gap",
-         u1=1.2, u2=1.0, h1=0.0, h2=1.5, curve="exponential", p1=0.1, p2=0.1, split=0),
+         u1=1.2, u2=1.0, h1=0.0, h2=1.5, curve="exponential", p1=0.1),
     dict(name="C", title="Right from the start",
-         u1=2.0, u2=0.0, h1=0.5, h2=0.0, curve="exponential", p1=0.1, p2=0.1, split=0),
-    dict(name="D", title="Action 1 learned 10x faster: right, wrong, right",
-         u1=1.0, u2=0.5, h1=3.0, h2=2.8, curve="exponential", p1=0.3, p2=0.03, split=1),
+         u1=2.0, u2=0.0, h1=0.5, h2=0.0, curve="exponential", p1=0.1),
 ]
 
 EXP01_FIGURES = [
@@ -99,8 +105,9 @@ def _round(t):
     return None if math.isinf(t) else int(t)
 
 
-def _verdict(du, dh0, wrong, settle, switches, T):
-    """Headline numeral plus one plain sentence describing what the human does."""
+def _verdict(du, dh0, wrong, settle, T):
+    """Headline numeral plus one plain sentence describing what the human does. Both actions share the
+    feature's one learning curve, so the belief gap crosses zero at most once: a wrong start flips once."""
     gaps = f"belief gap {dh0:+.2f} against a true gap of {du:+.2f}"
     n_wrong = int(wrong.sum())
     if du == 0:
@@ -111,22 +118,16 @@ def _verdict(du, dh0, wrong, settle, switches, T):
         return "never", f"within {T} rounds", (
             f"With a {gaps}, the human is still picking the wrong action at the end of the horizon. "
             "Lengthen the horizon or speed up the learner to see the flip.")
-    if switches <= 1:
-        return str(int(settle)), "round of the flip", (
-            f"The human starts with the wrong sign ({gaps}), picks the wrong action for "
-            f"{n_wrong} round{'s' if n_wrong != 1 else ''}, and is right from round {int(settle)} on.")
-    first_wrong = int(np.flatnonzero(wrong)[0])
-    return str(int(settle)), "round of the final flip", (
-        f"The choice changes {switches} times. The human {'starts right, ' if not wrong[0] else ''}"
-        f"goes wrong at round {first_wrong}, is wrong on {n_wrong} rounds in total, "
-        f"and is right for good from round {int(settle)}.")
+    return str(int(settle)), "round of the flip", (
+        f"The human starts with the wrong sign ({gaps}), picks the wrong action for "
+        f"{n_wrong} round{'s' if n_wrong != 1 else ''}, and is right from round {int(settle)} on.")
 
 
 def _settle_map(learner, u_mid, h_mid, du, dh0, T, G=60):
     """Round from which the human is right for good, binned, over a G x G grid of (du, dh0) worlds.
 
-    The grid keeps the mean levels (u1 + u2)/2 and (h1 + h2)/2 of the world on the bench, so with
-    per-action learning speeds the map is specific to those levels. Row 0 is the largest dh0.
+    The grid keeps the mean levels (u1 + u2)/2 and (h1 + h2)/2 of the world on the bench; with the one
+    shared learning curve only the two gaps matter. Row 0 is the largest dh0.
     """
     lim = float(np.ceil(max(3.0, 1.15 * abs(du), 1.15 * abs(dh0))))
     axis = np.linspace(-lim, lim, G)   # even G keeps the tie lines du = 0, dh0 = 0 off the lattice
@@ -143,10 +144,9 @@ def _settle_map(learner, u_mid, h_mid, du, dh0, T, G=60):
 
 
 @lru_cache(maxsize=1024)
-def run_world(u1, u2, h1, h2, curve_name, p1, p2, split, T, delta):
+def run_world(u1, u2, h1, h2, curve_name, speed, T, delta):
     spec = CURVE_SPECS[curve_name]
-    speed = np.array([[p1], [p2]]) if split else p1
-    learner = CountLearner(spec["make"](speed))
+    learner = CountLearner(spec["make"](speed))     # one feature, so one curve for both actions
     du, dh0 = u1 - u2, h1 - h2
 
     # everything is shown every round, so the beliefs follow the learning curve in closed form
@@ -176,10 +176,8 @@ def run_world(u1, u2, h1, h2, curve_name, p1, p2, split, T, delta):
     best = None if du == 0 else (0 if du > 0 else 1)
     choice = H.argmax(axis=1) if best is None else np.where(wrong, 1 - best, best)
 
-    numeral, numeral_label, sentence = _verdict(du, dh0, wrong, settle, switches, T)
-    if split:
-        needed = dict(value="varies", note="each action has its own curve, so no single threshold")
-    elif du == 0:
+    numeral, numeral_label, sentence = _verdict(du, dh0, wrong, settle, T)
+    if du == 0:
         needed = dict(value="—", note="the actions are equally good")
     else:
         phi_star = float(analysis.flip_threshold(du, dh0))
@@ -195,8 +193,7 @@ def run_world(u1, u2, h1, h2, curve_name, p1, p2, split, T, delta):
         stats=[
             dict(label="Learning needed", **needed),
             dict(label="Rounds wrong", value=str(int(wrong.sum())), note=f"out of {T} simulated"),
-            dict(label="Choice changes", value=str(switches),
-                 note="more than one means the choice un-flipped" if switches > 1 else "right/wrong switches"),
+            dict(label="Choice changes", value=str(switches), note="right/wrong switches"),
             dict(label="Expected discounted regret", value=f"{regret:.2f}",
                  note=(f"lower bound: still wrong at round {T}" if still_wrong
                        else f"δ = {delta:g}, states x ~ N(0, 1)")),
@@ -211,6 +208,12 @@ def run_world(u1, u2, h1, h2, curve_name, p1, p2, split, T, delta):
     )
 
 
+@app.route("/overview")
+def overview():
+    """The figures, the equations behind them and how to read both, with a live specimen of each figure."""
+    return render_template("overview.html", default_world=DEFAULT_TIMED, page="overview")
+
+
 @app.route("/")
 def lab():
     specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
@@ -223,18 +226,17 @@ def api_run():
     if curve_name not in CURVE_SPECS:
         abort(400, "unknown curve")
     spec = CURVE_SPECS[curve_name]
-    split = request.args.get("split", "0") == "1"
-    p1 = _num("p1", spec["default"], spec["min"], spec["max"])
-    p2 = _num("p2", spec["default"], spec["min"], spec["max"]) if split else p1
-    split = split and p1 != p2  # equal speeds are one shared curve, so the closed form applies
     return jsonify(run_world(
         _num("u1", 1.2, -3, 3), _num("u2", 1.0, -3, 3), _num("h1", 0.0, -3, 3), _num("h2", 1.5, -3, 3),
-        curve_name, p1, p2, split, int(_num("T", 80, 10, 400)), _num("delta", 0.95, 0.01, 0.99),
+        curve_name, _num("p1", spec["default"], spec["min"], spec["max"]),
+        int(_num("T", 80, 10, 400)), _num("delta", 0.95, 0.01, 0.99),
     ))
 
 
 # ---------------------------------------------------------------------------
-# Larger worlds: K actions, n features, and a fixed choice of what is shown
+# Larger worlds: K actions, n features, and a choice of what is shown: the same every round
+# ("More actions and features"), or with windows of rounds in which one feature or action is
+# held back ("Timed hiding")
 # ---------------------------------------------------------------------------
 
 DEFAULT_WORLD = dict(
@@ -243,6 +245,8 @@ DEFAULT_WORLD = dict(
     H=[[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]],
     F=[1, 1, 1], A=[1, 1, 1], curve="exponential", p1=0.05, T=100, delta=0.95,
 )
+# the same world, with the misjudged feature held back from round 20 to round 25
+DEFAULT_TIMED = dict(DEFAULT_WORLD, W="f3:20-25")
 
 
 def _human_list(items):
@@ -275,40 +279,113 @@ def _mask(name, size):
     return mask
 
 
+def _speeds(spec, n):
+    """The learning speed of each feature: ps='0.05,0.1,0.2' gives every feature its own, otherwise all
+    of them share p1. Each is clamped to the curve's range."""
+    raw = request.args.get("ps", "").strip()
+    if not raw:
+        return (_num("p1", spec["default"], spec["min"], spec["max"]),) * n
+    try:
+        speeds = [float(v) for v in raw.split(",")]
+    except ValueError:
+        abort(400, "ps must be numbers")
+    if len(speeds) != n or not all(math.isfinite(v) for v in speeds):
+        abort(400, f"ps must be {n} speeds, one per feature")
+    return tuple(min(max(v, spec["min"]), spec["max"]) for v in speeds)
+
+
+def _windows(K, n, T):
+    """Parse W='f3:20-25;a1:40-60': feature 3 hidden in rounds 20 to 25 and action 1 not offered in
+    rounds 40 to 60, both ends included. Returns (kind, index, first, last) cut to the horizon."""
+    raw = request.args.get("W", "").strip()
+    if not raw:
+        return ()
+    parts = raw.split(";")
+    if len(parts) > MAX_WINDOWS:
+        abort(400, f"at most {MAX_WINDOWS} windows")
+    windows = []
+    for part in parts:
+        match = re.fullmatch(r"([fa])(\d{1,4}):(\d{1,4})-(\d{1,4})", part.strip())
+        if not match:
+            abort(400, "W must look like f3:20-25;a1:40-60")
+        kind, (index, first, last) = match[1], (int(v) for v in match.groups()[1:])
+        if not 1 <= index <= (n if kind == "f" else K) or first > last:
+            abort(400, "a window names an existing feature or action and a first round no later than its last")
+        if first < T:
+            windows.append((kind, index - 1, first, min(last, T - 1)))
+    return tuple(windows)
+
+
+def _schedule(base, windows, kind, T):
+    """(T, size) bool: the base mask every round, switched off inside each window of this kind."""
+    rounds = np.tile(np.array(base, bool), (T, 1))
+    for window_kind, index, first, last in windows:
+        if window_kind == kind:
+            rounds[first:last + 1, index] = False
+    return rounds
+
+
+def _window_text(windows, F_base, A_base):
+    """The windows that change something, as a clause for the headline sentence."""
+    live = [w for w in windows if (F_base if w[0] == "f" else A_base)[w[1]]]
+    if not live:
+        return ""
+    if len(live) > 2:
+        return f", with {len(live)} timed windows"
+    return ", with " + " and ".join(
+        f"{'feature' if kind == 'f' else 'action'} {index + 1} {'hidden' if kind == 'f' else 'not offered'} in "
+        + (f"round {first}" if first == last else f"rounds {first}\u2013{last}")
+        for kind, index, first, last in live)
+
+
 def _subsets(size):
     """Every non-empty on/off mask of the given size, as a bool array (2^size - 1, size)."""
     return np.array([m for m in itertools.product([False, True], repeat=size) if any(m)])
 
 
 @lru_cache(maxsize=512)
-def run_general(U_rows, H_rows, F_now, A_now, curve_name, speed, T, delta, full=True):
-    """Score the chosen policy. `full` also runs every feature subset and every action subset for
-    the ranking tables; without it only the chosen policy and the show-everything reference run,
-    which is fast enough to follow a control while it moves."""
+def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=()):
+    """Score the chosen policy: the features and actions switched on, minus each window's rounds.
+    `speeds` holds one learning speed per feature (all equal when the features share a curve).
+    `full` also runs every feature subset and every action subset, each kept every round, for the
+    ranking tables; without it only the chosen policy and the show-everything reference run, which
+    is fast enough to follow a control while it moves."""
     U, H0 = np.array(U_rows), np.array(H_rows)
     K, n = U.shape
-    F_now, A_now = np.array(F_now), np.array(A_now)
+    F_base, A_base = np.array(F_now), np.array(A_now)
+    F_bench, A_bench = _schedule(F_base, windows, "f", T), _schedule(A_base, windows, "a", T)   # (T, n), (T, K)
+
+    def every(sets):
+        """Fixed subsets, the same every round: (count, size) to (T, count, size)."""
+        return np.broadcast_to(sets, (T,) + sets.shape)
+
+    def along(rounds, count=1):
+        """The bench's own schedule, for `count` worlds of the batch."""
+        return np.repeat(rounds[:, None, :], count, axis=1)
 
     if full:
-        # One batch holds every candidate policy: each feature subset with the chosen actions, each
-        # action subset with the chosen features, and last the world where nothing is held back.
+        # One batch holds every candidate policy: each feature subset with the bench's actions, each
+        # action subset with the bench's features, then the bench itself and the world where nothing
+        # is held back.
         feature_sets, action_sets = _subsets(n), _subsets(K)
         n_f, n_a = len(feature_sets), len(action_sets)
-        F = np.vstack([feature_sets, np.tile(F_now, (n_a, 1)), np.ones((1, n), bool)])
-        A = np.vstack([np.tile(A_now, (n_f, 1)), action_sets, np.ones((1, K), bool)])
+        F = np.concatenate([every(feature_sets), along(F_bench, n_a + 1), np.ones((T, 1, n), bool)], axis=1)
+        A = np.concatenate([along(A_bench, n_f), every(action_sets), along(A_bench), np.ones((T, 1, K), bool)], axis=1)
     else:
-        F = np.vstack([F_now, np.ones(n, bool)])
-        A = np.vstack([A_now, np.ones(K, bool)])
-    B = len(F)
-    learner = CountLearner(CURVE_SPECS[curve_name]["make"](speed))
+        F = np.concatenate([along(F_bench), np.ones((T, 1, n), bool)], axis=1)
+        A = np.concatenate([along(A_bench), np.ones((T, 1, K), bool)], axis=1)
+    B = F.shape[1]
+    now, everything = B - 2, B - 1
+    learner = CountLearner(CURVE_SPECS[curve_name]["make"](np.array(speeds)))    # (n,): one curve per feature
     res = simulate(np.broadcast_to(U, (B, K, n)), np.broadcast_to(H0, (B, K, n)), learner, T=T,
-                   policy=FixedMasks(F, A))
+                   policy=ScheduledMasks(F, A))
 
     # the learner is deterministic, so H_t is exact; score it on a fixed set of probe states
     X = np.random.default_rng(0).standard_normal((N_PROBES, n))
-    per_round = [analysis.evaluate(res.H[t], U, X, F, A, value_gap=True) for t in range(T)]
+    per_round = [analysis.evaluate(res.H[t], U, X, F[t], A[t], value_gap=True) for t in range(T)]
     acc, reg, value_gap = (np.array(series) for series in zip(*per_round))      # each (T, B)
-    acc_limit, reg_limit = analysis.evaluate(res.U, U, X, F, A)   # once everything shown is learned
+    # once everything shown is learned: the last round's choice, kept up until every weight in use is right
+    acc_limit, reg_limit = analysis.evaluate(res.U, U, X, F[-1], A[-1])
     discounted = ((delta ** np.arange(T))[:, None] * reg).sum(axis=0)
     # Regret axis: fixed by the truth alone (the expected regret of always picking the worst action),
     # so it stays put while subsets, beliefs and the learner change.
@@ -319,61 +396,83 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speed, T, delta, full=
     # true best value.
     value_bound = float(max(payoff.max(axis=0).mean(), (H0 @ X.T).max(axis=0).mean()))
 
-    def ranking(offset, sets, chosen, noun):
-        """Rank one family of subsets by discounted regret; list the best 8 and the current one."""
-        ids = offset + np.arange(len(sets))
+    def ranking(offset, sets, bench, noun):
+        """Rank one family of fixed subsets by discounted regret; list the best 8 and the bench. The bench
+        is one of them unless its windows change this family over the rounds: then it is an extra row."""
+        fixed = offset + np.arange(len(sets))
+        steady = bool((bench == bench[0]).all())
+        here = offset + int(np.flatnonzero((sets == bench[0]).all(axis=1))[0]) if steady else now
+        ids = fixed if steady else np.append(fixed, now)
         order = ids[np.argsort(discounted[ids], kind="stable")]
         rank = {int(b): i + 1 for i, b in enumerate(order)}
-        now = offset + int(np.flatnonzero((sets == chosen).all(axis=1))[0])
-        listed = sorted(set(order[:8].tolist()) | {now}, key=rank.get)
-        rows = [dict(rank=rank[b], mask=[bool(v) for v in sets[b - offset]],
-                     label=_describe(sets[b - offset], noun), discounted=float(discounted[b]),
-                     start=float(acc[0, b]), end=float(acc[-1, b]), floor=float(reg_limit[b]), current=b == now)
-                for b in listed]
-        return dict(rows=rows, total=len(sets), rank=rank[now], best=int(order[0]), now=now)
+        listed = sorted(set(order[:8].tolist()) | {here}, key=rank.get)
+        rows = []
+        for b in listed:
+            scheduled = b == now and not steady
+            rows.append(dict(
+                rank=rank[b], mask=None if scheduled else [bool(v) for v in sets[b - offset]],
+                label="the schedule on the bench" if scheduled else _describe(sets[b - offset], noun),
+                discounted=float(discounted[b]), start=float(acc[0, b]), end=float(acc[-1, b]),
+                floor=float(reg_limit[b]), current=b == here, scheduled=scheduled))
+        return dict(rows=rows, total=len(ids), rank=rank[here], best=int(fixed[discounted[fixed].argmin()]))
 
-    now, everything, rankings = 0, B - 1, None
+    rankings = None
     if full:
-        by_feature = ranking(0, feature_sets, F_now, "feature")
-        by_action = ranking(n_f, action_sets, A_now, "action")
-        now = by_feature["now"]
+        by_feature = ranking(0, feature_sets, F_bench, "feature")
+        by_action = ranking(n_f, action_sets, A_bench, "action")
 
+    # What the last round holds back decides the lasting loss. Usually that is what was held back all
+    # along; a window that runs to the end of the horizon leaves something out that was in use before.
+    F_end, A_end = F_bench[-1], A_bench[-1]
+    settled = bool((F_bench.any(axis=0) == F_end).all() and (A_bench.any(axis=0) == A_end).all())
+    scheduled = bool((F_bench != F_end).any() or (A_bench != A_end).any())
     hidden = []
-    if not F_now.all():
-        hidden.append(_describe(~F_now, "feature") + (" stays" if (~F_now).sum() == 1 else " stay") + " hidden")
-    if not A_now.all():
-        hidden.append(_describe(~A_now, "action") + (" is" if (~A_now).sum() == 1 else " are") + " never offered")
-    sentence = (f"Showing {_describe(F_now, 'feature')} and offering {_describe(A_now, 'action')}, the human picks "
+    if not F_end.all():
+        one = (~F_end).sum() == 1
+        hidden.append(_describe(~F_end, "feature") + ((" stays" if one else " stay") + " hidden" if settled
+                                                       else (" is" if one else " are") + " hidden at the end"))
+    if not A_end.all():
+        one = (~A_end).sum() == 1
+        hidden.append(_describe(~A_end, "action") + (" is" if one else " are")
+                      + (" never offered" if settled else " not offered at the end"))
+    sentence = (f"Showing {_describe(F_base, 'feature')} and offering {_describe(A_base, 'action')}"
+                f"{_window_text(windows, F_base, A_base)}, the human picks "
                 f"the best move {acc[0, now]:.0%} of the time at round 0 and {acc[-1, now]:.0%} by round {T - 1}. ")
     if reg_limit[now] > 1e-9:
-        sentence += (f"Even after learning everything shown, {reg_limit[now]:.2f} of utility is lost per round"
+        sentence += ((f"Even after learning everything shown, {reg_limit[now]:.2f} of utility is lost per round" if settled
+                      else f"If the last round's choice carried on until everything shown is learned, {reg_limit[now]:.2f} "
+                           "of utility would still be lost per round")
                      + (f" because {_human_list(hidden)}. " if hidden else ". "))
-    else:
+    elif settled:
         sentence += "Once everything shown is learned, the human always picks the best move. "
+    else:
+        sentence += "Once everything shown at the end is learned, the human always picks the best move. "
     if full:
         best_f, best_a = by_feature["best"], by_action["best"]
+        kept = " every round" if scheduled else ""       # a fixed subset, against a schedule that changes
         feature_helps = discounted[best_f] < discounted[now] - 1e-9
         if feature_helps:
-            sentence += (f"Showing {_describe(feature_sets[best_f], 'feature')} instead would cut the discounted "
+            sentence += (f"Showing {_describe(feature_sets[best_f], 'feature')}{kept} instead would cut the discounted "
                          f"regret to {discounted[best_f]:.2f}. ")
         if discounted[best_a] < discounted[now] - 1e-9:
-            offer = f"ffering {_describe(action_sets[best_a - n_f], 'action')} instead would cut"
+            offer = f"ffering {_describe(action_sets[best_a - n_f], 'action')}{kept} instead would cut"
             sentence += (f"Separately, o{offer} it to {discounted[best_a]:.2f}." if feature_helps
                          else f"O{offer} the discounted regret to {discounted[best_a]:.2f}.")
         elif not feature_helps:
-            sentence += "Changing only the features, or only the actions, does no better over this horizon."
+            sentence += ("No fixed choice of the features alone, or of the actions alone, does better over this horizon."
+                         if scheduled else "Changing only the features, or only the actions, does no better over this horizon.")
         for r in (by_feature, by_action):
-            del r["best"], r["now"]
+            del r["best"]
         rankings = dict(features=by_feature, actions=by_action)
 
-    held_back = not (F_now.all() and A_now.all())
+    held_back = not (F_bench.all() and A_bench.all())
 
     # The human's choice for one reference state, every feature equal to +1 (the "positive state" of
     # the one-feature bench): y_hat = argmax over offered actions of the shown beliefs times x, against
     # the best move y* = argmax over all actions of U x. Ties go to the lowest-numbered action.
     x_ref = np.ones(n)
-    scores = (res.H[:T, now] * F_now) @ x_ref                          # (T, K)
-    picks = np.where(A_now, scores, -np.inf).argmax(axis=1)
+    scores = (res.H[:T, now] * F_bench[:, None, :]) @ x_ref            # (T, K)
+    picks = np.where(A_bench, scores, -np.inf).argmax(axis=1)
     worth = U @ x_ref
     best_move = int(worth.argmax())
     missed = worth[picks] < worth.max() - 1e-9      # a pick that ties with the best move is not a miss
@@ -397,21 +496,35 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speed, T, delta, full=
                     value_gap=np.round(value_gap[:, now], 4).tolist(),
                     ref_acc=np.round(acc[:, everything], 4).tolist() if held_back else None),
         # Beliefs over time as [feature][action][round], the same res.H the scores above use: a weight
-        # on a hidden feature, or of an action that is not offered, is never learned and stays at its
-        # first value (the page fades those flat lines).
+        # on a hidden feature, or of an action that is not offered, is not learned in that round and
+        # keeps its value (the page fades those flat stretches).
         beliefs=np.round(res.H[:T, now].transpose(2, 1, 0), 3).tolist(),
-        U=U.tolist(), F=F_now.tolist(), A=A_now.tolist(), delta=delta,
+        U=U.tolist(), F=F_base.tolist(), A=A_base.tolist(), delta=delta,
+        # what is shown and offered round by round, as [feature][round] and [action][round], and the
+        # rounds at which that changes
+        schedule=dict(F=F_bench.T.astype(int).tolist(), A=A_bench.T.astype(int).tolist()),
+        changes=[t for t in range(1, T) if (F_bench[t] != F_bench[t - 1]).any() or (A_bench[t] != A_bench[t - 1]).any()],
         choice=dict(x=x_ref.tolist(), picks=(picks + 1).tolist(), best=best_move + 1, missed=missed.tolist()),
         acc_limit=float(acc_limit[now]), reg_limit=float(reg_limit[now]),
         worst_regret=worst_regret, value_bound=value_bound,
     )
 
 
+def _bench_page(page, default_world, timed):
+    specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
+    return render_template("worlds.html", curve_specs=specs, default_world=default_world, page=page, timed=timed,
+                           max_actions=MAX_ACTIONS, max_features=MAX_FEATURES, max_windows=MAX_WINDOWS)
+
+
 @app.route("/worlds")
 def worlds():
-    specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
-    return render_template("worlds.html", curve_specs=specs, default_world=DEFAULT_WORLD, page="worlds",
-                           max_actions=MAX_ACTIONS, max_features=MAX_FEATURES)
+    return _bench_page("worlds", DEFAULT_WORLD, timed=False)
+
+
+@app.route("/timed")
+def timed():
+    """The same bench, with windows of rounds in which a feature or an action is held back."""
+    return _bench_page("timed", DEFAULT_TIMED, timed=True)
 
 
 @app.route("/api/world")
@@ -421,11 +534,15 @@ def api_world():
         abort(400, "unknown curve")
     spec = CURVE_SPECS[curve_name]
     K, n = int(_num("K", 3, 2, MAX_ACTIONS)), int(_num("n", 3, 1, MAX_FEATURES))
+    T = int(_num("T", 100, 10, 300))
+    F, A, windows = _mask("F", n), _mask("A", K), _windows(K, n, T)
+    for base, kind, problem in ((F, "f", "show no feature"), (A, "a", "offer no action")):
+        empty = np.flatnonzero(~_schedule(base, windows, kind, T).any(axis=1))
+        if len(empty):
+            abort(400, f"round {empty[0]} would {problem}")
     return jsonify(run_general(
-        _matrix("U", K, n), _matrix("H", K, n), _mask("F", n), _mask("A", K), curve_name,
-        _num("p1", spec["default"], spec["min"], spec["max"]),
-        int(_num("T", 100, 10, 300)), _num("delta", 0.95, 0.01, 0.99),
-        full=request.args.get("rank", "1") != "0",
+        _matrix("U", K, n), _matrix("H", K, n), F, A, curve_name, _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
+        full=request.args.get("rank", "1") != "0", windows=windows,
     ))
 
 
@@ -451,15 +568,16 @@ def _explore_grid(T, cycle, size=20):
 
 
 @lru_cache(maxsize=256)
-def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speed, T, delta, full=True):
+def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speeds, T, delta, full=True):
     """Score explore-then-commit policies under correlated features. Every policy explores with the same
-    rotation, so the exploration rounds are scored once and each policy only adds its committed rounds."""
+    rotation, so the exploration rounds are scored once and each policy only adds its committed rounds.
+    `speeds` holds one learning speed per feature."""
     U, H0 = np.array(U_rows), np.array(H_rows)
     K, n = U.shape
     Sigma = correlated.correlation_matrix(*rho)
     X = correlated.probes(Sigma, N_PROBES)
     score = correlated.Scorer(U, Sigma, X)
-    curve = CURVE_SPECS[curve_name]["make"](speed)
+    curve = CURVE_SPECS[curve_name]["make"](np.array(speeds))
     commit = np.array(commit)
 
     cycle = correlated.rotation(n, k)
@@ -562,6 +680,13 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speed, T
     best_move = (U @ Xs.T).argmax(axis=0)
     pick = lambda t: (effective(t) @ Xs.T).argmax(axis=0)
 
+    # The human's choice for the reference state, every feature at +1, as on the other benches: the shown
+    # features are seen, the hidden ones filled in, so the scores are H_t P_S x. Ties go to the lowest action.
+    x_ref = np.ones(n)
+    picks = (score.effective(bench_H, bench_masks) @ x_ref).argmax(axis=1)          # (T,)
+    worth = U @ x_ref
+    missed = worth[picks] < worth.max() - 1e-9
+
     ref = None if bench_is_fixed and best_fixed == 0 else best_fixed
     return dict(
         K=K, n=n, T=T, k=k, delta=delta, rho=list(rho), Sigma=Sigma.round(4).tolist(),
@@ -586,6 +711,7 @@ def run_correlated(U_rows, H_rows, rho, k, explore, commit, curve_name, speed, T
         schedule=bench_masks.astype(int).T.tolist(),                                      # [feature][round]
         beliefs=np.round(bench_H.transpose(2, 1, 0), 3).tolist(),                          # [feature][action][round]
         U=U.tolist(), C=commit.tolist(), explore=explore,
+        choice=dict(x=x_ref.tolist(), picks=(picks + 1).tolist(), best=int(worth.argmax()) + 1, missed=missed.tolist()),
         effective=dict(first=np.round(effective(0), 3).tolist(), last=np.round(effective(T - 1), 3).tolist(),
                        truth=np.round(truth_eff, 3).tolist(), first_mask=bench_masks[0].tolist()),
         scatter=dict(x=np.round(Xs, 3).tolist(), best=(best_move + 1).tolist(),
@@ -628,7 +754,7 @@ def api_correlated():
         abort(400, f"at most {k} features can be shown per round")
     return jsonify(run_correlated(
         _matrix("U", K, n), _matrix("H", K, n), _rho(), k, int(_num("explore", 0, 0, T)), commit, curve_name,
-        _num("p1", spec["default"], spec["min"], spec["max"]), T, _num("delta", 0.95, 0.01, 0.99),
+        _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
         full=request.args.get("rank", "1") != "0",
     ))
 

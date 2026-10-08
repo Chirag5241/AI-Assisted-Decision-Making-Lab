@@ -7,7 +7,8 @@
   const { SUB, SHADES } = MatrixEditor;
   const N = 3, PAIRS = [[0, 1], [0, 2], [1, 2]];
 
-  const world = { K: 3, U: [], H: [], k: 2, C: [true, true, false] };
+  // S: null while every feature learns at the one speed p1, otherwise one speed per feature
+  const world = { K: 3, U: [], H: [], k: 2, C: [true, true, false], S: null };
   const REMEMBER = "decision-lab:correlated";
 
   const randomWeight = () => Math.round((Math.random() * 4 - 2) * 10) / 10;
@@ -82,6 +83,11 @@
     for (const name of ["U", "H"]) MatrixEditor.draw($("matrix-" + name), world, name, { onChange: schedule });
   }
 
+  const speeds = Speeds.attach({
+    state: world, count: () => N, spec: () => SPECS[curve()], shared: () => value("p1"),
+    onChange: () => schedule(), onToggle: () => run(),
+  });
+
   function applyCurve(resetValue) {
     const spec = SPECS[curve()];
     inputs("p1").forEach((el) => {
@@ -90,6 +96,7 @@
     });
     $("p1-label").textContent = spec.param;
     $("curve-hint").textContent = spec.param + ": " + spec.hint;
+    if (resetValue) speeds.reset(); else speeds.draw();
   }
 
   // the exploration phase can last at most the whole horizon
@@ -102,11 +109,13 @@
 
   function query() {
     const rows = (M) => M.map((row) => row.join(",")).join(";");
-    return new URLSearchParams({
+    const q = new URLSearchParams({
       K: world.K, U: rows(world.U), H: rows(world.H), rho: rho().join(","), k: world.k,
       explore: value("explore"), C: world.C.map((on) => (on ? 1 : 0)).join(","),
       curve: curve(), p1: value("p1"), T: value("T"), delta: value("delta"),
     });
+    if (speeds.param()) q.set("ps", speeds.param());
+    return q;
   }
 
   const stepArea = (share) => "polygon(0% 100%, " + share.map((w, t) => {
@@ -115,7 +124,7 @@
   }).join(", ") + ", 100% 100%)";
 
   const key = (cls, text) => { const item = make("span"), i = make("i", cls); item.append(i, text); return item; };
-  let last = null;   // the latest answer, so the ring toggle can redraw Fig. 1 without asking Python again
+  let last = null;   // the latest answer, so the ring toggle can redraw the state clouds without asking Python again
 
   function drawScatter(data) {
     const round = document.querySelector('input[name="ring"]:checked').value;
@@ -154,25 +163,15 @@
     $("strip-end").textContent = "round " + (data.T - 1);
     const committed = data.explore > 0 && data.explore < data.T ? [{ t: data.explore, label: "commit" }] : [];
 
+    // Figs. 1 to 6, the standard ones. Every action is offered in every round here; only the features change.
+    // One rule marks the end of exploring, instead of one at every turn of the rotation.
+    const top = data.worst_regret || 1, bound = 1.1 * (data.value_bound || 1);
+    StandardFigures.draw(Object.assign({}, data, { schedule: { F: data.schedule, A: data.U.map(() => Array(data.T).fill(1)) } }), {
+      regret: { lo: -0.04 * top, hi: 1.04 * top }, value: { lo: -bound, hi: bound },
+      vlines: committed, refName: data.ref_label ? "best fixed subset" : undefined,
+    });
+
     drawScatter(data);
-
-    Charts.schedule($("fig-schedule"), data.T, data.schedule.map((on, j) => ({ name: "x" + SUB[j], on: on.map(Boolean) })), committed,
-      "Which features are shown in each round");
-
-    $("beliefs-legend").replaceChildren(...data.U.map((_, k) => key("bg-a" + (k + 1), "a" + SUB[k])),
-      key("truth-key", "truth u"), key("start", "starting belief"), key("box share", "grey: share of states with the wrong action"));
-    $("fig-beliefs").replaceChildren(...data.beliefs.map((byAction, j) => {
-      const panel = make("div"), title = make("p", "panel-title", "x" + SUB[j]), host = make("div", "chart");
-      if (!data.C[j]) title.append(make("small", "", "hidden once committed"));
-      host.style.setProperty("--shade", SHADES[j]);
-      panel.append(title, host);
-      Charts.line(host, data.T, byAction.map((v, k) => ({ v, cls: "c-a" + (k + 1), name: "a" + SUB[k], dot: true })),
-        data.U.map((row, k) => ({ y: row[j], cls: "truth c-a" + (k + 1) })), [],
-        { ylabel: "weight on x" + SUB[j], width: 380, height: 300, lo: -3.25, hi: 3.25, noLegend: true, dotRadius: 5, wrongShare, vlines: committed,
-          yticks: [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v })),
-          alt: "Each action's believed weight on feature " + (j + 1) + " over the rounds, against the true weights" });
-      return panel;
-    }));
 
     const C = data.C, first = data.effective.first_mask;
     $("fig-effective").replaceChildren(...[
@@ -185,19 +184,6 @@
       panel.append(title, MatrixEditor.grid(M, { label: name + ": effective weights, rows are actions", featureOn: (j) => mask[j] }));
       return panel;
     }));
-
-    const top = data.worst_regret || 1, pct = (v) => Math.round(v * 100) + "%";
-    Charts.line($("fig-regret"), data.T,
-      (data.series.ref_discounted ? [{ v: data.series.ref_discounted, cls: "c-ref", name: "best fixed subset" }] : [])
-        .concat([{ v: data.series.discounted, cls: "c-ink", name: "this policy" }]),
-      [], [], { ylabel: "discounted regret per round", step: true, lo: -0.04 * top, hi: 1.04 * top, wrongShare, vlines: committed,
-        alt: "Discounted regret loss in each round, this policy against the best fixed subset" });
-    Charts.line($("fig-accuracy"), data.T,
-      (data.series.ref_acc ? [{ v: data.series.ref_acc, cls: "c-ref", name: "best fixed subset" }] : [])
-        .concat([{ v: data.series.acc, cls: "c-a1", name: "this policy" }]),
-      [{ y: data.acc_limit, label: "once learned: " + pct(data.acc_limit) }], [],
-      { ylabel: "states with the best move picked", pct: true, lo: -0.03, hi: 1.08, wrongShare, vlines: committed,
-        alt: "Share of states in which the human picks the best move, per round" });
 
     if (data.ranking) {   // only the full answer runs the search
       renderSweep(data);
@@ -385,6 +371,7 @@
     for (const name of ["p1", "T", "delta"]) {
       if (s[name] !== undefined && isFinite(s[name])) inputs(name).forEach((el) => { el.value = s[name]; });
     }
+    speeds.load(s.ps);
     fitExplore();
     if (s.explore !== undefined && isFinite(s.explore)) inputs("explore").forEach((el) => { el.value = clamp(Number(s.explore), 0, value("T")); });
     return true;

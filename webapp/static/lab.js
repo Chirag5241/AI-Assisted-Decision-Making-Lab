@@ -3,37 +3,30 @@
 (function () {
   const SPECS = window.CURVE_SPECS;
   const PRESETS = window.PRESETS;
-  const KEYS = ["u1", "u2", "h1", "h2", "p1", "p2", "T", "delta"];
+  const KEYS = ["u1", "u2", "h1", "h2", "p1", "T", "delta"];
   const $ = (id) => document.getElementById(id);
   const inputs = (key) => document.querySelectorAll(`[data-key="${key}"]`);
   const bench = $("bench");
-  const split = $("split");
 
   const get = (key) => parseFloat(inputs(key)[0].value);
   const set = (key, value) => inputs(key).forEach((el) => { el.value = value; });
   const curve = () => document.querySelector('input[name="curve"]:checked').value;
   const signed = (v) => (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(2);
 
-  // Point the speed sliders at the chosen curve's parameter.
+  // Point the speed slider at the chosen curve's parameter. One feature, so one curve for both actions.
   function applyCurve(resetValues) {
     const spec = SPECS[curve()];
-    for (const key of ["p1", "p2"]) {
-      inputs(key).forEach((el) => {
-        el.min = spec.min; el.max = spec.max; el.step = spec.step;
-        if (resetValues) el.value = spec.default;
-      });
-    }
-    $("p1-label").textContent = split.checked ? spec.param + " 1" : spec.param;
-    $("p1-label").classList.toggle("a1", split.checked);
-    $("p2-label").textContent = spec.param + " 2";
-    $("p2-row").hidden = !split.checked;
+    inputs("p1").forEach((el) => {
+      el.min = spec.min; el.max = spec.max; el.step = spec.step;
+      if (resetValues) el.value = spec.default;
+    });
+    $("p1-label").textContent = spec.param;
     $("curve-hint").textContent = spec.param + ": " + spec.hint;
   }
 
   function state() {
-    const s = { curve: curve(), split: split.checked ? 1 : 0 };
+    const s = { curve: curve() };
     for (const key of KEYS) s[key] = get(key);
-    if (!s.split) s.p2 = s.p1;
     return s;
   }
 
@@ -41,7 +34,6 @@
     if (s.curve in SPECS) {
       document.querySelector(`input[name="curve"][value="${s.curve}"]`).checked = true;
     }
-    if (s.split !== undefined) split.checked = String(s.split) === "1";
     applyCurve(true);
     for (const key of KEYS) {
       if (s[key] !== undefined && s[key] !== "" && isFinite(s[key])) set(key, s[key]);
@@ -78,29 +70,32 @@
       return tile;
     }));
 
+    // Figs. 1 to 6, the standard ones, from this bench's answer in the shape every bench hands over: one feature,
+    // two actions, both in play every round, and the human right in every state or in none.
+    const wrong = [];
+    for (const run of data.runs) for (let t = run.start; t < run.stop; t++) wrong.push(run.wrong);
+    const always = Array(data.T).fill(1);
+    StandardFigures.draw({
+      T: data.T, K: 2, U: [[data.u[0]], [data.u[1]]], delta: data.delta,
+      beliefs: [[data.series.h1, data.series.h2]],
+      schedule: { F: [always], A: [always, always] }, changes: [],
+      choice: { picks: data.series.choice, best: data.best, missed: wrong },
+      series: { reg: data.series.regret, discounted: data.series.discounted, value_gap: data.series.value_gap,
+        acc: wrong.map((w) => (w ? 0 : 1)) },
+    }, {
+      // fixed to what the sliders allow, so no axis moves while one is dragged
+      regret: { lo: -0.2, hi: 5.2, yticks: [0, 1, 2, 3, 4, 5].map((v) => ({ v, label: v })) },
+      value: { lo: -2.6, hi: 2.6, yticks: [-2, -1, 0, 1, 2].map((v) => ({ v, label: v })) },
+      truthLabels: true,
+    });
+
+    // Fig. 7: the belief gap, whose sign decides the choice
     const shade = data.runs.filter((run) => run.wrong).map((run) => [run.start, run.stop]);
-    Charts.line($("fig-beliefs"), data.T,
-      [{ v: data.series.h1, cls: "c-a1", name: "h\u2081", dot: true }, { v: data.series.h2, cls: "c-a2", name: "h\u2082", dot: true }],
-      [{ y: data.u[0], label: "u\u2081 = " + data.u[0].toFixed(2) }, { y: data.u[1], label: "u\u2082 = " + data.u[1].toFixed(2) }],
-      // fixed to the sliders' range (plus a little room for the dots), so the axis never jumps
-      shade, { ylabel: "utility weight", lo: -3.25, hi: 3.25, yticks: [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v })), dotLabel: "starting belief (the h sliders)", alt: "Beliefs h1 and h2 over the rounds, converging to the true weights u1 and u2" });
-    Charts.line($("fig-regret"), data.T,
-      [{ v: data.series.regret, cls: "c-ref", name: "before discounting" },
-        { v: data.series.discounted, cls: "c-ink", name: "discounted, \u03b4 = " + data.delta }],
-      [], shade, { ylabel: "regret per round", height: 205, step: true, noXLabel: true, lo: -0.2, hi: 5.2, yticks: [0, 1, 2, 3, 4, 5].map((v) => ({ v, label: v })),
-        alt: "Expected regret loss in each round, before and after discounting" });
-    Charts.line($("fig-choice"), data.T,
-      (data.best ? [{ v: data.series.choice.map(() => data.best), cls: "c-ink", dash: true, name: "y* best move" }] : [])
-        .concat([{ v: data.series.choice, cls: "c-ink", name: "\u0177 human's choice" }]),
-      [], shade, { ylabel: "action chosen", height: 150, step: true, lo: 0.5, hi: 2.5, fmt: (v) => "action " + v,
-        yticks: [{ v: 1, label: "a\u2081" }, { v: 2, label: "a\u2082" }],
-        alt: "Which of the two actions the human chooses in each round, against the best move" });
     const gap = data.series.h1.map((v, t) => v - data.series.h2[t]);
     Charts.line($("fig-gap"), data.T, [{ v: gap, cls: "c-ink", name: "h\u2081 \u2212 h\u2082" }],
       [{ y: 0, cls: "zero", label: "zero: indifferent" }, { y: data.du, label: "true gap \u0394u = " + signed(data.du) }],
-      shade, { ylabel: "belief gap  h\u2081 \u2212 h\u2082", height: 230, lo: -6.4, hi: 6.4, yticks: [-6, -4, -2, 0, 2, 4, 6].map((v) => ({ v, label: v })), alt: "The belief gap h1 minus h2 over the rounds, against zero and the true gap" });
-    Charts.line($("fig-value"), data.T, [{ v: data.series.value_gap, cls: "c-ink", name: "expected value gap" }],
-      [{ y: 0, cls: "zero", label: "zero: expects exactly what the best move is worth" }], shade, { ylabel: "value gap per round", lo: -2.6, hi: 2.6, yticks: [-2, -1, 0, 1, 2].map((v) => ({ v, label: v })), alt: "True best value minus the value the human expects from the chosen action, per round" });
+      shade, { ylabel: "belief gap  h\u2081 \u2212 h\u2082", lo: -6.4, hi: 6.4, yticks: [-6, -4, -2, 0, 2, 4, 6].map((v) => ({ v, label: v })), alt: "The belief gap h1 minus h2 over the rounds, against zero and the true gap" });
+    // Fig. 8: the round of the flip in every nearby world
     Charts.heat($("fig-map"), $("fig-map-key"), data.map, data.du, data.dh0,
       "Map of the round from which the human is right for good, over the true gap and the initial belief gap");
   }
@@ -159,12 +154,6 @@
 
   document.querySelectorAll('input[name="curve"]').forEach((el) =>
     el.addEventListener("change", () => { applyCurve(true); schedule(); }));
-
-  split.addEventListener("change", () => {
-    if (split.checked) set("p2", get("p1"));
-    applyCurve(false);
-    schedule();
-  });
 
   document.querySelectorAll(".preset").forEach((button) =>
     button.addEventListener("click", () => { load(PRESETS[button.dataset.preset]); run(); }));

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_figures.html" import standard_set, own_head, own with context %}
 {% block title %}Correlated features &middot; {{ site_name }}{% endblock %}
 
 {% block body %}
@@ -72,7 +73,9 @@
           <input type="range" id="p1" data-key="p1">
           <input type="number" data-key="p1" aria-label="learning speed">
         </div>
+        <div id="speed-rows"></div>
         <p class="hint" id="curve-hint"></p>
+        <label class="check"><input type="checkbox" id="each-speed"> A separate speed for each feature</label>
       </fieldset>
 
       <fieldset class="card">
@@ -108,9 +111,12 @@
 
     <section class="tiles" id="tiles"></section>
 
+    {{ standard_set() }}
+
+    {{ own_head() }}
     <section class="figs one">
       <figure>
-        <figcaption><b>Fig. 1</b> What correlated states look like: 300 of the probe states, two features at a time, coloured by the best move</figcaption>
+        {{ own(1) }}
         <div class="segmented two" role="radiogroup" aria-label="Which round's choices to ring" style="max-width: 320px">
           <label><input type="radio" name="ring" value="first"><span>mistakes at round 0</span></label>
           <label><input type="radio" name="ring" value="last" checked><span>mistakes at the last round</span></label>
@@ -122,41 +128,14 @@
 
     <section class="figs one">
       <figure>
-        <figcaption><b>Fig. 2</b> Which features the algorithm shows, round by round</figcaption>
-        <div class="legend"><span><i class="on-key"></i>shown</span><span><i class="fit-key"></i>exploration ends</span></div>
-        <div class="chart" id="fig-schedule"></div>
-      </figure>
-    </section>
-
-    <section class="figs one">
-      <figure>
-        <figcaption><b>Fig. 3</b> What the human believes: each action's weight on each feature. A weight moves only on rounds its feature is shown</figcaption>
-        <div class="legend" id="beliefs-legend"></div>
-        <div class="scatter-grid" id="fig-beliefs"></div>
-      </figure>
-    </section>
-
-    <section class="figs one">
-      <figure>
-        <figcaption><b>Fig. 4</b> What the human actually weighs: beliefs once hidden features are filled in, <i>H</i>&nbsp;<i>P</i><sub>S</sub>, against the best possible with the same features, <i>U</i>&nbsp;<i>P</i><sub>S</sub></figcaption>
+        {{ own(2) }}
         <div class="effective" id="fig-effective"></div>
       </figure>
     </section>
 
-    <section class="figs">
-      <figure>
-        <figcaption><b>Fig. 5</b> Discounted regret loss each round, &delta;<sup>t</sup> &middot; &#8467;, against the best fixed subset</figcaption>
-        <div class="chart" id="fig-regret"></div>
-      </figure>
-      <figure>
-        <figcaption><b>Fig. 6</b> How often the human picks the best move</figcaption>
-        <div class="chart" id="fig-accuracy"></div>
-      </figure>
-    </section>
-
     <section class="figs one">
       <figure>
-        <figcaption><b>Fig. 7</b> How long to explore: discounted regret against the length of the exploration phase, one line per subset committed to</figcaption>
+        {{ own(3) }}
         <div class="chart" id="fig-sweep"></div>
       </figure>
     </section>
@@ -188,7 +167,7 @@
       <span class="math">E[x<sub>hidden</sub> | x<sub>S</sub>] = &Sigma;<sub>hS</sub> &Sigma;<sub>SS</sub><sup>&minus;1</sup> x<sub>S</sub></span>,
       then picks <span class="math">argmax<sub>k</sub> (H x&#770;)<sub>k</sub></span>. Because the filled-in state is a fixed matrix
       times the true one, <span class="math">x&#770; = P<sub>S</sub> x</span>, the human acts as if their weights were
-      <span class="math">H P<sub>S</sub></span> (Fig. 4).</p>
+      <span class="math">H P<sub>S</sub></span> (Fig. 8).</p>
     <p>As in the paper, a weight is learned only on the rounds its feature is shown. A filled-in value never corrects
       the belief about that feature, so a misjudged hidden feature keeps pulling the choice the wrong way. With
       independent features it would be filled in as zero and simply drop out.</p>
@@ -199,7 +178,7 @@
       guaranteed to find the true optimum. Click a row to put that policy on the bench.</p>
     <p>Each round is scored over 2,000 probe states drawn from <span class="math">N(0, &Sigma;)</span>, built from the
       same draws as the independent bench, so with &Sigma; = I this page gives that bench's numbers.</p>
-    <p>Fig. 1 rings the probe states where the human's pick is not the best move. The dashed line is
+    <p>Fig. 7 rings the probe states where the human's pick is not the best move. The dashed line is
       <span class="math">E[x<sub>j</sub> | x<sub>i</sub>] = &rho;<sub>ij</sub> x<sub>i</sub></span>, the value the human
       would fill in for the vertical feature from the horizontal one alone.</p>
   </div>
@@ -210,6 +189,8 @@
   window.DEFAULT_WORLD = {{ default_world|tojson }};
 </script>
 <script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('figures.js') }}"></script>
 <script src="{{ static_v('matrix.js') }}"></script>
+<script src="{{ static_v('speeds.js') }}"></script>
 <script src="{{ static_v('correlated.js') }}"></script>
 {% endblock %}

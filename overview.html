@@ -1,0 +1,525 @@
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overview &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791494390">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
+    </div>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" aria-current="page">Overview</a>
+      <details class="mast-menu">
+        <summary  title="Go to an experiment">Experiments</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" >More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html"  class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
+    </nav>
+  </header>
+  
+<main class="guide">
+  <header class="guide-head">
+    <h2>How to read the lab</h2>
+    <p class="lead">Every bench simulates the same loop: an algorithm decides what a human sees, the human picks an
+      action from beliefs that are partly wrong, and those beliefs move toward the truth with use. This page sets
+      out the equations of that loop and the six figures every bench draws from them, so a figure means the same
+      thing wherever it appears.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#loop">One round</a><a href="#equations">Equations</a><a href="#figures">Standard figures</a>
+      <a href="#conventions">Conventions</a><a href="#benches">Benches</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="loop">
+    <h3>One round</h3>
+    <div class="loop">
+      <ol>
+        <li><b>The algorithm chooses what is in play.</b> It shows a set of features F<sub>t</sub> and offers a set
+          of actions A<sub>t</sub>. This choice, over all the rounds, is the policy being tested.</li>
+        <li><b>The human picks an action.</b> A state x is drawn. The human scores each offered action from the
+          shown features with their own weights H<sub>t</sub> and picks the highest (<a href="#eq-choice">Eq. 2</a>). The
+          round costs the regret of that pick against the best move (<a href="#eq-regret">Eq. 6</a>).</li>
+        <li><b>The human learns.</b> Every weight that was in use closes part of its gap to the truth
+          (<a href="#eq-learning">Eq. 4</a>). A weight that was held back does not move.</li>
+      </ol>
+      <dl class="symbols">
+        <div><dt>K, n</dt><dd>the number of actions and of features</dd></div>
+        <div><dt>x</dt><dd>the state of a round, one number per feature</dd></div>
+        <div><dt>U</dt><dd>the truth: u<sub>kj</sub> is the weight of feature j in the value of action k</dd></div>
+        <div><dt>H<sub>t</sub></dt><dd>what the human believes U is in round t; H<sub>0</sub> is the first belief</dd></div>
+        <div><dt>F<sub>t</sub>, A<sub>t</sub></dt><dd>the features shown and the actions offered in round t</dd></div>
+        <div><dt>&ycirc;, y*</dt><dd>the human's choice and the best move</dd></div>
+        <div><dt>&phi;<sub>j</sub></dt><dd>the learning curve of feature j</dd></div>
+        <div><dt>&delta;, T</dt><dd>the discount and the number of rounds</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="guide-section" id="equations">
+    <h3>Equations</h3>
+    <p class="section-sub">Numbered so an experiment can cite them. Each will link to its derivation once that is written.</p>
+    
+    <article class="eq" id="eq-value">
+      <header><b>Eq. 1</b><h4>What an action is worth</h4></header>
+      <p class="formula">(<i>Ux</i>)<sub>k</sub> = &Sigma;<sub>j</sub> u<sub>kj</sub> x<sub>j</sub>,&emsp;x ~ N(0, I)</p>
+      <p class="eq-text">The state x has one number per feature. The truth U has one row per action and one column per feature: u<sub>kj</sub> is the weight of feature j in the value of action k. States are drawn afresh every round; on the Correlated features bench they come from N(0, &Sigma;).</p>
+      <p class="eq-meta">
+        
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-choice">
+      <header><b>Eq. 2</b><h4>The human&#39;s choice</h4></header>
+      <p class="formula">&ycirc;<sub>t</sub>(x) = argmax<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> x<sub>j</sub></p>
+      <p class="eq-text">In round t the algorithm shows the features F<sub>t</sub> and offers the actions A<sub>t</sub>. The human scores each offered action with their own weights H<sub>t</sub>, using only the shown features, and picks the highest. Ties are split evenly.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-1">Fig. 1</a>, <a href="#fig-3">Fig. 3</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-best">
+      <header><b>Eq. 3</b><h4>The best move</h4></header>
+      <p class="formula">y*(x) = argmax<sub>k</sub> (<i>Ux</i>)<sub>k</sub></p>
+      <p class="eq-text">The best move uses the truth, every feature and every action, whatever the algorithm holds back. Regret is always measured against it.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-3">Fig. 3</a>, <a href="#fig-6">Fig. 6</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-learning">
+      <header><b>Eq. 4</b><h4>How a belief moves</h4></header>
+      <p class="formula">h<sub>kj,t</sub> = u<sub>kj</sub> + (h<sub>kj,0</sub> &minus; u<sub>kj</sub>) (1 &minus; &phi;<sub>j</sub>(N<sub>kj</sub>(t)))</p>
+      <p class="eq-text">N<sub>kj</sub>(t) counts the rounds before t in which feature j was shown and action k was offered. A weight moves only in those rounds; held back, it keeps its value and carries on later from where it stopped. The speed belongs to the feature: every action's weight on feature j follows the same curve &phi;<sub>j</sub>.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-2">Fig. 2</a>, <a href="#fig-1">Fig. 1</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-curves">
+      <header><b>Eq. 5</b><h4>The learning curves</h4></header>
+      <p class="formula">exponential&ensp;&phi;(m) = 1 &minus; (1 &minus; r)<sup>m</sup><br>hyperbolic&ensp;&phi;(m) = m / (m + m<sub>&frac12;</sub>)<br>power law&ensp;&phi;(m) = 1 &minus; (1 + m)<sup>&minus;a</sup><br>sigmoid&ensp;&phi;(m) = (s(m) &minus; s(0)) / (1 &minus; s(0))<br>with&ensp;s(m) = 1 / (1 + e<sup>&minus;5(m &minus; m<sub>0</sub>) / m<sub>0</sub></sup>)</p>
+      <p class="eq-text">&phi;(m) is the share of the gap between the first belief and the truth that is closed after m rounds in use: it starts at 0, never falls, and tends to 1. Each curve has one parameter, set on the bench: the rate r, the half-life m<sub>&frac12;</sub>, the exponent a, or the midpoint m<sub>0</sub>.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-2">Fig. 2</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-regret">
+      <header><b>Eq. 6</b><h4>Regret loss of a round</h4></header>
+      <p class="formula">&#8467;<sub>t</sub> = E<sub>x</sub>[ max<sub>k</sub> (<i>Ux</i>)<sub>k</sub> &minus; (<i>Ux</i>)<sub>&ycirc;<sub>t</sub>(x)</sub> ]</p>
+      <p class="eq-text">What the best move is worth minus what the chosen move is worth, averaged over states. It is zero in a state where the human picks the best move. With one feature and two actions it is |&Delta;u| &middot; E|x| = |&Delta;u| &radic;(2/&pi;) on a wrong round; on the other benches it is the mean over 2,000 probe states.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-4">Fig. 4</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-objective">
+      <header><b>Eq. 7</b><h4>The objective: discounted regret</h4></header>
+      <p class="formula">R = &Sigma;<sub>t = 0</sub><sup>T &minus; 1</sup> &delta;<sup>t</sup> &#8467;<sub>t</sub></p>
+      <p class="eq-text">The algorithm's patience &delta; is one number in (0, 1). Near 0 only the first rounds count; near 1 later rounds count almost as much. This sum is the large number at the top of every bench and the quantity every ranking table sorts by.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-4">Fig. 4</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-value-gap">
+      <header><b>Eq. 8</b><h4>Value gap</h4></header>
+      <p class="formula">g<sub>t</sub> = E<sub>x</sub>[ max<sub>k</sub> (<i>Ux</i>)<sub>k</sub> &minus; &ucirc;<sub>t</sub>(&ycirc;) ],&emsp;&ucirc;<sub>t</sub>(&ycirc;) = max<sub>k &isin; A<sub>t</sub></sub> &Sigma;<sub>j &isin; F<sub>t</sub></sub> h<sub>kj,t</sub> x<sub>j</sub></p>
+      <p class="eq-text">What the best move is truly worth minus what the human expects from the move they pick. It measures how well calibrated the human is, not whether they choose well: it can sit at zero while the choice is still wrong.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-5">Fig. 5</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-accuracy">
+      <header><b>Eq. 9</b><h4>Share of states with the best move</h4></header>
+      <p class="formula">a<sub>t</sub> = P<sub>x</sub>[ &ycirc;<sub>t</sub>(x) = y*(x) ]</p>
+      <p class="eq-text">With several features the human is no longer simply right or wrong: it depends on the state. a<sub>t</sub> is the share of states in which the pick is the best move. 1 &minus; a<sub>t</sub> is the grey behind every figure and the hatched bar at the top of a bench.</p>
+      <p class="eq-meta">
+        <span>Drawn in <a href="#fig-6">Fig. 6</a></span>
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-flip">
+      <header><b>Eq. 10</b><h4>The flip, with one feature and two actions</h4></header>
+      <p class="formula">right in round t&ensp;&hArr;&ensp;&phi;(t) &gt; |&Delta;h<sub>0</sub>| / (|&Delta;h<sub>0</sub>| + |&Delta;u|)</p>
+      <p class="eq-text">With one feature the state scales both actions alike, so the human is right in every state or in none: right exactly when h<sub>1</sub> &minus; h<sub>2</sub> has the sign of &Delta;u = u<sub>1</sub> &minus; u<sub>2</sub>. A human who starts on the wrong side flips once, when the curve passes this threshold. &Delta;h<sub>0</sub> is the first belief gap.</p>
+      <p class="eq-meta">
+        
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-filling-in">
+      <header><b>Eq. 11</b><h4>Filling in a hidden feature, when features are correlated</h4></header>
+      <p class="formula">x&#770; = P<sub>S</sub> x,&emsp;E[x<sub>hidden</sub> | x<sub>S</sub>] = &Sigma;<sub>hS</sub> &Sigma;<sub>SS</sub><sup>&minus;1</sup> x<sub>S</sub></p>
+      <p class="eq-text">On the Correlated features bench the human predicts each hidden feature from the shown ones S and then chooses with the filled-in state, so they act as if their weights were H<sub>t</sub> P<sub>S</sub>. A filled-in value never corrects the belief about that feature.</p>
+      <p class="eq-meta">
+        
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+  </section>
+
+  <section class="guide-section" id="figures">
+    <h3>The six standard figures</h3>
+    <p class="section-sub">Every bench draws these six, in this order and under these numbers. A bench that has no use
+      for one still lists it and says why. The specimens below are live: three actions, three features, with
+      x<sub>3</sub> hidden from round 20 to round 25, the first world of
+      <a href="timed.html">Timed hiding</a>.</p>
+    <p class="hint error" id="specimen-problem" role="alert" hidden></p>
+
+    
+    
+    <article class="specimen" id="fig-1">
+      <figure>
+        <figcaption><b>Fig. 1</b>What the algorithm shows and offers, round by round</figcaption>
+        
+        <div class="legend"><span><i class="on-key"></i>shown or offered</span><span><i class="off-key"></i>held back</span></div>
+        <div class="chart" id="fig-schedule"></div>
+        
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>One row per feature, then one row per action. A row is inked in the rounds its feature is shown or its action is offered, and pale where the algorithm holds it back.</p></div>
+        <div><h4>How to read it</h4><p>Read down a column for what the human has to work with in that round. A pale stretch is also a stretch in which nothing is learned about that row.</p>
+          <p class="eq-meta"><span>From <a href="#eq-choice">Eq. 2</a>, <a href="#eq-learning">Eq. 4</a></span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            
+            <div class="absent"><dt><a href="index.html">1 feature, 2 actions</a></dt>
+              <dd>Not relevant here. There is one feature and two actions and both are in play in every round, so the algorithm has nothing to hold back.</dd></div>
+            
+            <div><dt><a href="worlds.html">More actions and features</a></dt>
+              <dd>The same every round on this bench.</dd></div>
+            
+            <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="correlated.html">Correlated features</a></dt>
+              <dd>Every action is offered in every round; only the features change.</dd></div>
+            
+          </dl>
+        </div>
+      </div>
+    </article>
+    
+    
+    <article class="specimen" id="fig-2">
+      <figure>
+        <figcaption><b>Fig. 2</b>What the human believes: each action's weight on each feature</figcaption>
+        
+        <div class="legend" id="beliefs-legend"></div>
+        <div class="belief-grid" id="fig-beliefs" data-fig="2"></div>
+        
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>One panel per feature, numbered 2.1, 2.2 and so on; with one feature there is one panel. Each line is one action's believed weight on that feature, the dot is the first belief, and the dashed line of the same colour is the truth it is heading for.</p></div>
+        <div><h4>How to read it</h4><p>A line is faded and flat across the rounds in which its weight is out of use. How fast a line closes on its dashed truth is the feature's learning curve.</p>
+          <p class="eq-meta"><span>From <a href="#eq-learning">Eq. 4</a>, <a href="#eq-curves">Eq. 5</a></span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            
+            <div><dt><a href="index.html">1 feature, 2 actions</a></dt>
+              <dd>One panel: there is one feature, and both actions share its learning curve.</dd></div>
+            
+            <div><dt><a href="worlds.html">More actions and features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="correlated.html">Correlated features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+          </dl>
+        </div>
+      </div>
+    </article>
+    
+    
+    <article class="specimen" id="fig-3">
+      <figure>
+        <figcaption><b>Fig. 3</b>The human's choice &ycirc; against the best move y*, for one reference state</figcaption>
+        
+        <div class="chart" id="fig-choice"></div>
+        
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>For one fixed state, the action the human picks in each round as a solid step line and the best move as a dashed one, with a grey box over the rounds where they differ.</p></div>
+        <div><h4>How to read it</h4><p>This is one state's story. Other states can flip at other rounds, which is what Fig. 6 adds up.</p>
+          <p class="eq-meta"><span>From <a href="#eq-choice">Eq. 2</a>, <a href="#eq-best">Eq. 3</a></span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            
+            <div><dt><a href="index.html">1 feature, 2 actions</a></dt>
+              <dd>For a positive state. For a negative state the choice and the best move both swap.</dd></div>
+            
+            <div><dt><a href="worlds.html">More actions and features</a></dt>
+              <dd>For the state with every feature at +1.</dd></div>
+            
+            <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>For the state with every feature at +1.</dd></div>
+            
+            <div><dt><a href="correlated.html">Correlated features</a></dt>
+              <dd>For the state with every feature at +1, hidden features filled in from the shown ones.</dd></div>
+            
+          </dl>
+        </div>
+      </div>
+    </article>
+    
+    
+    <article class="specimen half" id="fig-4">
+      <figure>
+        <figcaption><b>Fig. 4</b>Regret loss each round, before and after discounting</figcaption>
+        
+        <div class="chart" id="fig-regret"></div>
+        
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>The grey line is the expected regret of each round, &#8467;<sub>t</sub>. The ink line weights it by &delta;<sup>t</sup>.</p></div>
+        <div><h4>How to read it</h4><p>The area under the ink line is the objective, the large number at the top of the bench. A dashed level, where drawn, is the regret that remains once everything in use is learned.</p>
+          <p class="eq-meta"><span>From <a href="#eq-regret">Eq. 6</a>, <a href="#eq-objective">Eq. 7</a></span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            
+            <div><dt><a href="index.html">1 feature, 2 actions</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="worlds.html">More actions and features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="correlated.html">Correlated features</a></dt>
+              <dd>The dashed line is the best fixed subset, discounted.</dd></div>
+            
+          </dl>
+        </div>
+      </div>
+    </article>
+    
+    
+    <article class="specimen half" id="fig-5">
+      <figure>
+        <figcaption><b>Fig. 5</b>Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+        
+        <div class="chart" id="fig-value"></div>
+        
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>One line, g<sub>t</sub>, around a zero line.</p></div>
+        <div><h4>How to read it</h4><p>Above zero the human expects too little from the move they pick; below zero, too much. Zero does not mean the choice is right.</p>
+          <p class="eq-meta"><span>From <a href="#eq-value-gap">Eq. 8</a></span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            
+            <div><dt><a href="index.html">1 feature, 2 actions</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="worlds.html">More actions and features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="correlated.html">Correlated features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+          </dl>
+        </div>
+      </div>
+    </article>
+    
+    
+    <article class="specimen" id="fig-6">
+      <figure>
+        <figcaption><b>Fig. 6</b>How often the human picks the best move</figcaption>
+        
+        <div class="chart" id="fig-accuracy"></div>
+        
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>The share of states in which the pick is the best move, a<sub>t</sub>, from 0% to 100%. A grey line, where drawn, is the bench's reference policy.</p></div>
+        <div><h4>How to read it</h4><p>A dashed level is where the share is heading once everything in use is learned. With one feature the share is 0% or 100%: the human is right in every state or in none.</p>
+          <p class="eq-meta"><span>From <a href="#eq-accuracy">Eq. 9</a></span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            
+            <div><dt><a href="index.html">1 feature, 2 actions</a></dt>
+              <dd>0% or 100% here: with one feature the human is right in every state or in none.</dd></div>
+            
+            <div><dt><a href="worlds.html">More actions and features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="correlated.html">Correlated features</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+          </dl>
+        </div>
+      </div>
+    </article>
+    
+  </section>
+
+  <section class="guide-section" id="conventions">
+    <h3>Conventions shared by every figure</h3>
+    <ul class="conventions">
+      <li><b>Colour is the action.</b> a<sub>1</sub> is always the same blue, a<sub>2</sub> the same orange, and so on,
+        in every figure and on every slider. In Fig. 2 each feature's panel uses a slightly lighter shade.</li>
+      <li><b>Dashed is the truth.</b> A dashed line of an action's colour is the true weight its solid line is heading
+        for. A dashed ink line is a reference: the best move, or a level reached once everything in use is learned.</li>
+      <li><b>Grey behind a plot is error.</b> The darker the grey in a round, the larger the share of states in which
+        the human picks the wrong action. It is the same in every figure of a bench.</li>
+      <li><b>Faded means out of use.</b> A faded stretch of a line is a weight that was held back in those rounds, so
+        nothing was learned about it.</li>
+      <li><b>Dotted vertical rules mark a change of policy</b>: the rounds at which what is shown or offered changes.</li>
+      <li><b>Axes are fixed.</b> In the standard figures an axis is set by the world, never by the data on it, so a
+        figure keeps its scale while the policy and the learner change and heights can be compared by eye.</li>
+      <li><b>Rounds count from 0.</b> A horizon of T rounds runs from round 0 to round T &minus; 1.</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="benches">
+    <h3>The benches</h3>
+    <p class="section-sub">After the six standard figures a bench may add its own, numbered on from 7. Those belong to
+      that experiment alone and need not exist anywhere else.</p>
+    <div class="table-scroll"><table class="guide-table">
+      <thead><tr><th scope="col">Bench</th><th scope="col">Fig. 1</th><th scope="col">Fig. 2</th><th scope="col">Fig. 3</th><th scope="col">Fig. 4</th><th scope="col">Fig. 5</th><th scope="col">Fig. 6</th><th scope="col">Its own figures</th></tr></thead>
+      <tbody>
+        
+        <tr>
+          <th scope="row"><a href="index.html">1 feature, 2 actions</a><span>The smallest world. The human is right in every state or in none, so everything comes down to one flip and when it happens.</span></th>
+          
+          <td class="absent">not relevant</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td class="own"><ol start="7"><li>The flip: when the belief gap lands on the side of the true gap</li><li>Every nearby world at once; the ring is the one on the bench</li></ol></td>
+        </tr>
+        
+        <tr>
+          <th scope="row"><a href="worlds.html">More actions and features</a><span>Up to six actions and six features, with a fixed choice of which features are shown and which actions are offered. Ranks every fixed subset.</span></th>
+          
+          <td>drawn</td>
+          
+          <td>2.1 to 2.n</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td class="own">none; its ranking tables follow the figures</td>
+        </tr>
+        
+        <tr>
+          <th scope="row"><a href="timed.html">Timed hiding</a><span>The same bench, with windows of rounds in which one feature or one action is held back and then brought back.</span></th>
+          
+          <td>drawn</td>
+          
+          <td>2.1 to 2.n</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td class="own">none; its ranking tables follow the figures</td>
+        </tr>
+        
+        <tr>
+          <th scope="row"><a href="correlated.html">Correlated features</a><span>Three features that move together. A hidden feature is filled in from the shown ones, and the algorithm may explore before committing to a subset.</span></th>
+          
+          <td>drawn</td>
+          
+          <td>2.1 to 2.n</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td class="own"><ol start="7"><li>What correlated states look like: 300 of the probe states, two features at a time, coloured by the best move</li><li>What the human actually weighs: beliefs once hidden features are filled in, <i>H</i>&nbsp;<i>P</i><sub>S</sub>, against the best possible with the same features, <i>U</i>&nbsp;<i>P</i><sub>S</sub></li><li>How long to explore: discounted regret against the length of the exploration phase, one line per subset committed to</li></ol></td>
+        </tr>
+        
+      </tbody>
+    </table></div>
+  </section>
+</main>
+
+<script>
+  window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "W": "f3:20-25", "curve": "exponential", "delta": 0.95, "p1": 0.05};
+</script>
+<script src="webapp/static/charts.js?v=1791492645"></script>
+<script src="webapp/static/figures.js?v=1791493952"></script>
+<script src="webapp/static/probes.js?v=1791494594"></script>
+<script src="webapp/static/static-api.js?v=1791493902"></script>
+<script src="webapp/static/overview.js?v=1791494061"></script>
+
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
+</body>
+</html>

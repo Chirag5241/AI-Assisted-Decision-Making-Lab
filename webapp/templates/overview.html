@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block title %}Overview &middot; {{ site_name }}{% endblock %}
+
+{# Written from webapp/guide.py: the equations, the standard figures and the benches are listed there once. #}
+{% macro eq_link(id) %}<a href="#eq-{{ id }}">Eq. {{ equation[id].n }}</a>{% endmacro %}
+
+{% block body %}
+<main class="guide">
+  <header class="guide-head">
+    <h2>How to read the lab</h2>
+    <p class="lead">Every bench simulates the same loop: an algorithm decides what a human sees, the human picks an
+      action from beliefs that are partly wrong, and those beliefs move toward the truth with use. This page sets
+      out the equations of that loop and the six figures every bench draws from them, so a figure means the same
+      thing wherever it appears.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#loop">One round</a><a href="#equations">Equations</a><a href="#figures">Standard figures</a>
+      <a href="#conventions">Conventions</a><a href="#benches">Benches</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="loop">
+    <h3>One round</h3>
+    <div class="loop">
+      <ol>
+        <li><b>The algorithm chooses what is in play.</b> It shows a set of features F<sub>t</sub> and offers a set
+          of actions A<sub>t</sub>. This choice, over all the rounds, is the policy being tested.</li>
+        <li><b>The human picks an action.</b> A state x is drawn. The human scores each offered action from the
+          shown features with their own weights H<sub>t</sub> and picks the highest ({{ eq_link("choice") }}). The
+          round costs the regret of that pick against the best move ({{ eq_link("regret") }}).</li>
+        <li><b>The human learns.</b> Every weight that was in use closes part of its gap to the truth
+          ({{ eq_link("learning") }}). A weight that was held back does not move.</li>
+      </ol>
+      <dl class="symbols">
+        <div><dt>K, n</dt><dd>the number of actions and of features</dd></div>
+        <div><dt>x</dt><dd>the state of a round, one number per feature</dd></div>
+        <div><dt>U</dt><dd>the truth: u<sub>kj</sub> is the weight of feature j in the value of action k</dd></div>
+        <div><dt>H<sub>t</sub></dt><dd>what the human believes U is in round t; H<sub>0</sub> is the first belief</dd></div>
+        <div><dt>F<sub>t</sub>, A<sub>t</sub></dt><dd>the features shown and the actions offered in round t</dd></div>
+        <div><dt>&ycirc;, y*</dt><dd>the human's choice and the best move</dd></div>
+        <div><dt>&phi;<sub>j</sub></dt><dd>the learning curve of feature j</dd></div>
+        <div><dt>&delta;, T</dt><dd>the discount and the number of rounds</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="guide-section" id="equations">
+    <h3>Equations</h3>
+    <p class="section-sub">Numbered so an experiment can cite them. Each will link to its derivation once that is written.</p>
+    {% for eq in equations %}
+    <article class="eq" id="eq-{{ eq.id }}">
+      <header><b>Eq. {{ eq.n }}</b><h4>{{ eq.name }}</h4></header>
+      <p class="formula">{{ eq.html|safe }}</p>
+      <p class="eq-text">{{ eq.text|safe }}</p>
+      <p class="eq-meta">
+        {% if eq.figures %}<span>Drawn in {% for key in eq.figures %}<a href="#fig-{{ standard[key].n }}">Fig. {{ standard[key].n }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</span>{% endif %}
+        {% if eq.derivation %}<a class="derivation" href="{{ eq.derivation }}">Derivation</a>
+        {% else %}<span class="derivation pending">Derivation not written yet</span>{% endif %}
+      </p>
+    </article>
+    {% endfor %}
+  </section>
+
+  <section class="guide-section" id="figures">
+    <h3>The six standard figures</h3>
+    <p class="section-sub">Every bench draws these six, in this order and under these numbers. A bench that has no use
+      for one still lists it and says why. The specimens below are live: three actions, three features, with
+      x<sub>3</sub> hidden from round 20 to round 25, the first world of
+      <a href="{{ url_for('timed') }}">Timed hiding</a>.</p>
+    <p class="hint error" id="specimen-problem" role="alert" hidden></p>
+
+    {% for figure in standard_figures %}
+    {% set half = figure.key in ("regret", "value") %}
+    <article class="specimen{% if half %} half{% endif %}" id="fig-{{ figure.n }}">
+      <figure>
+        <figcaption><b>Fig. {{ figure.n }}</b>{{ figure.title|safe }}</figcaption>
+        {% if figure.key == "schedule" %}
+        <div class="legend"><span><i class="on-key"></i>shown or offered</span><span><i class="off-key"></i>held back</span></div>
+        <div class="chart" id="fig-schedule"></div>
+        {% elif figure.key == "beliefs" %}
+        <div class="legend" id="beliefs-legend"></div>
+        <div class="belief-grid" id="fig-beliefs" data-fig="{{ figure.n }}"></div>
+        {% else %}
+        <div class="chart" id="fig-{{ figure.key }}"></div>
+        {% endif %}
+      </figure>
+      <div class="reading-notes">
+        <div><h4>What is drawn</h4><p>{{ figure.draws|safe }}</p></div>
+        <div><h4>How to read it</h4><p>{{ figure.read|safe }}</p>
+          <p class="eq-meta"><span>From {% for id in figure.equations %}{{ eq_link(id) }}{% if not loop.last %}, {% endif %}{% endfor %}</span></p></div>
+        <div><h4>On each bench</h4>
+          <dl class="per-bench">
+            {% for b in benches %}
+            <div{% if figure.key in b.absent %} class="absent"{% endif %}><dt><a href="{{ url_for(b.endpoint) }}">{{ b.name }}</a></dt>
+              <dd>{% if figure.key in b.absent %}{{ b.absent[figure.key]|safe }}{% else %}{{ b.notes.get(figure.key, "Drawn as described.")|safe }}{% endif %}</dd></div>
+            {% endfor %}
+          </dl>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </section>
+
+  <section class="guide-section" id="conventions">
+    <h3>Conventions shared by every figure</h3>
+    <ul class="conventions">
+      <li><b>Colour is the action.</b> a<sub>1</sub> is always the same blue, a<sub>2</sub> the same orange, and so on,
+        in every figure and on every slider. In Fig. 2 each feature's panel uses a slightly lighter shade.</li>
+      <li><b>Dashed is the truth.</b> A dashed line of an action's colour is the true weight its solid line is heading
+        for. A dashed ink line is a reference: the best move, or a level reached once everything in use is learned.</li>
+      <li><b>Grey behind a plot is error.</b> The darker the grey in a round, the larger the share of states in which
+        the human picks the wrong action. It is the same in every figure of a bench.</li>
+      <li><b>Faded means out of use.</b> A faded stretch of a line is a weight that was held back in those rounds, so
+        nothing was learned about it.</li>
+      <li><b>Dotted vertical rules mark a change of policy</b>: the rounds at which what is shown or offered changes.</li>
+      <li><b>Axes are fixed.</b> In the standard figures an axis is set by the world, never by the data on it, so a
+        figure keeps its scale while the policy and the learner change and heights can be compared by eye.</li>
+      <li><b>Rounds count from 0.</b> A horizon of T rounds runs from round 0 to round T &minus; 1.</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="benches">
+    <h3>The benches</h3>
+    <p class="section-sub">After the six standard figures a bench may add its own, numbered on from 7. Those belong to
+      that experiment alone and need not exist anywhere else.</p>
+    <div class="table-scroll"><table class="guide-table">
+      <thead><tr><th scope="col">Bench</th>{% for figure in standard_figures %}<th scope="col">Fig. {{ figure.n }}</th>{% endfor %}<th scope="col">Its own figures</th></tr></thead>
+      <tbody>
+        {% for b in benches %}
+        <tr>
+          <th scope="row"><a href="{{ url_for(b.endpoint) }}">{{ b.name }}</a><span>{{ b.summary }}</span></th>
+          {% for figure in standard_figures %}
+          <td{% if figure.key in b.absent %} class="absent"{% endif %}>{% if figure.key in b.absent %}not relevant{% elif figure.key == "beliefs" and b.endpoint != "lab" %}2.1 to 2.n{% else %}drawn{% endif %}</td>
+          {% endfor %}
+          <td class="own">{% if b.own %}<ol start="{{ standard_figures|length + 1 }}">{% for title in b.own %}<li>{{ title|safe }}</li>{% endfor %}</ol>{% else %}none; its ranking tables follow the figures{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+</main>
+
+<script>
+  window.DEFAULT_WORLD = {{ default_world|tojson }};
+</script>
+<script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('figures.js') }}"></script>
+<script src="{{ static_v('overview.js') }}"></script>
+{% endblock %}

@@ -12,16 +12,36 @@
 <body>
   <header class="mast">
     <div class="mast-title">
-      <p class="kicker">{{ site_kicker }}</p>
-      <h1>{{ site_name }}</h1>
+      <h1><a href="{{ url_for('overview') }}">{{ site_name }}</a></h1>
+      <p class="strapline">{{ site_kicker }}</p>
     </div>
-    <nav class="mast-nav" aria-label="Sections">
-      <a href="{{ url_for('lab') }}" {% if page == 'lab' %}aria-current="page"{% endif %}>1 feature, 2 actions</a>
-      <a href="{{ url_for('worlds') }}" {% if page == 'worlds' %}aria-current="page"{% endif %}>More actions and features</a>
-      <a href="{{ url_for('correlated_page') }}" {% if page == 'correlated' %}aria-current="page"{% endif %}>Correlated features</a>
-      <a href="{{ url_for('experiments') }}" {% if page == 'experiments' %}aria-current="page"{% endif %}>Experiment 1 figures</a>
+    {# the Overview, then the experiments as a menu that names the one you are on #}
+    {% set here = bench.name if bench else ('Experiment 1 figures' if request.endpoint == 'experiments' else none) %}
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="{{ url_for('overview') }}" {% if request.endpoint == 'overview' %}aria-current="page"{% endif %}>Overview</a>
+      <details class="mast-menu">
+        <summary {% if here %}class="current"{% endif %} title="Go to an experiment">{{ here or 'Experiments' }}</summary>
+        <div class="mast-list">
+          {% for b in benches %}
+          <a href="{{ url_for(b.endpoint) }}" {% if request.endpoint == b.endpoint %}aria-current="page"{% endif %}>{{ b.name }}</a>
+          {% endfor %}
+          <a href="{{ url_for('experiments') }}" {% if request.endpoint == 'experiments' %}aria-current="page"{% endif %} class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
     </nav>
   </header>
   {% block body %}{% endblock %}
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
 </body>
 </html>
