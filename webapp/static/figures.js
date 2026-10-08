@@ -16,7 +16,7 @@ window.StandardFigures = (function () {
   //        series: {reg, discounted, reg_mean, value_gap, value_gap_mean, acc, ref_acc}, reg_limit, acc_limit}
   //   choice (picks and best, per round), reg, discounted and value_gap are taken at the state drawn in each round;
   //   reg_mean and value_gap_mean are their averages over all states and acc the share of states with the best move.
-  //   ref_acc and the two limits are optional.
+  //   ref_acc and the two limits are optional. x[t][j] is the state drawn for round t, one number per feature.
   // opts: {regret: {lo, hi, yticks}, value: {lo, hi, yticks}   the fixed axes of Figs. 4 and 5
   //        vlines: [{t, label}]   rules to draw instead of one at every change of the schedule
   //        refName   what the grey reference line is
@@ -27,6 +27,10 @@ window.StandardFigures = (function () {
     const vlines = opts.vlines || (data.changes || []).map((t) => ({ t }));
     // the grey in every figure: the share of states with the wrong action in each round
     const wrongShare = data.series.acc.map((a) => 1 - a);
+    // the figures taken at the drawn state say in their tooltip what that state was: the vector x_t, feature by feature
+    const number = (v) => (v < 0 ? "\u2212" : "") + Math.abs(v).toFixed(2);
+    const names = n === 1 ? "x\u209c" : "x\u209c = (" + (n <= 3 ? plan.F.map((_, j) => "x" + SUB[j]).join(", ") : "x\u2081 \u2026 x" + SUB[n - 1]) + ")";
+    const tipLines = (t) => [names + " = " + (n === 1 ? number(data.x[t][0]) : "(" + data.x[t].map(number).join(", ") + ")")];
 
     // Fig. 1: what is shown and offered in each round
     if ($("fig-schedule")) {
@@ -77,7 +81,7 @@ window.StandardFigures = (function () {
       }
       Charts.line($("fig-choice"), T,
         [{ v: data.choice.best, cls: "c-ink", dash: true, name: "y* best move" }, { v: picks, cls: "c-ink", name: "\u0177 human's choice" }],
-        [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * K, lo: 0.5, hi: K + 0.5, vlines,
+        [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * K, lo: 0.5, hi: K + 0.5, vlines, tipLines,
           yticks: Array.from({ length: K }, (_, k) => ({ v: k + 1, label: "a" + SUB[k], faded: !plan.A[k].some(Boolean) })), fmt: (v) => "action " + v,
           alt: "Which action the human chooses in each round at that round's state, against the best move there" });
     }
@@ -89,7 +93,7 @@ window.StandardFigures = (function () {
         [{ v: data.series.reg, cls: "c-ink", name: "at the drawn state x\u209c" },
           { v: data.series.discounted, cls: "c-ref", name: "discounted, \u03b4 = " + data.delta },
           { v: data.series.reg_mean, cls: "c-ink", dash: true, name: "averaged over states" }],
-        limit, [], Object.assign({ ylabel: "regret per round", step: true, wrongShare, vlines,
+        limit, [], Object.assign({ ylabel: "regret per round", step: true, wrongShare, vlines, tipLines,
           alt: "Regret loss in each round at the state drawn for it, before and after discounting, with its average over states" }, opts.regret));
     }
 
@@ -99,7 +103,7 @@ window.StandardFigures = (function () {
         [{ v: data.series.value_gap, cls: "c-ink", name: "at the drawn state x\u209c" },
           { v: data.series.value_gap_mean, cls: "c-ink", dash: true, name: "averaged over states" }],
         [{ y: 0, cls: "zero", label: "zero: expects exactly what the best move is worth" }], [],
-        Object.assign({ ylabel: "value gap per round", step: true, wrongShare, vlines,
+        Object.assign({ ylabel: "value gap per round", step: true, wrongShare, vlines, tipLines,
           alt: "True best value minus the value the human expects from the chosen action, at each round's state" }, opts.value));
     }
 

@@ -80,7 +80,7 @@
     for (const run of data.runs) for (let t = run.start; t < run.stop; t++) wrong.push(run.wrong);
     const always = Array(data.T).fill(1);
     StandardFigures.draw({
-      T: data.T, K: 2, U: [[data.u[0]], [data.u[1]]], delta: data.delta,
+      T: data.T, K: 2, U: [[data.u[0]], [data.u[1]]], delta: data.delta, x: data.series.x.map((v) => [v]),
       beliefs: [[data.series.h1, data.series.h2]],
       schedule: { F: [always], A: [always, always] }, changes: [],
       choice: { picks: data.series.choice, best: data.series.best, missed: wrong },

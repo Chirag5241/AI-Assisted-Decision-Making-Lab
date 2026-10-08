@@ -28,7 +28,8 @@ window.Charts = (function () {
   // series: [{v, cls, name, dash, faded, off: [bool per round]}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
   // A series with `off` is faded from each round marked off to the next one: the stretch where its value is not in use.
   // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare,
-  //        xlabel, xscale (point i sits at x = i * xscale), vlines: [{t, label}]}
+  //        xlabel, xscale (point i sits at x = i * xscale), vlines: [{t, label}],
+  //        tipLines(t): extra lines for the tooltip of round t, shown above the series' values}
   function line(host, T, series, hlines, shade, opts) {
     const W = opts.width || 560, H = opts.height || 340, L = 54, R = 12, TOP = 10, B = opts.noXLabel ? 22 : 40, pw = W - L - R, ph = H - TOP - B;
     let lo = opts.lo, hi = opts.hi;
@@ -135,6 +136,7 @@ window.Charts = (function () {
       const t = Math.min(Math.max(Math.round(((sx - L) / pw) * (T - 1)), 0), T - 1);
       cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
       tip.replaceChildren(el("b", "", opts.xlabel ? xname + " " + t * xscale : "round " + t));
+      for (const text of opts.tipLines ? opts.tipLines(t) : []) tip.append(document.createElement("br"), text);
       for (const s of series) tip.append(document.createElement("br"), s.name + "  " + fmt(s.v[t]));
       tip.hidden = false;
       const left = (X(t) / W) * box.width, onLeft = left < box.width / 2;
