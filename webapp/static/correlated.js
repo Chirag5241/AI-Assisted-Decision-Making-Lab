@@ -133,7 +133,7 @@
     $("scatter-legend").replaceChildren(
       ...data.U.map((_, k) => key("pt-key bg-a" + (k + 1), "best move a" + SUB[k])),
       key("ring-key", `human's pick is not the best (${missed} of ${best.length}, round ${round === "first" ? 0 : data.T - 1})`),
-      key("fit-key", "E[xⱼ | xᵢ] = ρᵢⱼ xᵢ"));
+      (() => { const item = make("span"); item.append(Charts.swatch("fit"), "E[xⱼ | xᵢ] = ρᵢⱼ xᵢ"); return item; })());
     $("fig-scatter").replaceChildren(...PAIRS.map(([i, j], p) => {
       const panel = make("div"), title = make("p", "panel-title", `x${SUB[i]} and x${SUB[j]}`), host = make("div", "chart");
       title.append(make("small", "", "ρ = " + data.rho[p]));

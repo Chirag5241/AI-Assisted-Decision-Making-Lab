@@ -264,18 +264,19 @@ def test_windows_over_the_whole_horizon_match_the_fixed_subset_and_bad_ones_are_
 
 def test_timed_page_and_the_page_menu(client):
     page = client.get("/timed").data.decode()
-    assert 'id="add-window"' in page and 'id="fig-schedule"' in page and "window.TIMED_BENCH = true" in page
+    assert 'id="add-window"' in page and 'id="fig-schedule"' in page and 'window.BENCH_MODE = "timed"' in page
     assert '"W": "f3:20-25"' in page
     assert '<a href="/timed" aria-current="page">Timed hiding</a>' in page
     plain = client.get("/worlds").data.decode()
-    assert 'id="add-window"' not in plain and "window.TIMED_BENCH = false" in plain
+    assert 'id="add-window"' not in plain and 'window.BENCH_MODE = "fixed"' in plain
     # every page offers the Overview and every experiment, and the menu names the experiment you are on
     for path, name in (("/", "1 feature, 2 actions"), ("/worlds", "More actions and features"), ("/timed", "Timed hiding"),
-                       ("/correlated", "Correlated features"), ("/experiments", "Experiment 1 figures")):
+                       ("/aware", "State-aware subsets"), ("/correlated", "Correlated features"),
+                       ("/experiments", "Experiment 1 figures")):
         html = client.get(path).data.decode()
         assert f'<summary class="current" title="Go to an experiment">{name}</summary>' in html
         assert f'<a href="{path}" aria-current="page"' in html and '<a href="/overview" >Overview</a>' in html
-        for other in ("/", "/worlds", "/timed", "/correlated", "/experiments"):
+        for other in ("/", "/worlds", "/timed", "/aware", "/correlated", "/experiments"):
             assert f'<a href="{other}" ' in html
     overview = client.get("/overview").data.decode()
     assert '<a href="/overview" aria-current="page">Overview</a>' in overview
@@ -306,7 +307,7 @@ def test_each_feature_can_have_its_own_learning_speed(client):
     fast = np.array(client.get(corr + "&p1=0.15").get_json()["beliefs"])
     np.testing.assert_array_equal(slow[:2], fast[:2])
     assert np.abs(slow[2]).max() < np.abs(fast[2]).max()                      # feature 3 has barely moved
-    for path in ("/worlds", "/timed", "/correlated"):
+    for path in ("/worlds", "/timed", "/aware", "/correlated"):
         assert 'id="each-speed"' in client.get(path).data.decode()
 
 
@@ -315,7 +316,7 @@ def test_every_bench_lists_the_same_six_figures_under_the_same_numbers(client):
     from webapp import guide
     titles = [figure["title"] for figure in guide.STANDARD_FIGURES]
     assert [figure["n"] for figure in guide.STANDARD_FIGURES] == [1, 2, 3, 4, 5, 6]
-    own = {"/": 2, "/worlds": 0, "/timed": 0, "/correlated": 3}
+    own = {"/": 2, "/worlds": 0, "/timed": 0, "/aware": 1, "/correlated": 3}
     for path, extra in own.items():
         html = client.get(path).data.decode()
         captions = re.findall(r"<figcaption><b>(?:<a [^>]*>)?Fig\. (\d+)(?:</a>)?</b>(.*?)(?:<span|</figcaption>)", html, re.S)
@@ -382,3 +383,136 @@ def test_correlated_bench_takes_the_loss_at_the_drawn_state(client):
     ranked = client.get(base + "&rho=0.8,0.8,0.6&seed=2").get_json()["ranking"]
     assert [r["discounted"] for r in ranked["rows"]] == sorted(r["discounted"] for r in ranked["rows"])
     assert all(r["mean"] >= 0 for r in ranked["rows"])
+
+
+def test_state_aware_policy_shows_a_subset_that_makes_the_human_right(client):
+    import itertools
+    import numpy as np
+    # judged by the human's own weights: a subset works when the human, as they are now, picks the best move
+    data = client.get("/api/world?" + DEFAULT_3X3 + "&policy=aware&judge=belief&prefer=most&C=2&seed=5").get_json()
+    from simlab import draws
+    U, x = np.array(data["U"]), draws.states(5, 100, 3)                                      # the states, unrounded
+    shown = np.array(data["schedule"]["F"]).T.astype(bool)                                   # [round][feature]
+    # the beliefs of each round, unrounded: a feature's weights close 5% of their gap each round it was shown
+    H0 = np.array([[1, 0.5, 1.5], [0, 1, 0], [-0.5, 0, -1.5]])
+    before = np.vstack([np.zeros(3), np.cumsum(shown, axis=0)[:-1]])                         # rounds shown before t
+    beliefs = (U[:, :, None] + (H0 - U)[:, :, None] * (0.95 ** before.T)[None]).transpose(1, 0, 2)   # [feature][action][round]
+    np.testing.assert_allclose(beliefs, data["beliefs"], atol=6e-4)
+    policy, choice, reg = data["policy"], data["choice"], np.array(data["series"]["reg"])
+    candidates = [set(c) for size in (1, 2) for c in itertools.combinations(range(3), size)]
+    assert policy["budget"] == 2 and policy["candidates"] == len(candidates) == 6
+    assert shown.sum(axis=1).min() >= 1 and shown.sum(axis=1).max() <= 2                     # never more than C features
+    assert np.array(data["schedule"]["A"]).all()                                             # every action is offered
+
+    def works(t, subset):
+        """With the beliefs of round t, the best move scores strictly above every other on these features alone."""
+        scores = sum(beliefs[i, :, t] * x[t, i] for i in subset)
+        best = int((U @ x[t]).argmax())
+        return all(scores[best] > scores[k] for k in range(3) if k != best)
+
+    def by_truth(t, subset):
+        """The same test with the true weights: the hidden features are not needed to see which move is best."""
+        scores = sum(U[:, i] * x[t, i] for i in subset)
+        best = int((U @ x[t]).argmax())
+        return all(scores[best] > scores[k] for k in range(3) if k != best)
+
+    for t in range(100):
+        count = sum(works(t, c) for c in candidates)
+        assert count == policy["worked"][t], t
+        if count:
+            # a subset that works was shown, so the human picks the best move and the round costs nothing
+            assert works(t, set(np.flatnonzero(shown[t]))) and choice["picks"][t] == choice["best"][t] and reg[t] == 0
+            # with several to choose from it is one the truth agrees on, if there is one, and then the largest
+            agreed = [c for c in candidates if works(t, c) and by_truth(t, c)]
+            pool = agreed or [c for c in candidates if works(t, c)]
+            assert set(np.flatnonzero(shown[t])) in pool and shown[t].sum() == max(len(c) for c in pool)
+        else:
+            assert reg[t] > 0 and choice["picks"][t] != choice["best"][t]        # nothing works: a random subset, and a loss
+    found = sum(1 for count in policy["worked"] if count)
+    assert 0 < found < 100 and data["stats"][0]["value"] == f"{found} of 100"
+    assert f"in {found} of 100 rounds" in data["sentence"] and "a random one was shown" in data["sentence"]
+    # only what is shown is learned: a feature's weights move exactly after the rounds it was shown in
+    moved = np.abs(np.diff(beliefs, axis=2)).max(axis=1) > 0                                 # [feature][round]
+    assert not moved[~shown.T[:, :-1]].any()
+    # it is ranked against the fixed subsets within the same budget, on the same draw, and beats them here
+    rows = data["rankings"]["features"]["rows"]
+    bench = next(r for r in rows if r["current"])
+    assert data["rankings"]["actions"] is None and data["rankings"]["features"]["total"] == 7
+    assert bench["scheduled"] and bench["rank"] == 1 and f"{bench['discounted']:.2f}" == data["numeral"]
+    assert all(sum(r["mask"]) <= 2 for r in rows if not r["scheduled"])
+    # a human with blank beliefs cannot be steered: no subset works, a random one is shown, and the pick is a guess
+    blank = client.get("/api/world?K=3&n=3&U=1,0.5,0;0,1,0.5;-0.5,0,1&H=0,0,0;0,0,0;0,0,0&policy=aware&judge=belief&C=1&T=20&rank=0").get_json()
+    assert blank["policy"]["worked"][0] == 0 and abs(blank["series"]["acc"][0] - 1 / 3) < 1e-3
+    page = client.get("/aware").data.decode()
+    assert 'window.BENCH_MODE = "aware"' in page and 'id="fig-worked"' in page and 'id="feature-chips"' not in page
+    assert "If no subset works, it shows one at random, for now." in page
+
+
+def test_equally_good_moves_both_count_as_correct(client):
+    import numpy as np
+    # actions 1 and 2 are worth the same in every state, so picking either is correct
+    world = "K=3&n=3&U=1,1,0;1,1,0;0,0,1&H=1,0.5,1.5;0,1,0;-0.5,0,-1.5&curve=exponential&p1=0.05&T=300&delta=0.95"
+    data = client.get("/api/world?" + world + "&policy=aware&judge=belief&C=2&rank=0").get_json()
+    worked, reg, acc = np.array(data["policy"]["worked"]), np.array(data["series"]["reg"]), data["series"]["acc"]
+    # once the beliefs have reached the truth, a subset that makes the human right exists in almost every state
+    # (with at most 2 of 3 features a few states have none), and the policy stops falling back to a random one
+    assert np.abs(np.array(data["beliefs"])[:, :, -1].T - np.array(data["U"])).max() < 0.05
+    assert acc[-1] > 0.95 and acc[-1] > acc[0] and (worked[-100:] > 0).mean() > 0.9
+    assert reg[(worked > 0)].max() == 0
+    # the best move shown for a round is the human's pick whenever that pick is one of the equally good ones
+    picks, best = np.array(data["choice"]["picks"]), np.array(data["choice"]["best"])
+    np.testing.assert_array_equal(picks[reg == 0], best[reg == 0])
+    assert (picks[reg > 0] != best[reg > 0]).all() and {1, 2} <= set(picks.tolist())
+    # showing all three features, the human ends up right in every state on every bench that scores accuracy
+    full = client.get("/api/world?" + world + "&rank=0").get_json()
+    assert full["acc_limit"] == 1 and full["series"]["acc"][-1] > 0.99
+    # one feature, two equally good actions: never wrong, and the two lines of Fig. 3 coincide
+    flat = client.get("/api/run?u1=1&u2=1&h1=0.5&h2=2&curve=exponential&p1=0.1&T=30").get_json()
+    assert flat["series"]["choice"] == flat["series"]["best"] and set(flat["series"]["regret"]) == {0.0}
+
+
+def test_state_aware_policy_judged_by_the_truth_shows_the_widest_margin_and_has_a_ceiling(client):
+    import itertools
+    import numpy as np
+    from simlab import draws
+    # the world of the question: action 2 is best only when x1 < 0, by a hair, and needs x1 and x2 together to show it
+    world = "K=3&n=3&U=1.1,1,0;1,1,0;0,0,1&H=0,0,1;1,1,0;1,0,0&curve=exponential&p1=0.3&T=140&delta=0.95"
+    data = client.get("/api/world?" + world + "&policy=aware&judge=truth&C=2&seed=1").get_json()
+    U, x, policy = np.array(data["U"]), draws.states(1, 140, 3), data["policy"]
+    shown = np.array(data["schedule"]["F"]).T.astype(bool)
+    assert policy["judge"] == "truth" and policy["prefer"] == "margin"
+    candidates = [list(c) for size in (1, 2) for c in itertools.combinations(range(3), size)]
+    for t in range(140):
+        a = int((U @ x[t]).argmax())
+        # by the truth, on the shown features alone: the best move's score minus the best rival's
+        margins = [U[a, F] @ x[t, F] - max(U[k, F] @ x[t, F] for k in range(3) if k != a) for F in candidates]
+        working = [m for m in margins if m > 1e-9]
+        assert len(working) == policy["worked"][t], t
+        if working:       # the top-ranked subset is shown: the widest margin
+            assert abs(margins[candidates.index(np.flatnonzero(shown[t]).tolist())] - max(working)) < 1e-9, t
+    # the truth decides what is shown, so the schedule does not depend on what the human believes ...
+    other = client.get("/api/world?" + world.replace("H=0,0,1;1,1,0;1,0,0", "H=2,-1,0;0,0,0;1,1,1") + "&policy=aware&judge=truth&C=2&seed=1&rank=0").get_json()
+    assert other["schedule"] == data["schedule"] and other["policy"]["worked"] == policy["worked"]
+    # ... and the human can be wrong on a subset that works, until they have learned it
+    reg, worked = np.array(data["series"]["reg"]), np.array(policy["worked"])
+    assert reg[:10][worked[:10] > 0].max() > 0 and reg[60:][worked[60:] > 0].max() == 0
+    assert "the true weights rank the best move first" in data["sentence"]
+    # The ceiling. With one feature a state where action 2 is best can never be settled: x1 alone points to action 3
+    # and x2 or x3 alone cannot tell action 2 from action 1. P(x1 < 0, x1 + x2 > x3) = 1/4 - arcsin(1/sqrt 3) / 2 pi.
+    lost = 0.25 - np.arcsin(1 / np.sqrt(3)) / (2 * np.pi)
+    for C, expected in ((1, 1 - lost), (3, 1.0)):
+        for judge in ("truth", "belief"):        # the ceiling belongs to U and C, not to the rule or the beliefs
+            got = client.get("/api/world?" + world + f"&policy=aware&C={C}&judge={judge}&rank=0").get_json()
+            assert abs(got["policy"]["ceiling"] - expected) < 0.02, (C, judge)
+            assert got["stats"][2]["label"] == "States a subset can settle"
+    assert client.get("/api/world?" + world + "&policy=aware&C=3&rank=0").get_json()["acc_limit"] == 1
+    # By default the human's own weights judge: the choice in Fig. 3 is then wrong only where no subset works,
+    # whatever the budget, and the errors stop once the human has learned enough
+    for C in (1, 2, 3):
+        got = client.get("/api/world?" + world + f"&policy=aware&C={C}&rank=0").get_json()
+        missed, worked = np.array(got["choice"]["missed"]), np.array(got["policy"]["worked"])
+        assert got["policy"]["judge"] == "belief" and not missed[worked > 0].any() and missed[worked == 0].all()
+        assert f"{int((worked > 0).sum())} of 140" in got["stats"][0]["value"]
+    # the page says how the search scales and what the fallback is
+    page = client.get("/aware").data.decode()
+    assert "The search is exponential." in page and "hitting-set" in page and 'name="judge"' in page

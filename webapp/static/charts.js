@@ -16,6 +16,14 @@ window.Charts = (function () {
     return e;
   };
 
+  // A legend key drawn like the line it stands for: the same colour, weight and dash pattern, and long
+  // enough to show the pattern. `cls` is the class the line itself carries in the plot.
+  function swatch(cls) {
+    const svg = svgEl("svg", { class: "swatch", viewBox: "0 0 30 10", "aria-hidden": "true" });
+    svg.append(svgEl("line", { class: cls, x1: 1, x2: 29, y1: 5, y2: 5 }));
+    return svg;
+  }
+
   function niceTicks(lo, hi, target) {
     const span = hi - lo || 1, raw = span / target, mag = Math.pow(10, Math.floor(Math.log10(raw)));
     const step = [1, 2, 5, 10].map((m) => m * mag).find((s) => span / s <= target) || 10 * mag;
@@ -29,7 +37,8 @@ window.Charts = (function () {
   // A series with `off` is faded from each round marked off to the next one: the stretch where its value is not in use.
   // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare,
   //        xlabel, xscale (point i sits at x = i * xscale), vlines: [{t, label}],
-  //        tipLines(t): extra lines for the tooltip of round t, shown above the series' values}
+  //        tipLines(t): extra lines for the tooltip of round t, shown above the series' values,
+  //        shadeLabel: what a shaded stretch means, for the legend}
   function line(host, T, series, hlines, shade, opts) {
     const W = opts.width || 560, H = opts.height || 340, L = 54, R = 12, TOP = 10, B = opts.noXLabel ? 22 : 40, pw = W - L - R, ph = H - TOP - B;
     let lo = opts.lo, hi = opts.hi;
@@ -120,11 +129,11 @@ window.Charts = (function () {
     const legend = el("div", "legend");
     for (const s of series) {
       const item = el("span");
-      item.append(el("i", s.cls.replace("c-", "bg-") + (s.dash ? " dash" : "")), s.name);
+      item.append(swatch("line " + s.cls + (s.dash ? " dashed" : "")), s.name);
       legend.append(item);
     }
     if (opts.dotLabel) { const item = el("span"); item.append(el("i", "start"), opts.dotLabel); legend.append(item); }
-    if (shade.length) { const item = el("span"); item.append(el("i", "box"), "human picks the wrong action"); legend.append(item); }
+    if (shade.length) { const item = el("span"); item.append(el("i", "box"), opts.shadeLabel || "human picks the wrong action"); legend.append(item); }
     if (opts.wrongShare) { const item = el("span"); item.append(el("i", "box share"), "grey: share of states with the wrong action"); legend.append(item); }
     const tip = el("div", "tip");
     tip.hidden = true;
@@ -235,5 +244,5 @@ window.Charts = (function () {
     host.replaceChildren(svg);
   }
 
-  return { line, heat, scatter, schedule };
+  return { line, heat, scatter, schedule, swatch };
 })();

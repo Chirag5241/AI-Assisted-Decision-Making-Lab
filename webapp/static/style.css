@@ -503,8 +503,6 @@ pre {
 .belief-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 30px; }
 .panel-title { margin: 0 0 2px; font: italic 500 17px/1.2 var(--display); }
 .panel-title small { margin-left: 8px; font: 400 11.5px/1.2 var(--mono); font-style: normal; color: var(--ink-2); }
-.legend i.truth-key { height: 0; background: none; border-top: 2px dashed var(--ink-2); }
-.legend i.faded-key { background: var(--ink-2); opacity: 0.28; }
 .figs.one { grid-template-columns: minmax(0, 1fr); }
 .chart .shade-share { fill: var(--ink); }
 .legend i.box.share { background: var(--ink); opacity: 0.2; }
@@ -523,7 +521,14 @@ pre {
 
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 4px; font: 400 12px/1.4 var(--mono); color: var(--ink-2); }
 .legend i { display: inline-block; width: 16px; height: 3px; margin-right: 6px; vertical-align: 3px; border-radius: 2px; }
-.legend i.dash { height: 0; background: none; border-top: 2px dashed var(--ink); }
+/* a key for a line is drawn like the line: its colour, weight and dash pattern, long enough to show the dashes */
+.legend svg.swatch { display: inline-block; width: 30px; height: 10px; margin-right: 6px; vertical-align: -1px; overflow: visible; }
+:where(.swatch) line { stroke: var(--ink-2); }     /* unless the line's own class gives it a colour */
+.swatch line { fill: none; stroke-width: 2; stroke-linecap: round; }
+.swatch .line.dashed { stroke-width: 1.5; stroke-dasharray: 5 4; }
+.swatch .truth { stroke-width: 1.5; stroke-dasharray: 4 3; stroke-linecap: butt; }
+.swatch .fit { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 5 3; stroke-linecap: butt; }
+.swatch .faded { opacity: 0.28; }
 .legend i.start { width: 10px; height: 10px; border-radius: 50%; background: var(--ink-2); vertical-align: -1px; }
 .legend i.box { height: 10px; vertical-align: -1px; background: #e9e8e2; border-radius: 0; }
 
@@ -725,7 +730,6 @@ pre {
 .chart .sched-on { fill: var(--ink); }
 .legend i.pt-key { width: 8px; height: 8px; border-radius: 50%; vertical-align: 0; }
 .legend i.ring-key { width: 10px; height: 10px; border-radius: 50%; background: none; border: 1.2px solid var(--ink); vertical-align: -1px; }
-.legend i.fit-key { height: 0; background: none; border-top: 2px dashed var(--ink); }
 .legend i.on-key { width: 14px; height: 10px; border-radius: 0; background: var(--ink); vertical-align: -1px; }
 .scatter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
 .effective { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; align-items: start; }
@@ -745,9 +749,6 @@ pre {
 .c-s3 { stroke: #6da7ec; } .c-s4 { stroke: #eb6834; } .c-s5 { stroke: #a3a29b; }
 .bg-s0 { background: #0d366b; } .bg-s1 { background: #3987e5; } .bg-s2 { background: #9ec5f4; }
 .bg-s3 { background: #6da7ec; } .bg-s4 { background: #eb6834; } .bg-s5 { background: #a3a29b; }
-.legend i.dash[class*="bg-s"] { background: none; }
-.legend i.dash.bg-s0 { border-top-color: #0d366b; } .legend i.dash.bg-s1 { border-top-color: #3987e5; } .legend i.dash.bg-s2 { border-top-color: #9ec5f4; }
-.legend i.dash.bg-s3 { border-top-color: #6da7ec; } .legend i.dash.bg-s4 { border-top-color: #eb6834; } .legend i.dash.bg-s5 { border-top-color: #a3a29b; }
 
 /* ---------- timed hiding: the windows in the rail, and their key in the schedule figure ---------- */
 

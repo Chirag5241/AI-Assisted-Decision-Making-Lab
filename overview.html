@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791494390">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791521091">
 </head>
 <body>
   <header class="mast">
@@ -29,6 +29,8 @@
           <a href="worlds.html" >More actions and features</a>
           
           <a href="timed.html" >Timed hiding</a>
+          
+          <a href="aware.html" >State-aware subsets</a>
           
           <a href="correlated.html" >Correlated features</a>
           
@@ -227,6 +229,9 @@
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
             
+            <div><dt><a href="aware.html">State-aware subsets</a></dt>
+              <dd>Chosen afresh for each round's state: the top-ranked subset on which the best move ranks first, or a random one. Every action is offered.</dd></div>
+            
             <div><dt><a href="correlated.html">Correlated features</a></dt>
               <dd>Every action is offered in every round; only the features change.</dd></div>
             
@@ -260,6 +265,9 @@
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
             
+            <div><dt><a href="aware.html">State-aware subsets</a></dt>
+              <dd>These depend on the draw: what is shown, and so what is learned, follows the states.</dd></div>
+            
             <div><dt><a href="correlated.html">Correlated features</a></dt>
               <dd>Drawn as described.</dd></div>
             
@@ -292,6 +300,9 @@
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
             
+            <div><dt><a href="aware.html">State-aware subsets</a></dt>
+              <dd>Judged by the human's weights, the two differ only in the rounds where no subset within the budget works.</dd></div>
+            
             <div><dt><a href="correlated.html">Correlated features</a></dt>
               <dd>Hidden features are filled in from the shown ones before the human scores the actions.</dd></div>
             
@@ -322,6 +333,9 @@
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="aware.html">State-aware subsets</a></dt>
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="correlated.html">Correlated features</a></dt>
@@ -356,6 +370,9 @@
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
             
+            <div><dt><a href="aware.html">State-aware subsets</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
             <div><dt><a href="correlated.html">Correlated features</a></dt>
               <dd>Drawn as described.</dd></div>
             
@@ -387,6 +404,9 @@
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="aware.html">State-aware subsets</a></dt>
+              <dd>Here: the share of states in which the human picks the best move from the subset the algorithm would show there. The dashed level is the ceiling the budget sets.</dd></div>
             
             <div><dt><a href="correlated.html">Correlated features</a></dt>
               <dd>Drawn as described.</dd></div>
@@ -480,6 +500,24 @@
         </tr>
         
         <tr>
+          <th scope="row"><a href="aware.html">State-aware subsets</a><span>For each round&#39;s state the algorithm shows the top-ranked subset of at most C features from which the human picks the best move (or, as an option, on which the truth ranks it first). When no subset within the budget works, it shows one at random, for now.</span></th>
+          
+          <td>drawn</td>
+          
+          <td>2.1 to 2.n</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td class="own"><ol start="7"><li>How many of the candidate subsets work, round by round</li></ol></td>
+        </tr>
+        
+        <tr>
           <th scope="row"><a href="correlated.html">Correlated features</a><span>Three features that move together. A hidden feature is filled in from the shown ones, and the algorithm may explore before committing to a subset.</span></th>
           
           <td>drawn</td>
@@ -505,10 +543,10 @@
 <script>
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "W": "f3:20-25", "curve": "exponential", "delta": 0.95, "p1": 0.05};
 </script>
-<script src="webapp/static/charts.js?v=1791498407"></script>
-<script src="webapp/static/figures.js?v=1791498407"></script>
-<script src="webapp/static/probes.js?v=1791498408"></script>
-<script src="webapp/static/static-api.js?v=1791496803"></script>
+<script src="webapp/static/charts.js?v=1791521077"></script>
+<script src="webapp/static/figures.js?v=1791524128"></script>
+<script src="webapp/static/probes.js?v=1791525307"></script>
+<script src="webapp/static/static-api.js?v=1791523695"></script>
 <script src="webapp/static/overview.js?v=1791496940"></script>
 
   <script>

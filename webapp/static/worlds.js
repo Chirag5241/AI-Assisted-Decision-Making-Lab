@@ -1,18 +1,22 @@
 // Bench for K actions and n features. The browser holds the inputs (two matrices and
 // two on/off masks); every number comes back from /api/world (simlab) and is drawn here.
 // The "Timed hiding" page is the same bench with one more input: windows of rounds in
-// which one feature or one action is held back.
+// which one feature or one action is held back. On the "State-aware subsets" page the
+// algorithm chooses the features itself for each round's state, within a budget C.
 (function () {
   const SPECS = window.CURVE_SPECS;
   const $ = (id) => document.getElementById(id);
   const bench = $("bench");
   const SUB = ["₁", "₂", "₃", "₄", "₅", "₆"];
 
-  const TIMED = Boolean(window.TIMED_BENCH), MAX_WINDOWS = window.MAX_WINDOWS || 0, LAST_ROUND = 299;
+  const MODE = window.BENCH_MODE, TIMED = MODE === "timed", AWARE = MODE === "aware";
+  const MAX_WINDOWS = window.MAX_WINDOWS || 0, LAST_ROUND = 299;
   // W: the windows, each {kind: "f" or "a", index, from, to}; hidden from round `from` to round `to`, both included
   // S: null while every feature learns at the one speed p1, otherwise one speed per feature
-  const world = { K: 3, n: 3, U: [], H: [], F: [], A: [], W: [], S: null };
-  const REMEMBER = TIMED ? "decision-lab:timed" : "decision-lab:worlds";
+  // C, judge, prefer: on the state-aware page, the most features shown in a round, whose weights decide
+  // whether a subset works ("truth" or "belief"), and which working subset is shown ("margin" or "most")
+  const world = { K: 3, n: 3, U: [], H: [], F: [], A: [], W: [], S: null, C: 2, judge: "belief", prefer: "margin" };
+  const REMEMBER = "decision-lab:" + (TIMED ? "timed" : AWARE ? "aware" : "worlds");
 
   const randomWeight = () => Math.round((Math.random() * 4 - 2) * 10) / 10;
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -35,6 +39,7 @@
     if (!world.F.some(Boolean)) world.F[0] = true;
     if (!world.A.some(Boolean)) world.A[0] = true;
     world.W = world.W.filter((w) => w.index >= 0 && w.index < (w.kind === "f" ? n : K));   // windows on what is gone go with it
+    world.C = clamp(world.C, 1, n);                                                         // the budget cannot exceed the features
     world.K = K;
     world.n = n;
   }
@@ -121,8 +126,14 @@
 
   function drawAll() {
     document.querySelectorAll("[data-size]").forEach((el) => { el.value = world[el.dataset.size]; });
-    drawChips("feature-chips", world.F, "x", "feature");
-    drawChips("action-chips", world.A, "a", "action");
+    if (AWARE) {
+      document.querySelectorAll("[data-budget]").forEach((el) => { el.max = world.n; el.value = world.C; });
+      document.querySelector(`input[name="judge"][value="${world.judge}"]`).checked = true;
+      document.querySelector(`input[name="prefer"][value="${world.prefer}"]`).checked = true;
+    } else {
+      drawChips("feature-chips", world.F, "x", "feature");
+      drawChips("action-chips", world.A, "a", "action");
+    }
     drawWindows();
     speeds.fit();
     drawMatrix("U");
@@ -151,6 +162,10 @@
       seed: inputs("seed")[0].value,
     });
     if (speeds.param()) q.set("ps", speeds.param());
+    if (AWARE) {      // the algorithm chooses the features itself and offers every action
+      q.delete("F"); q.delete("A");
+      q.set("policy", "aware"); q.set("C", world.C); q.set("judge", world.judge); q.set("prefer", world.prefer);
+    }
     if (world.W.length) q.set("W", world.W.map((w) => `${w.kind}${w.index + 1}:${span(w).join("-")}`).join(";"));
     return q;
   }
@@ -187,16 +202,33 @@
     // Figs. 1 to 6, the standard ones. The regret axis is fixed by the truth alone and the value-gap axis by
     // the truth and the first beliefs, so neither moves while the policy, the learner or the draw changes.
     const top = data.regret_cap || 1, bound = 1.05 * (data.value_cap || 1);
-    StandardFigures.draw(data, {
+    StandardFigures.draw(data, Object.assign({
       regret: { lo: -0.04 * top, hi: 1.04 * top }, value: { lo: -bound, hi: bound },
       refName: "everything shown and offered",
-    });
+    }, AWARE ? { vlines: [] } : {}));     // what is shown changes almost every round there: no rule at each change
+
+    // Fig. 7, on the state-aware page: how many of the candidate subsets made the human right in each round,
+    // with a box over the rounds where none did and a random one was shown. The axis is fixed by n and C.
+    if (AWARE) {
+      const { worked, candidates } = data.policy, none = [];
+      for (let start = 0, t = 1; t <= data.T; t++) {
+        if (t < data.T && (worked[t] === 0) === (worked[start] === 0)) continue;
+        if (worked[start] === 0) none.push([start, t]);
+        start = t;
+      }
+      Charts.line($("fig-worked"), data.T,
+        [{ v: worked, cls: "c-ink", name: "subsets that work, judged by " + (data.policy.judge === "truth" ? "the truth" : "the human's weights") }],
+        [{ y: candidates, label: `all ${candidates} candidates of at most ${data.policy.budget}` }], none,
+        { ylabel: "subsets that work", step: true, width: 1120, height: 260, lo: -0.04 * candidates, hi: 1.12 * candidates,
+          shadeLabel: "no subset works: a random one is shown", fmt: (v) => String(v),
+          alt: "The number of candidate feature subsets for which the human picks the best move, in each round" });
+    }
 
     if (data.rankings) {   // only the full answer ranks every subset
       // a fixed subset put on the bench replaces that family's windows as well as its chips
       const fixed = (name, kind) => (mask) => { world[name] = mask; world.W = world.W.filter((w) => w.kind !== kind); };
       renderRanking("features", data.rankings.features, "x", "feature", fixed("F", "f"));
-      renderRanking("actions", data.rankings.actions, "a", "action", fixed("A", "a"));
+      if (data.rankings.actions) renderRanking("actions", data.rankings.actions, "a", "action", fixed("A", "a"));
       rankings.classList.remove("stale");
     }
   }
@@ -205,8 +237,9 @@
     const { rows, total } = ranking;
     const other = noun === "feature" ? "actions" : "features";
     const subsets = total - (rows.some((r) => r.scheduled) ? 1 : 0);   // the bench's own schedule can be an extra row
-    $("ranking-" + key + "-sub").textContent = (subsets === 1
-      ? `With one ${noun} there is only one subset.`
+    $("ranking-" + key + "-sub").textContent = (AWARE
+      ? `The policy on the bench against ${subsets === 1 ? "the one fixed subset" : `all ${subsets} fixed subsets`} within its budget, each kept every round, on the same draw.`
+      : subsets === 1 ? `With one ${noun} there is only one subset.`
       : TIMED ? `All ${subsets} ${noun} subsets, each kept every round, with the ${other} as scheduled on the bench.`
         : `All ${subsets} ${noun} subsets, each run with the chosen ${other}.`)
       + (rows.length < total ? ` The best ${Math.min(8, rows.length)} and the one on the bench are listed.` : "");
@@ -216,7 +249,7 @@
       const tr = document.createElement("tr");
       if (r.current) tr.className = "current";
       tr.tabIndex = 0;
-      tr.title = r.current ? "On the bench now" : TIMED ? `Put this subset on the bench, in place of the ${noun} windows` : "Put this subset on the bench";
+      tr.title = r.current ? "On the bench now" : AWARE ? "A fixed subset, for comparison" : TIMED ? `Put this subset on the bench, in place of the ${noun} windows` : "Put this subset on the bench";
       const cell = (text, cls) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
@@ -224,7 +257,7 @@
         return td;
       };
       const members = document.createElement("td");
-      if (r.scheduled) members.textContent = "the windows on the bench";
+      if (r.scheduled) members.textContent = AWARE ? "chosen for each state" : "the windows on the bench";
       else r.mask.forEach((on, j) => {
         const dot = document.createElement("span");
         dot.className = "feat" + (on ? " on" : "");
@@ -241,7 +274,7 @@
       bar.append(fill, value);
       tr.append(cell(r.rank + (r.current ? "  \u2190 now" : ""), "rank"), members, bar, cell(r.mean.toFixed(2), "num"),
         cell(`${pct(r.start)} \u2192 ${pct(r.end)}`, "num"), cell(r.floor.toFixed(2), "num"));
-      const apply = () => { if (r.scheduled) return; choose(r.mask.slice()); drawAll(); run(); };
+      const apply = () => { if (r.scheduled || AWARE) return; choose(r.mask.slice()); drawAll(); run(); };   // the state-aware page keeps its policy
       tr.addEventListener("click", apply);
       tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apply(); } });
       return tr;
@@ -356,6 +389,23 @@
     schedule();
   });
 
+  if (AWARE) {
+    document.querySelectorAll("[data-budget]").forEach((el) => {
+      el.addEventListener("input", () => {
+        const v = parseInt(el.value, 10);
+        if (isNaN(v)) return;
+        world.C = clamp(v, 1, world.n);
+        document.querySelectorAll("[data-budget]").forEach((other) => { if (other !== el) other.value = world.C; });
+        schedule();
+      });
+      el.addEventListener("change", () => { el.value = world.C; });
+    });
+    for (const name of ["judge", "prefer"]) {
+      document.querySelectorAll(`input[name="${name}"]`).forEach((el) =>
+        el.addEventListener("change", () => { world[name] = el.value; run(); }));
+    }
+  }
+
   if (TIMED) {
     $("add-window").addEventListener("click", () => {
       // hide the last feature in use (or, with one feature, the last action) for a short stretch early on
@@ -390,6 +440,12 @@
     world.F = s.F ? mask(s.F) : []; world.A = s.A ? mask(s.A) : [];
     if (world.F.length !== world.n) world.F = [];
     if (world.A.length !== world.K) world.A = [];
+    if (AWARE) {      // every feature and action is in play; the algorithm chooses among the features itself
+      world.F = []; world.A = [];
+      if (s.C !== undefined && isFinite(s.C)) world.C = Math.max(1, Math.trunc(Number(s.C)));
+      world.judge = s.judge === "truth" ? "truth" : "belief";
+      world.prefer = s.prefer === "most" ? "most" : "margin";
+    }
     world.W = [];
     for (const part of TIMED && typeof s.W === "string" ? s.W.split(";").slice(0, MAX_WINDOWS) : []) {
       const m = /^([fa])(\d{1,4}):(\d{1,4})-(\d{1,4})$/.exec(part);

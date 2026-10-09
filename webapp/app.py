@@ -32,6 +32,7 @@ SITE_NAME = "AI-Assisted Decision Making Lab"
 SITE_KICKER = "CS 598 · Helping a learning human pick the best move"
 
 MAX_ACTIONS, MAX_FEATURES, N_PROBES, MAX_WINDOWS, MAX_SEED = 6, 6, 2000, 12, 999
+AWARE_STREAM = 7919    # the random fallback of the state-aware policy draws from its own stream of the seed
 
 app = Flask(__name__)
 app.config["TEMPLATES_AUTO_RELOAD"] = True   # template edits show up on reload, no restart
@@ -182,8 +183,10 @@ def run_world(u1, u2, h1, h2, curve_name, speed, T, delta, seed=0):
     # the best move y* = argmax_k u_k x_t and the choice y_hat = argmax_k h_k x_t at the drawn state: both
     # swap with the sign of x_t, and they differ exactly on the wrong rounds
     best = np.array([u1, u2])[None, :] * x[:, None]
-    best = best.argmax(axis=1)                                  # equally good actions: the first
+    best = best.argmax(axis=1)
     choice = (H * x[:, None]).argmax(axis=1) if du == 0 else np.where(wrong, 1 - best, best)
+    if du == 0:
+        best = choice                                           # equally good actions: whichever the human picks
 
     numeral, numeral_label, sentence = _verdict(du, dh0, wrong, settle, T)
     if du == 0:
@@ -258,6 +261,8 @@ DEFAULT_WORLD = dict(
 )
 # the same world, with the misjudged feature held back from round 20 to round 25
 DEFAULT_TIMED = dict(DEFAULT_WORLD, W="f3:20-25")
+# the same world again, with at most two features shown and the algorithm choosing which for each state
+DEFAULT_AWARE = dict(DEFAULT_WORLD, C=2, judge="belief", prefer="margin")
 
 
 def _human_list(items):
@@ -359,8 +364,110 @@ def _subsets(size):
     return np.array([m for m in itertools.product([False, True], repeat=size) if any(m)])
 
 
+# ---- the state-aware policy: for each round's state, a feature subset on which the best move ranks first ----
+#
+# A subset F works in a state x when the best move a = argmax_k (U x)_k ranks first on the shown features alone:
+#     sum_{i in F} w_ai x_i  >  sum_{i in F} w_ki x_i   for every other move k.
+# Its margin is the left side minus the largest right side. Two sets of weights can judge it:
+#   the human's own, w = H_t: the human, as they are now, picks a from F, so the round has no error;
+#   the truth, w = U: the hidden features are not needed to see that a is best.
+# Judged by the human's weights (the default), the policy shows a subset on which the human is right and,
+# among those, prefers one on which the truth agrees, so the pick stays right as the human learns. Judged by
+# the truth alone, the human may still be wrong on what is shown until they have learned it. Among equals the
+# top-ranked is the widest margin (or the most features). When no subset works a random candidate is shown.
+#
+# The search is exhaustive over the subsets of at most `budget` features: sum_{c <= budget} C(n, c) of them,
+# 2^n - 1 when the budget is n, so exponential in the number of features. With two moves it is not needed
+# (rank the features by (w_ai - w_ki) x_i and take the largest positive ones), but with more moves finding a
+# subset that beats every rival at once contains hitting set, so no shortcut is known in general. Here n <= 6.
+
+def _aware_sets(n, budget):
+    """The candidate feature subsets: every non-empty one of at most `budget` features."""
+    sets = _subsets(n)
+    return sets[sets.sum(axis=1) <= budget]
+
+
+def _aware_margin(est, true):
+    """The margin of each candidate: `est` (S, K, P) are the moves' scores under it, `true` (K, P) what the
+    moves are really worth. Moves that are exactly equally good are all correct, so the margin is the best
+    score among the best moves minus the best score among the rest. Returns (S, P)."""
+    best = (true.max(axis=0) - true) <= 1e-12                                    # (K, P)
+    return np.where(best, est, -np.inf).max(axis=1) - np.where(best, -np.inf, est).max(axis=1)
+
+
+def _aware_pick(margin, sets, prefer, truth_margin=None):
+    """Which candidates work and which one is shown, from their margins (S, P) by the judging weights. With
+    `truth_margin` (the human's weights are judging), a candidate on which the truth agrees is preferred, and
+    ranked by the truth's margin. Margins closer than 1e-9 count as equal (to zero, or to each other): then
+    the first candidate in order is taken, so rounding never decides. Returns works (S, P), bool, and the
+    index of the top-ranked working candidate (P,)."""
+    works = margin > 1e-9
+    pool, key = works, margin
+    if truth_margin is not None:
+        both = works & (truth_margin > 1e-9)
+        agreed = both.any(axis=0)                           # states with a candidate the truth agrees on
+        pool, key = np.where(agreed, both, works), np.where(agreed, truth_margin, margin)
+    if prefer == "most":       # the most features rather than the widest margin
+        key = sets.sum(axis=1)[:, None] + np.zeros_like(margin)
+    rank = np.where(pool, key, -np.inf)
+    return works, (rank >= rank.max(axis=0) - 1e-9).argmax(axis=0)
+
+
+def _aware_schedule(U, H0, curve, x, sets, judge, prefer, seed):
+    """Run the policy on the drawn states x (T, n): in each round show the top-ranked candidate that works, by
+    the human's weights of that round or by the truth, or a random candidate when none works. Every action is
+    offered, so a shown feature's weights all learn. Returns the masks shown (T, n) and how many candidates
+    worked in each round (T,)."""
+    T, n = x.shape
+    N = np.zeros(n)                                     # rounds each feature has been shown
+    lots = draws.uniforms(seed + AWARE_STREAM, T)       # one 32-bit number per round, for the random fallback
+    shown, worked = np.zeros((T, n), bool), np.zeros(T, int)
+    for t in range(T):
+        true = (U @ x[t])[:, None]
+        by_truth = _aware_margin(((U[None] * sets[:, None, :]) @ x[t])[:, :, None], true)
+        if judge == "truth":
+            works, chosen = _aware_pick(by_truth, sets, prefer)
+        else:
+            H = U + (H0 - U) * (1.0 - curve(N))
+            by_human = _aware_margin(((H[None] * sets[:, None, :]) @ x[t])[:, :, None], true)
+            works, chosen = _aware_pick(by_human, sets, prefer, by_truth)
+        worked[t] = works.sum()
+        pick = int(chosen[0]) if works.any() else (int(lots[t]) * len(sets)) >> 32
+        shown[t] = sets[pick]
+        N += sets[pick]
+    return shown, worked
+
+
+def _aware_scores(W, X, sets):
+    """The moves' scores under each candidate for weights W (K, n) on the states X (P, n): (S, K, P)."""
+    S, (K, n) = len(sets), W.shape
+    return ((sets[:, None, :] * W[None]).reshape(S * K, n) @ X.T).reshape(S, K, len(X))
+
+
+def _aware_average(H, U, X, sets, judge, prefer, truth_margin):
+    """The policy's accuracy, regret and value gap for beliefs H (K, n), averaged over the probe states X. In
+    each state it shows the candidate it would pick there and the human chooses from it with H; where no
+    candidate works a random one is shown, so the three are averaged over the candidates. `truth_margin`
+    (S, P) is the candidates' margin by the truth, which is the same every round."""
+    cols = np.arange(len(X))
+    est = _aware_scores(H, X, sets)
+    true = U @ X.T
+    best_value = true.max(axis=0)
+    top = est.max(axis=1)                                                   # (S, P)
+    tied = est == top[:, None, :]
+    count = tied.sum(axis=1)
+    regret = (tied * (best_value - true)[None]).sum(axis=1) / count         # the human's regret under each candidate
+    # how often the pick is a best move: a human who cannot tell several moves apart picks among them evenly
+    right = (tied & ((best_value - true) <= 1e-12)[None]).sum(axis=1) / count
+    gap = best_value[None] - top
+    works, chosen = (_aware_pick(truth_margin, sets, prefer) if judge == "truth"
+                     else _aware_pick(_aware_margin(est, true), sets, prefer, truth_margin))
+    found = works.any(axis=0)
+    return tuple(float(np.where(found, of[chosen, cols], of.mean(axis=0)).mean()) for of in (right, regret, gap))
+
+
 @lru_cache(maxsize=512)
-def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=(), seed=0):
+def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=(), seed=0, aware=None):
     """Score the chosen policy: the features and actions switched on, minus each window's rounds.
     `speeds` holds one learning speed per feature (all equal when the features share a curve).
     `seed` picks the draw of the states x_0 .. x_{T-1}: the loss of round t is taken at x_t, as in the
@@ -368,11 +475,21 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
     states is kept beside it, as a reference.
     `full` also runs every feature subset and every action subset, each kept every round, for the
     ranking tables; without it only the chosen policy and the show-everything reference run, which
-    is fast enough to follow a control while it moves."""
+    is fast enough to follow a control while it moves.
+    `aware` = (budget, judge, prefer) swaps the fixed choice for the state-aware policy: every action
+    offered, and for each round's state a feature subset of at most `budget` on which the best move ranks
+    first, judged by the truth or by the human's weights (see `_aware_schedule`). It is ranked against the
+    fixed subsets within the same budget."""
     U, H0 = np.array(U_rows), np.array(H_rows)
     K, n = U.shape
     F_base, A_base = np.array(F_now), np.array(A_now)
     F_bench, A_bench = _schedule(F_base, windows, "f", T), _schedule(A_base, windows, "a", T)   # (T, n), (T, K)
+    x_draw = draws.states(seed, T, n)                   # (T, n): the state of each round, the same for every policy
+    curve = CURVE_SPECS[curve_name]["make"](np.array(speeds))                     # (n,): one curve per feature
+    if aware:
+        budget, judge, prefer = aware
+        sets = _aware_sets(n, budget)
+        F_bench, worked = _aware_schedule(U, H0, curve, x_draw, sets, judge, prefer, seed)
 
     def every(sets):
         """Fixed subsets, the same every round: (count, size) to (T, count, size)."""
@@ -386,7 +503,8 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         # One batch holds every candidate policy: each feature subset with the bench's actions, each
         # action subset with the bench's features, then the bench itself and the world where nothing
         # is held back.
-        feature_sets, action_sets = _subsets(n), _subsets(K)
+        # (the state-aware policy is set against the fixed subsets within its budget, and no action subsets)
+        feature_sets, action_sets = (sets, np.zeros((0, K), bool)) if aware else (_subsets(n), _subsets(K))
         n_f, n_a = len(feature_sets), len(action_sets)
         F = np.concatenate([every(feature_sets), along(F_bench, n_a + 1), np.ones((T, 1, n), bool)], axis=1)
         A = np.concatenate([along(A_bench, n_f), every(action_sets), along(A_bench), np.ones((T, 1, K), bool)], axis=1)
@@ -395,7 +513,7 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         A = np.concatenate([along(A_bench), np.ones((T, 1, K), bool)], axis=1)
     B = F.shape[1]
     now, everything = B - 2, B - 1
-    learner = CountLearner(CURVE_SPECS[curve_name]["make"](np.array(speeds)))    # (n,): one curve per feature
+    learner = CountLearner(curve)
     res = simulate(np.broadcast_to(U, (B, K, n)), np.broadcast_to(H0, (B, K, n)), learner, T=T,
                    policy=ScheduledMasks(F, A))
 
@@ -405,10 +523,19 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
     acc, reg, value_gap = (np.array(series) for series in zip(*per_round))      # each (T, B)
     # once everything shown is learned: the last round's choice, kept up until every weight in use is right
     acc_limit, reg_limit = analysis.evaluate(res.U, U, X, F[-1], A[-1])
+    if aware:
+        # Averaged over states, the bench is not the subset it happened to show: in another state it would
+        # have shown another. Score the policy itself, with the beliefs of each round, and with the truth.
+        truth_margin = _aware_margin(_aware_scores(U, X, sets), U @ X.T)
+        # the ceiling the budget sets: the share of states in which some candidate settles the best move by the
+        # truth; in the rest a hidden feature is needed, whatever the human believes
+        ceiling = float((truth_margin > 1e-9).any(axis=0).mean())
+        for t in range(T):
+            acc[t, now], reg[t, now], value_gap[t, now] = _aware_average(res.H[t, now], U, X, sets, judge, prefer, truth_margin)
+        acc_limit[now], reg_limit[now], _ = _aware_average(U, U, X, sets, judge, prefer, truth_margin)
     # The round's own loss, at the state drawn for it: regret l(x_t, y_hat_t), value gap, the pick and the
     # best move, each (T, B). The objective is their discounted sum on this draw; `mean_discounted` is the
     # same sum of the averages over states.
-    x_draw = draws.states(seed, T, n)                                            # (T, n)
     real_reg, real_gap, real_pick, real_best = analysis.realized(res.H[:T] * F[:, :, None, :], U, x_draw[:, None, :], A)
     weights = delta ** np.arange(T)
     discounted = (weights[:, None] * real_reg).sum(axis=0)
@@ -425,7 +552,7 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         """Rank one family of fixed subsets by discounted regret; list the best 8 and the bench. The bench
         is one of them unless its windows change this family over the rounds: then it is an extra row."""
         fixed = offset + np.arange(len(sets))
-        steady = bool((bench == bench[0]).all())
+        steady = bool((bench == bench[0]).all()) and not aware      # the state-aware policy is never one of them
         here = offset + int(np.flatnonzero((sets == bench[0]).all(axis=1))[0]) if steady else now
         ids = fixed if steady else np.append(fixed, now)
         order = ids[np.argsort(discounted[ids], kind="stable")]
@@ -436,7 +563,8 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
             scheduled = b == now and not steady
             rows.append(dict(
                 rank=rank[b], mask=None if scheduled else [bool(v) for v in sets[b - offset]],
-                label="the schedule on the bench" if scheduled else _describe(sets[b - offset], noun),
+                label=("the policy on the bench" if aware else "the schedule on the bench") if scheduled
+                else _describe(sets[b - offset], noun),
                 discounted=float(discounted[b]), mean=float(mean_discounted[b]), start=float(acc[0, b]), end=float(acc[-1, b]),
                 floor=float(reg_limit[b]), current=b == here, scheduled=scheduled))
         return dict(rows=rows, total=len(ids), rank=rank[here], best=int(fixed[discounted[fixed].argmin()]))
@@ -444,7 +572,7 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
     rankings = None
     if full:
         by_feature = ranking(0, feature_sets, F_bench, "feature")
-        by_action = ranking(n_f, action_sets, A_bench, "action")
+        by_action = None if aware else ranking(n_f, action_sets, A_bench, "action")
 
     # What the last round holds back decides the lasting loss. Usually that is what was held back all
     # along; a window that runs to the end of the horizon leaves something out that was in use before.
@@ -472,7 +600,7 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         sentence += "Once everything shown is learned, the human always picks the best move. "
     else:
         sentence += "Once everything shown at the end is learned, the human always picks the best move. "
-    if full:
+    if full and not aware:
         best_f, best_a = by_feature["best"], by_action["best"]
         kept = " every round" if scheduled else ""       # a fixed subset, against a schedule that changes
         feature_helps = discounted[best_f] < discounted[now] - 1e-9
@@ -490,26 +618,63 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
             del r["best"]
         rankings = dict(features=by_feature, actions=by_action)
 
+    if aware:
+        # the state-aware policy has its own sentence: how often a subset that works exists, and how the human did
+        found = int((worked > 0).sum())
+        right = int((real_reg[:, now] <= 1e-9).sum())               # rounds in which the human picked a best move
+        most = f"at most {budget} of the {n} features" if budget < n else (f"any of the {n} features" if n > 1 else "the one feature")
+        rounds = f"every one of the {T} rounds" if found == T else f"{found} of {T} rounds"
+        rest = "one" if T - found == 1 else str(T - found)
+        sentence = f"Showing {most}, chosen for each round's state, "
+        if judge == "truth":
+            sentence += (f"the algorithm found a subset on which the true weights rank the best move first in {rounds}"
+                         + ("" if found == T else f"; in the other {rest} no subset within the budget does, so a random one was shown")
+                         + f". The human picked the best move in {right} of the {T} rounds. ")
+        elif found == T:
+            sentence += (f"the algorithm found a subset that makes the human pick the best move in {rounds}, so nothing "
+                         "is lost on this draw. ")
+        else:
+            sentence += (f"the algorithm found a subset that makes the human pick the best move in {rounds}. In the other "
+                         f"{rest} no subset within the budget does, so a random one was shown; all of the regret comes "
+                         "from those rounds. ")
+        if full:
+            best_f = by_feature["best"]
+            sentence += (f"The best fixed subset within the budget, {_describe(feature_sets[best_f], 'feature')}, "
+                         f"costs {discounted[best_f]:.2f} on this draw.")
+            del by_feature["best"]
+            rankings = dict(features=by_feature, actions=None)
+
     held_back = not (F_bench.all() and A_bench.all())
+    stats = [
+        dict(label="Averaged over states", value=f"{mean_discounted[now]:.2f}",
+             note="the same discounted regret, averaged over every state instead of the ones drawn"),
+        dict(label=f"Best move picked at round {T - 1}", value=f"{acc[-1, now]:.0%}",
+             note=f"of states; {acc[0, now]:.0%} at round 0, heading for {acc_limit[now]:.0%} once fully learned"),
+        dict(label="Regret per round once learned", value=f"{reg_limit[now]:.2f}",
+             note=("on average, the lasting price of what is held back" if reg_limit[now] > 1e-9
+                   else "nothing held back matters")),
+        dict(label="Against showing everything", value=f"{discounted[now] - discounted[everything]:+.2f}",
+             note=(f"on this draw; showing and offering everything costs {discounted[everything]:.2f}"
+                   if held_back else "this is the show-everything policy")),
+    ]
+    if aware:
+        stats[0] = dict(label="Rounds with a subset that works", value=f"{found} of {T}",
+                        note=(("judged by the truth" if judge == "truth" else "judged by the human's beliefs") + "; "
+                              + ("a random subset is shown in the rest" if found < T else "no round needed the random fallback")))
+        stats[1] = dict(label="Averaged over states", value=f"{mean_discounted[now]:.2f}",
+                        note="the discounted regret with each round's beliefs, averaged over every state instead of the one drawn")
+        stats[2] = dict(label="States a subset can settle", value=f"{ceiling:.0%}",
+                        note=("by the truth, some subset within the budget ranks the best move first in every state"
+                              if ceiling > 1 - 1e-9 else
+                              f"by the truth, with at most {budget} feature{'s' if budget > 1 else ''}; the rest need a "
+                              "hidden feature, whatever the human believes"))
 
     # The human's choice and the best move at the state drawn in each round. A round is missed when the
     # pick costs regret there.
     picks, best_moves, missed = real_pick[:, now], real_best[:, now], real_reg[:, now] > 1e-9
     return dict(
         K=K, n=n, T=T, seed=seed, numeral=f"{discounted[now]:.2f}", numeral_label="discounted regret on this draw",
-        sentence=sentence.strip(), rankings=rankings, full=full,
-        stats=[
-            dict(label="Averaged over states", value=f"{mean_discounted[now]:.2f}",
-                 note="the same discounted regret, averaged over every state instead of the ones drawn"),
-            dict(label=f"Best move picked at round {T - 1}", value=f"{acc[-1, now]:.0%}",
-                 note=f"of states; {acc[0, now]:.0%} at round 0, heading for {acc_limit[now]:.0%} once fully learned"),
-            dict(label="Regret per round once learned", value=f"{reg_limit[now]:.2f}",
-                 note=("on average, the lasting price of what is held back" if reg_limit[now] > 1e-9
-                       else "nothing held back matters")),
-            dict(label="Against showing everything", value=f"{discounted[now] - discounted[everything]:+.2f}",
-                 note=(f"on this draw; showing and offering everything costs {discounted[everything]:.2f}"
-                       if held_back else "this is the show-everything policy")),
-        ],
+        sentence=sentence.strip(), rankings=rankings, full=full, stats=stats,
         # The browser draws the figures from these. reg, discounted and value_gap are taken at the state
         # drawn in each round; the *_mean series are their averages over all states, and acc is the share
         # of states with the best move.
@@ -528,27 +693,40 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         # rounds at which that changes
         schedule=dict(F=F_bench.T.astype(int).tolist(), A=A_bench.T.astype(int).tolist()),
         changes=[t for t in range(1, T) if (F_bench[t] != F_bench[t - 1]).any() or (A_bench[t] != A_bench[t - 1]).any()],
+        # the state-aware policy: its budget, how many candidate subsets there are, and how many of them made
+        # the human right in each round (0 means a random one was shown)
+        policy=dict(budget=budget, judge=judge, prefer=prefer, candidates=len(sets), worked=worked.tolist(),
+                    ceiling=ceiling) if aware else None,
         choice=dict(picks=(picks + 1).tolist(), best=(best_moves + 1).tolist(), missed=missed.tolist()),
         acc_limit=float(acc_limit[now]), reg_limit=float(reg_limit[now]),
         regret_cap=regret_cap, value_cap=value_cap,
     )
 
 
-def _bench_page(page, default_world, timed):
+def _bench_page(page, default_world, mode):
+    """One bench, three pages: `mode` is "fixed" (the same subsets every round), "timed" (windows of rounds in
+    which something is held back) or "aware" (the features are chosen for each round's state)."""
     specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
-    return render_template("worlds.html", curve_specs=specs, default_world=default_world, page=page, timed=timed,
+    return render_template("worlds.html", curve_specs=specs, default_world=default_world, page=page, mode=mode,
+                           timed=mode == "timed", aware=mode == "aware",
                            max_actions=MAX_ACTIONS, max_features=MAX_FEATURES, max_windows=MAX_WINDOWS)
 
 
 @app.route("/worlds")
 def worlds():
-    return _bench_page("worlds", DEFAULT_WORLD, timed=False)
+    return _bench_page("worlds", DEFAULT_WORLD, "fixed")
 
 
 @app.route("/timed")
 def timed():
     """The same bench, with windows of rounds in which a feature or an action is held back."""
-    return _bench_page("timed", DEFAULT_TIMED, timed=True)
+    return _bench_page("timed", DEFAULT_TIMED, "timed")
+
+
+@app.route("/aware")
+def aware():
+    """The same bench again, with the features chosen for each round's state so that the human picks the best move."""
+    return _bench_page("aware", DEFAULT_AWARE, "aware")
 
 
 @app.route("/api/world")
@@ -559,14 +737,19 @@ def api_world():
     spec = CURVE_SPECS[curve_name]
     K, n = int(_num("K", 3, 2, MAX_ACTIONS)), int(_num("n", 3, 1, MAX_FEATURES))
     T = int(_num("T", 100, 10, 300))
-    F, A, windows = _mask("F", n), _mask("A", K), _windows(K, n, T)
+    F, A, windows, aware = _mask("F", n), _mask("A", K), _windows(K, n, T), None
+    if request.args.get("policy") == "aware":
+        # the state-aware policy chooses the features itself, within a budget, and offers every action
+        F, A, windows = (True,) * n, (True,) * K, ()
+        aware = (int(_num("C", 2, 1, n)), "truth" if request.args.get("judge") == "truth" else "belief",
+                 "most" if request.args.get("prefer") == "most" else "margin")
     for base, kind, problem in ((F, "f", "show no feature"), (A, "a", "offer no action")):
         empty = np.flatnonzero(~_schedule(base, windows, kind, T).any(axis=1))
         if len(empty):
             abort(400, f"round {empty[0]} would {problem}")
     return jsonify(run_general(
         _matrix("U", K, n), _matrix("H", K, n), F, A, curve_name, _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
-        full=request.args.get("rank", "1") != "0", windows=windows, seed=_seed(),
+        full=request.args.get("rank", "1") != "0", windows=windows, seed=_seed(), aware=aware,
     ))
 
 

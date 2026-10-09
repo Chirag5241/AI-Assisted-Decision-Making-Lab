@@ -204,6 +204,21 @@ BENCHES = [
                 "then brought back.",
         notes={}, absent={}, own=[]),
     dict(
+        endpoint="aware", name="State-aware subsets",
+        summary="For each round's state the algorithm shows the top-ranked subset of at most C features from "
+                "which the human picks the best move (or, as an option, on which the truth ranks it first). When "
+                "no subset within the budget works, it shows one at random, for now.",
+        notes=dict(
+            schedule="Chosen afresh for each round's state: the top-ranked subset on which the best move ranks "
+                     "first, or a random one. Every action is offered.",
+            choice="Judged by the human's weights, the two differ only in the rounds where no subset within the "
+                   "budget works.",
+            beliefs="These depend on the draw: what is shown, and so what is learned, follows the states.",
+            accuracy="Here: the share of states in which the human picks the best move from the subset the "
+                     "algorithm would show there. The dashed level is the ceiling the budget sets."),
+        absent={},
+        own=["How many of the candidate subsets work, round by round"]),
+    dict(
         endpoint="correlated_page", name="Correlated features",
         summary="Three features that move together. A hidden feature is filled in from the shown ones, and the "
                 "algorithm may explore before committing to a subset.",

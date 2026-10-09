@@ -9,6 +9,7 @@ window.StandardFigures = (function () {
   const SHADES = ["100%", "88%", "76%", "66%", "57%", "50%"];
   const make = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
   const key = (cls, text) => { const item = make("span"); item.append(make("i", cls), text); return item; };
+  const lineKey = (cls, text) => { const item = make("span"); item.append(Charts.swatch(cls), text); return item; };   // drawn like its line
   const pct = (v) => Math.round(v * 100) + "%";
   const UNITS = [-3, -2, -1, 0, 1, 2, 3].map((v) => ({ v, label: v }));
 
@@ -31,6 +32,11 @@ window.StandardFigures = (function () {
     const number = (v) => (v < 0 ? "\u2212" : "") + Math.abs(v).toFixed(2);
     const names = n === 1 ? "x\u209c" : "x\u209c = (" + (n <= 3 ? plan.F.map((_, j) => "x" + SUB[j]).join(", ") : "x\u2081 \u2026 x" + SUB[n - 1]) + ")";
     const tipLines = (t) => [names + " = " + (n === 1 ? number(data.x[t][0]) : "(" + data.x[t].map(number).join(", ") + ")")];
+    // Fig. 3 also says which features the human was shown in that round, and, on the state-aware bench, when
+    // that subset was the random fallback
+    const shownLine = (t) => "shown: " + plan.F.map((on, j) => (on[t] ? "x" + SUB[j] : null)).filter(Boolean).join(", ")
+      + (data.policy && data.policy.worked[t] === 0 ? "  (random: no subset works)" : "");
+    const choiceTip = (t) => tipLines(t).concat(n > 1 ? [shownLine(t)] : []);
 
     // Fig. 1: what is shown and offered in each round
     if ($("fig-schedule")) {
@@ -45,8 +51,8 @@ window.StandardFigures = (function () {
     if (host) {
       const fig = host.dataset.fig;
       $("beliefs-legend").replaceChildren(
-        ...data.U.map((_, k) => key("bg-a" + (k + 1), "a" + SUB[k])),
-        key("truth-key", "truth u"), key("start", "starting belief"), key("faded-key", "not in use: nothing learned"),
+        ...data.U.map((_, k) => lineKey("line c-a" + (k + 1), "a" + SUB[k])),
+        lineKey("truth", "truth u"), key("start", "starting belief"), lineKey("line faded", "not in use: nothing learned"),
         key("box share", "grey: share of states with the wrong action"));
       host.classList.toggle("single", n === 1);
       host.replaceChildren(...data.beliefs.map((byAction, j) => {
@@ -81,7 +87,7 @@ window.StandardFigures = (function () {
       }
       Charts.line($("fig-choice"), T,
         [{ v: data.choice.best, cls: "c-ink", dash: true, name: "y* best move" }, { v: picks, cls: "c-ink", name: "\u0177 human's choice" }],
-        [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * K, lo: 0.5, hi: K + 0.5, vlines, tipLines,
+        [], misses, { ylabel: "action chosen", step: true, width: 1120, height: 96 + 26 * K, lo: 0.5, hi: K + 0.5, vlines, tipLines: choiceTip,
           yticks: Array.from({ length: K }, (_, k) => ({ v: k + 1, label: "a" + SUB[k], faded: !plan.A[k].some(Boolean) })), fmt: (v) => "action " + v,
           alt: "Which action the human chooses in each round at that round's state, against the best move there" });
     }

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791494390">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791521091">
 </head>
 <body>
   <header class="mast">
@@ -30,6 +30,8 @@
           
           <a href="timed.html" aria-current="page">Timed hiding</a>
           
+          <a href="aware.html" >State-aware subsets</a>
+          
           <a href="correlated.html" >Correlated features</a>
           
           <a href="experiments.html"  class="apart">Experiment 1 figures</a>
@@ -43,10 +45,12 @@
     <form id="setup" class="controls" autocomplete="off">
       <fieldset class="card">
         <legend>The algorithm's choice</legend>
+        
         <p class="group-label first">Features it shows</p>
         <div class="chips" id="feature-chips"></div>
         <p class="group-label">Actions it offers</p>
         <div class="chips" id="action-chips"></div>
+        
         
         <p class="group-label">Hidden for a while</p>
         <div class="windows" id="windows"></div>
@@ -227,6 +231,8 @@
 </section>
 
 
+    
+
     <section class="rankings">
       <div>
         <h2 class="section-title">Which features should it show?</h2>
@@ -237,6 +243,7 @@
           <tbody id="ranking-features"></tbody>
         </table></div>
       </div>
+      
       <div>
         <h2 class="section-title">Which actions should it offer?</h2>
         <p class="section-sub" id="ranking-actions-sub"></p>
@@ -246,6 +253,7 @@
           <tbody id="ranking-actions"></tbody>
         </table></div>
       </div>
+      
     </section>
   </main>
 </div>
@@ -268,8 +276,10 @@
     <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
       state. The grey in the figures, the bar at the top and the &ldquo;averaged over states&rdquo; numbers therefore
       score each round over 2,000 probe states drawn from <span class="math">N(0, I)</span>.</p>
+    
     <p>Actions work like features: dropping one the human misjudges removes those mistakes, but it can never be picked
       when it is the best move, and it is never learned.</p>
+    
     
     <p>A window names one feature or one action, a first round and a last round. Windows may overlap, and one that runs
       past the horizon is cut off there. Every round must still show at least one feature and offer at least one
@@ -298,16 +308,16 @@
 <script>
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "W": "f3:20-25", "curve": "exponential", "delta": 0.95, "p1": 0.05};
-  window.TIMED_BENCH = true;
+  window.BENCH_MODE = "timed";
   window.MAX_WINDOWS = 12;
 </script>
-<script src="webapp/static/charts.js?v=1791498407"></script>
-<script src="webapp/static/figures.js?v=1791498407"></script>
+<script src="webapp/static/charts.js?v=1791521077"></script>
+<script src="webapp/static/figures.js?v=1791524128"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791498408"></script>
-<script src="webapp/static/static-api.js?v=1791496803"></script>
-<script src="webapp/static/worlds.js?v=1791496940"></script>
+<script src="webapp/static/probes.js?v=1791525307"></script>
+<script src="webapp/static/static-api.js?v=1791523695"></script>
+<script src="webapp/static/worlds.js?v=1791523744"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

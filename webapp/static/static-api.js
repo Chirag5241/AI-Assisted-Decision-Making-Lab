@@ -7,6 +7,7 @@
 
   const MEAN_ABS_X = Math.sqrt(2 / Math.PI);          // E|x| for x ~ N(0, 1)
   const MAX_ACTIONS = 6, MAX_FEATURES = 6, MAX_WINDOWS = 12, MAX_SEED = 999;
+  const AWARE_STREAM = 7919;    // the random fallback of the state-aware policy draws from its own stream of the seed
 
   const sigmoid = (p, m) => {
     const w = p / 5, s = 1 / (1 + Math.exp(-(m - p) / w)), s0 = 1 / (1 + Math.exp(p / w));
@@ -68,13 +69,15 @@
 
   // The state of each round, x_t ~ N(0, I), as [round][feature]: mulberry32, then Box-Muller. These are
   // the very numbers simlab/draws.py makes, so a draw is the same on the Flask site and here.
+  // the i-th 32-bit number of the stream `seed` (mulberry32, counter form)
+  function uniform32(seed, i) {
+    const a = (seed + (i + 1) * 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return (t ^ (t >>> 14)) >>> 0;
+  }
   function drawStates(seed, T, n) {
-    const uniform = (i) => {
-      const a = (seed + (i + 1) * 0x6D2B79F5) >>> 0;
-      let t = Math.imul(a ^ (a >>> 15), a | 1);
-      t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-      return (t ^ (t >>> 14)) >>> 0;
-    };
+    const uniform = (i) => uniform32(seed, i);
     return Array.from({ length: T }, (_, t) => Array.from({ length: n }, (_, j) => {
       const m = t * n + j, u1 = (uniform(2 * m) + 0.5) / 4294967296, u2 = uniform(2 * m + 1) / 4294967296;
       return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
@@ -120,8 +123,11 @@
     const valueGap = gap.map((_, t) => Math.max(u1 * x[t], u2 * x[t]) - Math.max(b1[t] * x[t], b2[t] * x[t]));
     const meanValueGap = gap.map((g) => ((Math.abs(du) - Math.abs(g)) * MEAN_ABS_X) / 2);
     // the best move and the choice at x_t: both swap with the sign of x_t, and differ exactly on the wrong rounds
-    const best = x.map((v) => (u2 * v > u1 * v ? 1 : 0));
-    const choice = wrong.map((w, t) => (du === 0 ? (b2[t] * x[t] > b1[t] * x[t] ? 1 : 0) : (w ? 1 - best[t] : best[t])));
+    const choice = wrong.map((w, t) => {
+      const first = u2 * x[t] > u1 * x[t] ? 1 : 0;
+      return du === 0 ? (b2[t] * x[t] > b1[t] * x[t] ? 1 : 0) : (w ? 1 - first : first);
+    });
+    const best = x.map((v, t) => (du === 0 ? choice[t] : (u2 * v > u1 * v ? 1 : 0)));     // equally good actions: whichever the human picks
 
     const gaps = `belief gap ${signed2(dh0)} against a true gap of ${signed2(du)}`;
     let numeral, label, sentence;
@@ -261,11 +267,17 @@
     const spec = CURVES[curveName];
     const K = Math.trunc(num(q, "K", 3, 2, MAX_ACTIONS)), n = Math.trunc(num(q, "n", 3, 1, MAX_FEATURES));
     const T = Math.trunc(num(q, "T", 100, 10, 300));
-    const Fbase = mask(q, "F", n), Abase = mask(q, "A", K), windows = parseWindows(q, K, n, T);
+    let Fbase = mask(q, "F", n), Abase = mask(q, "A", K), windows = parseWindows(q, K, n, T);
+    // the state-aware policy chooses the features itself, within a budget, and offers every action
+    const aware = q.get("policy") === "aware"
+      ? { budget: Math.trunc(num(q, "C", 2, 1, n)), judge: q.get("judge") === "truth" ? "truth" : "belief",
+        prefer: q.get("prefer") === "most" ? "most" : "margin" } : null;
+    if (aware) { Fbase = Array(n).fill(true); Abase = Array(K).fill(true); windows = []; }
     // what is shown and what is offered in each round: the base mask, switched off inside each window
     const scheduleOf = (base, kind) => Array.from({ length: T }, (_, t) =>
       base.map((on, i) => on && !windows.some((w) => w.kind === kind && w.index === i && w.first <= t && t <= w.last)));
-    const Fbench = scheduleOf(Fbase, "f"), Abench = scheduleOf(Abase, "a");
+    let Fbench = scheduleOf(Fbase, "f");
+    const Abench = scheduleOf(Abase, "a");
     for (const [rounds, problem] of [[Fbench, "show no feature"], [Abench, "offer no action"]]) {
       const empty = rounds.findIndex((m) => !m.some(Boolean));
       if (empty >= 0) throw new BadRequest(`round ${empty} would ${problem}`);
@@ -311,7 +323,8 @@
         if (v > top) { top = v; sumR = hi - worth[k]; count = 1; pick = k; }
         else if (v === top) { sumR += hi - worth[k]; count++; }
       }
-      return { reg: sumR / count, gap: hi - top, pick, best };
+      // when several moves are exactly equally good, the best move reported is the human's pick if it is one of them
+      return { reg: sumR / count, gap: hi - top, pick, best: sumR / count <= 1e-12 ? pick : best };
     }
 
     // Every action's score in every probe state for one set of shown features, from the first beliefs
@@ -399,7 +412,131 @@
     const same = (a, b) => a.every((v, i) => v === b[i]);
     const every = (set) => Array(T).fill(set);                    // a fixed subset, the same every round
     const steady = (rounds) => rounds.every((m) => same(m, rounds[0]));
+
+    // ---- the state-aware policy: for each round's state, a feature subset on which the best move ranks first ----
+    //
+    // A subset F works in a state x when the best move a = argmax_k (U x)_k ranks first on the shown features alone:
+    //     sum_{i in F} w_ai x_i  >  sum_{i in F} w_ki x_i   for every other move k.
+    // Its margin is the left side minus the largest right side. Judged by the human's weights (w = H_t, the
+    // default), the human picks a from F, so the round has no error; among such subsets one on which the truth
+    // agrees is preferred. Judged by the truth alone (w = U), the human may still be wrong until they have learned
+    // it. Among equals the top-ranked is the widest margin (or the most features). When no subset works a random
+    // candidate is shown.
+    //
+    // The search is exhaustive over the subsets of at most `budget` features, 2^n - 1 of them when the budget is n,
+    // so exponential in the number of features (see webapp/app.py). Here n <= 6.
+    let candidates = null, members = null, worked = null;
+    const isBest = new Uint8Array(K);      // which moves are best in the state being judged
+    // the margin of candidate s by the weights W in the state xs[at + j]: the best score among the best moves minus
+    // the best score among the rest (moves that are exactly equally good are all correct)
+    function marginOf(s, W, xs, at) {
+      const js = members[s];
+      let topBest = -Infinity, topRest = -Infinity;
+      for (let k = 0; k < K; k++) {
+        let v = 0;
+        for (let i = 0; i < js.length; i++) v += W[k][js[i]] * xs[at + js[i]];
+        if (isBest[k]) { if (v > topBest) topBest = v; } else if (v > topRest) topRest = v;
+      }
+      return topBest - topRest;
+    }
+    // Judge every candidate in one state by the weights W: how many work, and the top-ranked of those (-1 if none).
+    // With `agree` (the human's weights are judging), a candidate on which the truth agrees is preferred and ranked
+    // by the truth's margin. Margins closer than 1e-9 count as equal (to zero, or to each other): then the first
+    // candidate in order is taken, so rounding never decides.
+    const margins = [], truthMargins = [];
+    function judgeState(W, xs, at, agree) {
+      const S = candidates.length;
+      let count = 0, agreed = false;
+      for (let s = 0; s < S; s++) {
+        margins[s] = marginOf(s, W, xs, at);
+        if (!(margins[s] > 1e-9)) continue;
+        count++;
+        if (agree) { truthMargins[s] = marginOf(s, U, xs, at); if (truthMargins[s] > 1e-9) agreed = true; }
+      }
+      if (!count) return [0, -1];
+      const inPool = (s) => margins[s] > 1e-9 && (!agreed || truthMargins[s] > 1e-9);
+      const key = (s) => (aware.prefer === "most" ? members[s].length : agreed ? truthMargins[s] : margins[s]);
+      let best = -Infinity;
+      for (let s = 0; s < S; s++) if (inPool(s) && key(s) > best) best = key(s);
+      for (let s = 0; s < S; s++) if (inPool(s) && key(s) >= best - 1e-9) return [count, s];
+      return [count, -1];
+    }
+    // The policy's accuracy, regret and value gap with the human's weights W[k][j], averaged over the probe states.
+    // In each state it shows the candidate it would pick there and the human chooses from it; where no candidate
+    // works a random one is shown, so the three are averaged over the candidates. `pickedAt[p]` is that pick when
+    // the truth judges, which is the same every round; without it the human's own weights judge.
+    function awareAverage(W, pickedAt) {
+      const S = candidates.length, out = [0, 0, 0];
+      // the human's choice under candidate s in probe state p, added to `out` with weight w
+      const human = (s, p, w) => {
+        const js = members[s];
+        let top = -Infinity, sumR = 0, sumOk = 0, count = 0;
+        for (let k = 0; k < K; k++) {
+          let v = 0;
+          for (let i = 0; i < js.length; i++) v += W[k][js[i]] * X[p * n + js[i]];
+          const r = regretOf[p * K + k];
+          if (v > top) { top = v; sumR = r; sumOk = r <= 1e-12 ? 1 : 0; count = 1; }
+          else if (v === top) { sumR += r; sumOk += r <= 1e-12 ? 1 : 0; count++; }     // ties are split evenly
+        }
+        out[0] += (w * sumOk) / count; out[1] += (w * sumR) / count; out[2] += w * (bestTrue[p] - top);
+      };
+      for (let p = 0; p < P; p++) {
+        let chosen;
+        if (pickedAt) chosen = pickedAt[p];
+        else {
+          for (let k = 0; k < K; k++) isBest[k] = regretOf[p * K + k] <= 1e-12 ? 1 : 0;
+          chosen = judgeState(W, X, p * n, true)[1];
+        }
+        if (chosen >= 0) human(chosen, p, 1);
+        else for (let s = 0; s < S; s++) human(s, p, 1 / S);
+      }
+      return out.map((v) => v / P);
+    }
+    if (aware) {
+      candidates = subsets(n).filter((set) => set.filter(Boolean).length <= aware.budget);
+      members = candidates.map((set) => set.reduce((js, on, j) => (on ? js.concat(j) : js), []));
+      const S = candidates.length;
+      // Run it on the drawn states. Every action is offered, so a shown feature's weights all learn together.
+      const shownRounds = Array(n).fill(0);
+      Fbench = []; worked = [];
+      for (let t = 0; t < T; t++) {
+        const x = xDraw[t], worth = U.map((row) => row.reduce((sum, u, j) => sum + u * x[j], 0));
+        const bestWorth = Math.max(...worth);
+        worth.forEach((v, k) => { isBest[k] = bestWorth - v <= 1e-12 ? 1 : 0; });
+        const W = aware.judge === "truth" ? U
+          : U.map((row, k) => row.map((u, j) => u + (H0[k][j] - u) * (1 - phis[j][shownRounds[j]])));
+        let [count, pick] = judgeState(W, x, 0, aware.judge !== "truth");
+        // none works: one of the candidates at random
+        if (pick < 0) pick = Math.floor((uniform32(seed + AWARE_STREAM, t) * S) / 4294967296);
+        worked.push(count);
+        Fbench.push(candidates[pick]);
+        candidates[pick].forEach((on, j) => { if (on) shownRounds[j]++; });
+      }
+    }
+
     const now = score(Fbench, Abench, true);
+    if (aware) {
+      // Averaged over states, the bench is not the subset it happened to show: in another state it would have
+      // shown another. Score the policy itself, with the beliefs of each round, and with the truth.
+      const byTruth = new Int32Array(P);
+      let settled = 0;
+      for (let p = 0; p < P; p++) {
+        for (let k = 0; k < K; k++) isBest[k] = regretOf[p * K + k] <= 1e-12 ? 1 : 0;
+        byTruth[p] = judgeState(U, X, p * n, false)[1];
+        if (byTruth[p] >= 0) settled++;
+      }
+      // the ceiling the budget sets: the share of states in which some candidate settles the best move by the
+      // truth; in the rest a hidden feature is needed, whatever the human believes
+      aware.ceiling = settled / P;
+      const pickedAt = aware.judge === "truth" ? byTruth : null;
+      now.mean = 0;
+      for (let t = 0; t < T; t++) {
+        [now.acc[t], now.reg[t], now.vgap[t]] = awareAverage(now.beliefs[t], pickedAt);
+        now.mean += Math.pow(delta, t) * now.reg[t];
+        await breathe();
+      }
+      [now.accLimit, now.regLimit] = awareAverage(U, pickedAt);
+    }
     const heldBack = !(Fbench.every((m) => m.every(Boolean)) && Abench.every((m) => m.every(Boolean)));
     const everything = heldBack ? score(every(Array(n).fill(true)), every(Array(K).fill(true))) : now;
 
@@ -436,7 +573,7 @@
       // Rank one family of fixed subsets; the bench is one of them unless its windows change this
       // family over the rounds, and then it is ranked as an extra row.
       const rank = async (sets, bench, noun, policy) => {
-        const fixed = steady(bench), results = [];
+        const fixed = steady(bench) && !aware, results = [];     // the state-aware policy is never one of the fixed subsets
         for (const set of sets) { results.push(fixed && same(set, bench[0]) ? now : score(...policy(set))); await breathe(); }
         if (!fixed) results.push(now);
         const order = results.map((_, i) => i).sort((a, b) => results[a].disc - results[b].disc || a - b);
@@ -448,45 +585,81 @@
         return {
           rows: listed.map((i) => {
             const extra = i === sets.length;
-            return { rank: place[i], mask: extra ? null : sets[i], label: extra ? "the schedule on the bench" : describe(sets[i], noun),
+            return { rank: place[i], mask: extra ? null : sets[i],
+              label: extra ? (aware ? "the policy on the bench" : "the schedule on the bench") : describe(sets[i], noun),
               discounted: results[i].disc, mean: results[i].mean, start: results[i].acc[0], end: results[i].acc[T - 1], floor: results[i].regLimit,
               current: i === here, scheduled: extra };
           }),
           total: results.length, rank: place[here], best: { set: sets[best], disc: results[best].disc },
         };
       };
-      const byFeature = await rank(subsets(n), Fbench, "feature", (set) => [every(set), Abench]);
-      const byAction = await rank(subsets(K), Abench, "action", (set) => [Fbench, every(set)]);
-      const kept = scheduled ? " every round" : "";       // a fixed subset, against a schedule that changes
-      const featureHelps = byFeature.best.disc < now.disc - 1e-9;
-      if (featureHelps) sentence += `On this draw, showing ${describe(byFeature.best.set, "feature")}${kept} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
-      if (byAction.best.disc < now.disc - 1e-9) {
-        const offer = `ffering ${describe(byAction.best.set, "action")}${kept} instead would cut`;
-        sentence += featureHelps ? `Separately, o${offer} it to ${f2(byAction.best.disc)}.` : `On this draw, o${offer} the discounted regret to ${f2(byAction.best.disc)}.`;
-      } else if (!featureHelps) {
-        sentence += scheduled ? "On this draw, no fixed choice of the features alone, or of the actions alone, does better."
-          : "On this draw, changing only the features, or only the actions, does no better.";
+      // (the state-aware policy is set against the fixed subsets within its budget, and no action subsets)
+      const byFeature = await rank(aware ? candidates : subsets(n), Fbench, "feature", (set) => [every(set), Abench]);
+      const byAction = aware ? null : await rank(subsets(K), Abench, "action", (set) => [Fbench, every(set)]);
+      if (!aware) {
+        const kept = scheduled ? " every round" : "";       // a fixed subset, against a schedule that changes
+        const featureHelps = byFeature.best.disc < now.disc - 1e-9;
+        if (featureHelps) sentence += `On this draw, showing ${describe(byFeature.best.set, "feature")}${kept} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
+        if (byAction.best.disc < now.disc - 1e-9) {
+          const offer = `ffering ${describe(byAction.best.set, "action")}${kept} instead would cut`;
+          sentence += featureHelps ? `Separately, o${offer} it to ${f2(byAction.best.disc)}.` : `On this draw, o${offer} the discounted regret to ${f2(byAction.best.disc)}.`;
+        } else if (!featureHelps) {
+          sentence += scheduled ? "On this draw, no fixed choice of the features alone, or of the actions alone, does better."
+            : "On this draw, changing only the features, or only the actions, does no better.";
+        }
+        delete byAction.best;
       }
-      delete byFeature.best; delete byAction.best;
       rankings = { features: byFeature, actions: byAction };
     }
+
+    const found = aware ? worked.filter((count) => count > 0).length : 0;
+    if (aware) {
+      // the state-aware policy has its own sentence: how often a subset that works exists, and how the human did
+      const right = now.real.filter((r) => r.reg <= 1e-9).length;       // rounds in which the human picked a best move
+      const most = aware.budget < n ? `at most ${aware.budget} of the ${n} features` : (n > 1 ? `any of the ${n} features` : "the one feature");
+      const rounds = found === T ? `every one of the ${T} rounds` : `${found} of ${T} rounds`;
+      const rest = T - found === 1 ? "one" : String(T - found);
+      sentence = `Showing ${most}, chosen for each round's state, `;
+      if (aware.judge === "truth") {
+        sentence += `the algorithm found a subset on which the true weights rank the best move first in ${rounds}`
+          + (found === T ? "" : `; in the other ${rest} no subset within the budget does, so a random one was shown`)
+          + `. The human picked the best move in ${right} of the ${T} rounds. `;
+      } else if (found === T) {
+        sentence += `the algorithm found a subset that makes the human pick the best move in ${rounds}, so nothing is lost on this draw. `;
+      } else {
+        sentence += `the algorithm found a subset that makes the human pick the best move in ${rounds}. In the other ${rest} no subset within the budget does, so a random one was shown; all of the regret comes from those rounds. `;
+      }
+      if (full) sentence += `The best fixed subset within the budget, ${describe(rankings.features.best.set, "feature")}, costs ${f2(rankings.features.best.disc)} on this draw.`;
+    }
+    if (rankings) delete rankings.features.best;
 
     const changed = (rounds, t) => !same(rounds[t], rounds[t - 1]);
     const changes = [];
     for (let t = 1; t < T; t++) if (changed(Fbench, t) || changed(Abench, t)) changes.push(t);
 
+    const stats = [
+      { label: "Averaged over states", value: f2(now.mean), note: "the same discounted regret, averaged over every state instead of the ones drawn" },
+      { label: `Best move picked at round ${T - 1}`, value: pct(now.acc[T - 1]),
+        note: `of states; ${pct(now.acc[0])} at round 0, heading for ${pct(now.accLimit)} once fully learned` },
+      { label: "Regret per round once learned", value: f2(now.regLimit),
+        note: now.regLimit > 1e-9 ? "on average, the lasting price of what is held back" : "nothing held back matters" },
+      { label: "Against showing everything", value: signed2(now.disc - everything.disc),
+        note: heldBack ? `on this draw; showing and offering everything costs ${f2(everything.disc)}` : "this is the show-everything policy" },
+    ];
+    if (aware) {
+      stats[0] = { label: "Rounds with a subset that works", value: `${found} of ${T}`,
+        note: (aware.judge === "truth" ? "judged by the truth" : "judged by the human's beliefs") + "; "
+          + (found < T ? "a random subset is shown in the rest" : "no round needed the random fallback") };
+      stats[1] = { label: "Averaged over states", value: f2(now.mean),
+        note: "the discounted regret with each round's beliefs, averaged over every state instead of the one drawn" };
+      stats[2] = { label: "States a subset can settle", value: pct(aware.ceiling),
+        note: aware.ceiling > 1 - 1e-9 ? "by the truth, some subset within the budget ranks the best move first in every state"
+          : `by the truth, with at most ${aware.budget} feature${aware.budget > 1 ? "s" : ""}; the rest need a hidden feature, whatever the human believes` };
+    }
+
     return {
       K, n, T, seed, numeral: f2(now.disc), numeral_label: "discounted regret on this draw",
-      sentence: sentence.trim(), rankings, full,
-      stats: [
-        { label: "Averaged over states", value: f2(now.mean), note: "the same discounted regret, averaged over every state instead of the ones drawn" },
-        { label: `Best move picked at round ${T - 1}`, value: pct(now.acc[T - 1]),
-          note: `of states; ${pct(now.acc[0])} at round 0, heading for ${pct(now.accLimit)} once fully learned` },
-        { label: "Regret per round once learned", value: f2(now.regLimit),
-          note: now.regLimit > 1e-9 ? "on average, the lasting price of what is held back" : "nothing held back matters" },
-        { label: "Against showing everything", value: signed2(now.disc - everything.disc),
-          note: heldBack ? `on this draw; showing and offering everything costs ${f2(everything.disc)}` : "this is the show-everything policy" },
-      ],
+      sentence: sentence.trim(), rankings, full, stats,
       // reg, discounted and value_gap are taken at the state drawn in each round; the *_mean series are their
       // averages over all states, and acc is the share of states with the best move
       series: {
@@ -506,6 +679,10 @@
         F: Fbase.map((_, j) => Fbench.map((m) => (m[j] ? 1 : 0))), A: Abase.map((_, k) => Abench.map((m) => (m[k] ? 1 : 0))),
       },
       changes,
+      // the state-aware policy: its budget, how many candidate subsets there are, and how many of them made the
+      // human right in each round (0 means a random one was shown)
+      policy: aware ? { budget: aware.budget, judge: aware.judge, prefer: aware.prefer, candidates: candidates.length, worked,
+        ceiling: aware.ceiling } : null,
       choice: { picks: now.real.map((r) => r.pick + 1), best: now.real.map((r) => r.best + 1), missed: now.real.map((r) => r.reg > 1e-9) },
       acc_limit: now.accLimit, reg_limit: now.regLimit,
       regret_cap: regretCap, value_cap: valueCap,
@@ -659,7 +836,7 @@
         if (v > top) { top = v; sumR = hi - worth[a]; count = 1; pick = a; }
         else if (v === top) { sumR += hi - worth[a]; count++; }
       });
-      return { reg: sumR / count, gap: hi - top, pick, best };
+      return { reg: sumR / count, gap: hi - top, pick, best: sumR / count <= 1e-12 ? pick : best };
     }
 
     // Accuracy, regret and value gap of effective beliefs E (K x 3) on the probe states.

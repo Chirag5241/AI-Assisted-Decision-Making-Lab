@@ -3,7 +3,7 @@
     python build_pages.py
 
 GitHub Pages cannot run the Flask server, so this renders the site's own pages to index.html,
-overview.html, worlds.html, timed.html, correlated.html and experiments.html at the repository root. They load the same
+overview.html, worlds.html, timed.html, aware.html, correlated.html and experiments.html at the repository root. They load the same
 stylesheet and scripts as the Flask site (from webapp/static), so the two look and behave alike.
 Two extra scripts stand in for the server:
 
@@ -23,7 +23,8 @@ from webapp.app import MAX_FEATURES, N_PROBES, app
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "webapp" / "static"
-PAGES = {"/": "index.html", "/overview": "overview.html", "/worlds": "worlds.html", "/timed": "timed.html", "/correlated": "correlated.html",
+PAGES = {"/": "index.html", "/overview": "overview.html", "/worlds": "worlds.html", "/timed": "timed.html", "/aware": "aware.html",
+         "/correlated": "correlated.html",
          "/experiments": "experiments.html"}
 NOTE = "<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->\n"
 

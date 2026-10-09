@@ -1,22 +1,56 @@
-{% extends "base.html" %}
-{# One bench, three pages: "More actions and features" keeps the same subsets every round; "Timed hiding"
-   (timed) adds windows of rounds in which a feature or an action is held back; "State-aware subsets" (aware)
-   lets the algorithm choose the features for each round's state, within a budget. #}
-{% from "_figures.html" import standard_set, own_head, own with context %}
-{% block title %}{{ bench.name }} &middot; {{ site_name }}{% endblock %}
-
-{% block body %}
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>State-aware subsets &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791521091">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
+    </div>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" >Overview</a>
+      <details class="mast-menu">
+        <summary class="current" title="Go to an experiment">State-aware subsets</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" >More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="aware.html" aria-current="page">State-aware subsets</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html"  class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
+    </nav>
+  </header>
+  
 <div class="layout">
   <aside class="rail">
     <form id="setup" class="controls" autocomplete="off">
       <fieldset class="card">
         <legend>The algorithm's choice</legend>
-        {% if aware %}
+        
         <p class="group-label first">Features it may show in a round</p>
         <div class="row">
           <label for="budget"><span class="sym plain">at most C</span></label>
-          <input type="range" id="budget" data-budget min="1" max="{{ max_features }}" step="1">
-          <input type="number" data-budget min="1" max="{{ max_features }}" step="1" aria-label="the most features shown in a round">
+          <input type="range" id="budget" data-budget min="1" max="6" step="1">
+          <input type="number" data-budget min="1" max="6" step="1" aria-label="the most features shown in a round">
         </div>
         <p class="group-label">A subset works if the best move ranks first by</p>
         <div class="segmented two" role="radiogroup" aria-label="Whose weights judge whether a subset works">
@@ -33,34 +67,21 @@
           human picks the best move, so the round has no error. Every action is offered.
           <b>If no subset works, it shows one at random, for now.</b> It tries every subset, which grows
           exponentially with the number of features.</p>
-        {% else %}
-        <p class="group-label first">Features it shows</p>
-        <div class="chips" id="feature-chips"></div>
-        <p class="group-label">Actions it offers</p>
-        <div class="chips" id="action-chips"></div>
-        {% endif %}
-        {% if aware %}{% elif timed %}
-        <p class="group-label">Hidden for a while</p>
-        <div class="windows" id="windows"></div>
-        <div class="actions"><button type="button" id="add-window">Add a window</button></div>
-        <p class="hint error" id="window-problem" role="alert" hidden></p>
-        <p class="hint">A window holds one feature or action back from its first round to its last, both included, and nothing is learned about it meanwhile. Regret is always measured against the best of all actions.</p>
-        {% else %}
-        <p class="hint">The same subsets are shown every round. Regret is always measured against the best of all actions.</p>
-        {% endif %}
+        
+        
       </fieldset>
 
       <fieldset class="card">
         <legend>World size</legend>
         <div class="row">
           <label for="K"><span class="sym plain">actions</span></label>
-          <input type="range" id="K" data-size="K" min="2" max="{{ max_actions }}" step="1">
-          <input type="number" data-size="K" min="2" max="{{ max_actions }}" step="1" aria-label="number of actions">
+          <input type="range" id="K" data-size="K" min="2" max="6" step="1">
+          <input type="number" data-size="K" min="2" max="6" step="1" aria-label="number of actions">
         </div>
         <div class="row">
           <label for="n"><span class="sym plain">features</span></label>
-          <input type="range" id="n" data-size="n" min="1" max="{{ max_features }}" step="1">
-          <input type="number" data-size="n" min="1" max="{{ max_features }}" step="1" aria-label="number of features">
+          <input type="range" id="n" data-size="n" min="1" max="6" step="1">
+          <input type="number" data-size="n" min="1" max="6" step="1" aria-label="number of features">
         </div>
         <p class="hint">Growing the world adds random truth weights and zero beliefs; new features and actions start switched on.</p>
       </fieldset>
@@ -82,9 +103,15 @@
       <fieldset class="card">
         <legend>How the human learns</legend>
         <div class="segmented" role="radiogroup" aria-label="Learning curve">
-          {% for name, spec in curve_specs.items() %}
-          <label><input type="radio" name="curve" value="{{ name }}"><span>{{ spec.label }}</span></label>
-          {% endfor %}
+          
+          <label><input type="radio" name="curve" value="exponential"><span>Exponential</span></label>
+          
+          <label><input type="radio" name="curve" value="hyperbolic"><span>Hyperbolic</span></label>
+          
+          <label><input type="radio" name="curve" value="power law"><span>Power law</span></label>
+          
+          <label><input type="radio" name="curve" value="sigmoid"><span>Sigmoid</span></label>
+          
         </div>
         <div class="row">
           <label for="p1"><span class="sym plain" id="p1-label">rate</span></label>
@@ -100,8 +127,8 @@
         <legend>States <i>x</i><sub>t</sub></legend>
         <div class="row">
           <label for="seed"><span class="sym plain">draw</span></label>
-          <input type="range" id="seed" data-key="seed" min="0" max="{{ max_seed }}" step="1" value="0">
-          <input type="number" data-key="seed" min="0" max="{{ max_seed }}" step="1" value="0" aria-label="which draw of the states">
+          <input type="range" id="seed" data-key="seed" min="0" max="999" step="1" value="0">
+          <input type="number" data-key="seed" min="0" max="999" step="1" value="0" aria-label="which draw of the states">
         </div>
         <div class="actions"><button type="button" id="redraw">Draw new states</button></div>
         <p class="hint">Each round has its own state, drawn from N(0, I). The loss of a round is taken at that state, and everything on this page runs on the same draw. The number picks the draw.</p>
@@ -141,21 +168,98 @@
 
     <section class="tiles" id="tiles"></section>
 
-    {{ standard_set() }}
+    
+<header class="set-head">
+  <h2>Standard figures</h2>
+  <p>The same six on every bench, under the same numbers. <a href="overview.html#figures">How to read them</a></p>
+</header>
+<section class="figs one">
 
-    {% if aware %}
-    {{ own_head() }}
+
+<figure id="std-schedule">
+  <figcaption><b><a href="overview.html#fig-1" title="How to read this figure">Fig. 1</a></b>What the algorithm shows and offers, round by round<span class="cap-note">Chosen afresh for each round's state: the top-ranked subset on which the best move ranks first, or a random one. Every action is offered.</span></figcaption>
+  
+  <div class="legend"><span><i class="on-key"></i>shown or offered</span><span><i class="off-key"></i>held back</span></div>
+  <div class="chart" id="fig-schedule"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-beliefs">
+  <figcaption><b><a href="overview.html#fig-2" title="How to read this figure">Fig. 2</a></b>What the human believes: each action's weight on each feature<span class="cap-note">These depend on the draw: what is shown, and so what is learned, follows the states.</span></figcaption>
+  
+  <div class="legend" id="beliefs-legend"></div>
+  <div class="belief-grid" id="fig-beliefs" data-fig="2"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-choice">
+  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, at the state drawn each round<span class="cap-note">Judged by the human's weights, the two differ only in the rounds where no subset within the budget works.</span></figcaption>
+  
+  <div class="chart" id="fig-choice"></div>
+  
+</figure>
+
+</section>
+<section class="figs">
+
+
+<figure id="std-regret">
+  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, at the state drawn for it</figcaption>
+  
+  <div class="chart" id="fig-regret"></div>
+  
+</figure>
+
+
+
+
+<figure id="std-value">
+  <figcaption><b><a href="overview.html#fig-5" title="How to read this figure">Fig. 5</a></b>Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+  
+  <div class="chart" id="fig-value"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-accuracy">
+  <figcaption><b><a href="overview.html#fig-6" title="How to read this figure">Fig. 6</a></b>How often the human picks the best move<span class="cap-note">Here: the share of states in which the human picks the best move from the subset the algorithm would show there. The dashed level is the ceiling the budget sets.</span></figcaption>
+  
+  <div class="chart" id="fig-accuracy"></div>
+  
+</figure>
+
+</section>
+
+
+    
+    
+<header class="set-head">
+  <h2>Only on this bench</h2>
+  <p>Figures this experiment needs and the others do not.</p>
+</header>
+
     <section class="figs one">
       <figure>
-        {{ own(1) }}
+        <figcaption><b>Fig. 7</b>How many of the candidate subsets work, round by round</figcaption>
         <div class="chart" id="fig-worked"></div>
       </figure>
     </section>
-    {% endif %}
+    
 
-    <section class="rankings{% if aware %} one-table{% endif %}">
+    <section class="rankings one-table">
       <div>
-        <h2 class="section-title">{{ "Against a fixed subset" if aware else "Which features should it show?" }}</h2>
+        <h2 class="section-title">Against a fixed subset</h2>
         <p class="section-sub" id="ranking-features-sub"></p>
         <div class="table-scroll"><table class="ranking">
           <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th><th scope="col" class="num">Discounted regret, this draw</th>
@@ -163,17 +267,7 @@
           <tbody id="ranking-features"></tbody>
         </table></div>
       </div>
-      {% if not aware %}
-      <div>
-        <h2 class="section-title">Which actions should it offer?</h2>
-        <p class="section-sub" id="ranking-actions-sub"></p>
-        <div class="table-scroll"><table class="ranking">
-          <thead><tr><th scope="col">Rank</th><th scope="col">Actions offered</th><th scope="col" class="num">Discounted regret, this draw</th>
-            <th scope="col" class="num">Averaged over states</th><th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
-          <tbody id="ranking-actions"></tbody>
-        </table></div>
-      </div>
-      {% endif %}
+      
     </section>
   </main>
 </div>
@@ -181,23 +275,13 @@
 <footer class="reading">
   <div class="reading-lead">
     <h2>Reading this bench</h2>
-    {% if aware %}
+    
     <p class="callout"><mark>The algorithm shows the features from which the human gets this state right. Where the budget leaves none, no learning makes up for it.</mark></p>
     <p class="callout-sub">Each round it looks for a subset of at most C features from which the human, with the
       beliefs they hold now, picks the best move, and shows the top-ranked one. So the human's choice in Fig. 3 is
       wrong only in the rounds where no such subset exists. Some states cannot be settled by any C features even by
       the truth: there a hidden feature is needed, and that share is a ceiling no belief can lift.</p>
-    {% elif timed %}
-    <p class="callout"><mark>Holding something back for a while pauses what the human learns about it. It does not undo it.</mark></p>
-    <p class="callout-sub">Inside a window the feature or action is out of play: the human decides without it and its
-      weights stop moving. When it comes back, each weight carries on from where it stopped. The tables set the
-      schedule on the bench against every fixed subset under the proposal's objective, the discounted regret.</p>
-    {% else %}
-    <p class="callout"><mark>Hiding what the human misjudges trades early mistakes for a loss that never goes away.</mark></p>
-    <p class="callout-sub">Showing a misjudged feature costs regret now but lets the human learn it. The tables rank every
-      subset by the proposal's objective, the discounted regret, so you can see which side of that trade wins for this
-      world, learner and discount.</p>
-    {% endif %}
+    
   </div>
   <div class="reading-body notes">
     <p>Each round has its own state <span class="math">x<sub>t</sub> ~ N(0, I)</span>, and the regret of the round is
@@ -207,7 +291,7 @@
     <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
       state. The grey in the figures, the bar at the top and the &ldquo;averaged over states&rdquo; numbers therefore
       score each round over 2,000 probe states drawn from <span class="math">N(0, I)</span>.</p>
-    {% if aware %}
+    
     <p>A subset F works in round t when the best move
       <span class="math">a = argmax<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub></span> ranks first on the shown features alone:</p>
     <p class="formula">&Sigma;<sub>i &isin; F</sub> w<sub>ai</sub> x<sub>i</sub> &gt; &Sigma;<sub>i &isin; F</sub> w<sub>ki</sub> x<sub>i</sub>&ensp;for every k &ne; a,&emsp;|F| &le; C</p>
@@ -242,30 +326,8 @@
     <p>The table sets the policy against every fixed subset within the same budget, each kept every round, on the
       same draw. &ldquo;Averaged over states&rdquo; for the policy scores it afresh in each round with that round's
       beliefs: for every probe state it finds the subset the policy would show and lets the human choose from it.</p>
-    {% else %}
-    <p>Actions work like features: dropping one the human misjudges removes those mistakes, but it can never be picked
-      when it is the best move, and it is never learned.</p>
-    {% endif %}
-    {% if aware %}{% elif timed %}
-    <p>A window names one feature or one action, a first round and a last round. Windows may overlap, and one that runs
-      past the horizon is cut off there. Every round must still show at least one feature and offer at least one
-      action. The chips above the windows switch a feature or an action off for every round.</p>
-    <p>Each table runs every fixed subset, kept every round. The first varies the features and keeps the actions as
-      scheduled on the bench; the second varies the actions and keeps the features as scheduled. When the bench's own
-      windows change that family over the rounds, the bench is ranked as an extra row. Click a subset to put it on the
-      bench in place of that family's windows.</p>
-    <p>Fig. 2 is the one-feature beliefs chart, once per feature: each line is one action's weight on that feature,
-      heading for its dashed truth. A line is faded and flat across the rounds in which its feature is hidden or its
-      action is not offered: nothing is learned about that weight then.</p>
-    <p>Dotted vertical rules mark the rounds at which what is shown or offered changes. &ldquo;Once fully learned&rdquo;
-      takes the last round's choice and keeps it up until every weight in use has reached the truth.</p>
-    {% else %}
-    <p>Each table runs every subset as a fixed policy. The first varies the features and keeps the chosen actions; the
-      second varies the actions and keeps the chosen features. Click a row to put that subset on the bench.</p>
-    <p>Fig. 2 is the one-feature beliefs chart, once per feature: each line is one action's weight on that feature,
-      heading for its dashed truth. Faded lines belong to a hidden feature or an action that is not offered: that weight
-      is never learned, so its line stays flat at the first belief.</p>
-    {% endif %}
+    
+    
     <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span> at
       each round's state: above zero the human expects too little from their pick, below zero too much.</p>
     <p>Fig. 3 follows the drawn states: the action the human picks at <span class="math">x<sub>t</sub></span> against the
@@ -278,14 +340,30 @@
 </footer>
 
 <script>
-  window.CURVE_SPECS = {{ curve_specs|tojson }};
-  window.DEFAULT_WORLD = {{ default_world|tojson }};
-  window.BENCH_MODE = {{ mode|tojson }};
-  window.MAX_WINDOWS = {{ max_windows }};
+  window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
+  window.DEFAULT_WORLD = {"A": [1, 1, 1], "C": 2, "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "curve": "exponential", "delta": 0.95, "judge": "belief", "p1": 0.05, "prefer": "margin"};
+  window.BENCH_MODE = "aware";
+  window.MAX_WINDOWS = 12;
 </script>
-<script src="{{ static_v('charts.js') }}"></script>
-<script src="{{ static_v('figures.js') }}"></script>
-<script src="{{ static_v('matrix.js') }}"></script>
-<script src="{{ static_v('speeds.js') }}"></script>
-<script src="{{ static_v('worlds.js') }}"></script>
-{% endblock %}
+<script src="webapp/static/charts.js?v=1791521077"></script>
+<script src="webapp/static/figures.js?v=1791524128"></script>
+<script src="webapp/static/matrix.js?v=1791365885"></script>
+<script src="webapp/static/speeds.js?v=1791492951"></script>
+<script src="webapp/static/probes.js?v=1791525307"></script>
+<script src="webapp/static/static-api.js?v=1791523695"></script>
+<script src="webapp/static/worlds.js?v=1791523744"></script>
+
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
+</body>
+</html>

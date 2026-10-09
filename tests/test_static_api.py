@@ -43,6 +43,23 @@ QUERIES = [
     + "&H=" + ";".join(",".join("0" for _ in range(6)) for _ in range(6)) + "&W=f2:3-9;a5:0-20&T=30&seed=123&rank=0",
     "/api/correlated?K=4&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0;0,0,2&H=0,0,0;0,0,0;0,0,0;0,0,0"
     "&rho=-0.5,0.3,0.4&k=1&explore=9&C=0,1,0&curve=power%20law&p1=0.5&T=50&delta=0.9&seed=77",
+    # the state-aware policy: for each round's state, a feature subset within the budget that makes the human right
+    f"/api/world?{W}&policy=aware&C=2&curve=exponential&p1=0.05&T=100&delta=0.95",
+    f"/api/world?{W}&policy=aware&C=1&judge=belief&prefer=most&curve=sigmoid&p1=20&T=60&delta=0.9&seed=5",
+    f"/api/world?{W}&policy=aware&C=2&judge=truth&T=80&seed=11",
+    f"/api/world?{W}&policy=aware&C=2&judge=truth&prefer=most&T=80&seed=12",
+    f"/api/world?{W}&policy=aware&C=3&prefer=most&T=80&seed=13",
+    "/api/world?K=3&n=3&U=1.1,1,0;1,1,0;0,0,1&H=0,0,1;1,1,0;1,0,0&policy=aware&C=1&p1=0.3&T=140",
+    "/api/world?K=3&n=3&U=1.1,1,0;1,1,0;0,0,1&H=0,0,1;1,1,0;1,0,0&policy=aware&C=1&judge=truth&p1=0.3&T=140",
+    f"/api/world?{W}&policy=aware&C=3&ps=0.02,0.1,0.4&T=40&seed=9&rank=0",
+    f"/api/world?{W}&policy=aware&C=9&F=1,0,0&A=1,0,0&W=f1:0-5&T=30",        # the budget is capped; F, A and W do not apply
+    "/api/world?K=4&n=2&U=1,2;-1,0.5;0,0;2,-2&H=0,0;0,0;0,0;0,0&policy=aware&C=1&T=40&seed=3",   # blank beliefs: nothing works at first
+    "/api/world?K=5&n=5&U=" + ";".join(",".join(str(((i * j) % 5 - 2) / 2) for j in range(5)) for i in range(5))
+    + "&H=" + ";".join(",".join(str(((i + 2 * j) % 4 - 1.5) / 2) for j in range(5)) for i in range(5)) + "&policy=aware&C=3&T=50&seed=21",
+    # two moves that are equally good everywhere: either is correct, here and in the state-aware search
+    "/api/world?K=3&n=3&U=1,1,0;1,1,0;0,0,1&H=1,0.5,1.5;0,1,0;-0.5,0,-1.5&policy=aware&C=2&T=120&seed=2",
+    "/api/world?K=3&n=3&U=1,1,0;1,1,0;0,0,1&H=0,0,0;0,0,0;0,0,0&F=1,1,0&T=40&seed=2&rank=0",
+    "/api/run?u1=1&u2=1&h1=0.5&h2=2&curve=exponential&p1=0.1&T=30&seed=3",
     # a learning speed for each feature
     f"/api/world?{W}&ps=0.02,0.1,0.4&curve=exponential&T=100&delta=0.95",
     f"/api/world?{W}&F=1,0,1&ps=30,8,15&W=f3:10-19;a2:5-30&curve=sigmoid&T=80&delta=0.9",
