@@ -271,16 +271,68 @@ def test_timed_page_and_the_page_menu(client):
     assert 'id="add-window"' not in plain and 'window.BENCH_MODE = "fixed"' in plain
     # every page offers the Overview and every experiment, and the menu names the experiment you are on
     for path, name in (("/", "1 feature, 2 actions"), ("/worlds", "More actions and features"), ("/timed", "Timed hiding"),
+                       ("/two-actions", "The two-action problem"),
+                       ("/losses", "Alternatives to the regret loss"),
                        ("/aware", "State-aware subsets"), ("/correlated", "Correlated features"),
                        ("/experiments", "Experiment 1 figures")):
         html = client.get(path).data.decode()
         assert f'<summary class="current" title="Go to an experiment">{name}</summary>' in html
         assert f'<a href="{path}" aria-current="page"' in html and '<a href="/overview" >Overview</a>' in html
-        for other in ("/", "/worlds", "/timed", "/aware", "/correlated", "/experiments"):
+        for other in ("/", "/worlds", "/timed", "/two-actions", "/losses", "/aware", "/correlated", "/experiments"):
             assert f'<a href="{other}" ' in html
+        # the problem written out, and the study of its loss, sit in the menu just before the bench that runs it
+        assert (html.index('<a href="/timed" ') < html.index('<a href="/two-actions" ')
+                < html.index('<a href="/losses" ') < html.index('<a href="/aware" '))
     overview = client.get("/overview").data.decode()
     assert '<a href="/overview" aria-current="page">Overview</a>' in overview
     assert '<summary  title="Go to an experiment">Experiments</summary>' in overview
+
+
+def test_the_losses_page_simulates_six_losses_and_ranks_the_policies_by_each(client):
+    import numpy as np
+    from simlab import analysis
+    from webapp import guide
+    from simlab import draws
+    from webapp.app import DEFAULT_AWARE, LOSS_DRAWS, _loss_study
+    html = client.get("/losses").data.decode()
+    for part in ('id="losses"', 'id="margin"', 'id="rounds"', 'id="ranking"', 'id="fig-margin"', 'id="fig-rounds"',
+                 "window.LOSS_STUDY = ", "/static/losses.js", "Jiang\n      et al. (2014)"):
+        assert part in html, part
+    assert html.count("<figure") == 2 and html.count("<table") == 2
+    # it draws none of the standard figures, so it is not a bench; the Overview names it once, under them
+    assert all(b["endpoint"] != "losses_page" for b in guide.BENCHES)
+    assert client.get("/overview").data.decode().count('<a href="/losses">Alternatives to the regret loss</a>') == 1
+
+    study = _loss_study()
+    keys = [loss["key"] for loss in study["losses"]]
+    assert keys == ["regret", "wrong", "pairs", "ranked", "noisy", "log"]
+    assert [p["shown"] for p in study["policies"]] == [[1], [2], [3], [1, 2], [1, 3], [2, 3], [1, 2, 3], None]
+    U, H0 = np.array(DEFAULT_AWARE["U"]), np.array(DEFAULT_AWARE["H"])
+    first = draws.states(0, LOSS_DRAWS * study["T"], 3).reshape(LOSS_DRAWS, study["T"], 3)[:, 0]    # each run's first state
+    weight = study["delta"] ** np.arange(study["T"])
+    for policy in study["policies"]:
+        for loss in study["losses"]:
+            series = np.array(policy["series"][loss["key"]])
+            # every line stays on its panel's axis, which is the same for every policy
+            assert len(series) == study["T"] and series.min() >= 0 and series.max() <= loss["top"], (policy["shown"], loss["key"])
+            assert abs(series @ weight - policy["total"][loss["key"]]) < 0.01
+        if policy["shown"]:
+            # a fixed subset's first round is the bench's own accuracy and regret at the first beliefs, on the same states
+            acc, regret = analysis.evaluate(H0, U, first, F=np.isin(np.arange(1, 4), policy["shown"]))
+            assert abs(policy["series"]["wrong"][0] - (1 - acc)) < 1e-4 and abs(policy["series"]["regret"][0] - regret) < 1e-4
+    for key in keys:
+        assert sorted(p["rank"][key] for p in study["policies"]) == list(range(1, 9))
+    # the finding the page states: the pick-based losses put State-aware first, the other three put {x1, x2} first
+    assert study["winners"] == [dict(shown=None, losses=["Regret", "Wrong pick", "Pairs out of order"]),
+                                dict(shown=[1, 2], losses=["Ranked regret", "Noisy regret", "Log loss"])]
+    aware, both = study["policies"][-1], study["policies"][3]
+    assert sum(aware["series"]["wrong"]) < sum(both["series"]["wrong"])        # the top pick is right more often
+    assert html.count('class="num best"') == 6
+    # against the margin: with two actions the first four are one step, and the noisy two are smooth
+    margin = study["margin"]["series"]
+    assert margin["regret"] == margin["wrong"] == margin["pairs"] and margin["regret"][0] == 1 and margin["regret"][-1] == 0
+    assert margin["ranked"][:60] == margin["regret"][:60] and margin["ranked"][61:] == margin["regret"][61:]
+    assert all(a > b for a, b in zip(margin["noisy"], margin["noisy"][1:])) and max(margin["log"]) <= study["margin"]["top"]
 
 
 def test_each_feature_can_have_its_own_learning_speed(client):
@@ -516,3 +568,26 @@ def test_state_aware_policy_judged_by_the_truth_shows_the_widest_margin_and_has_
     # the page says how the search scales and what the fallback is
     page = client.get("/aware").data.decode()
     assert "The search is exponential." in page and "hitting-set" in page and 'name="judge"' in page
+
+
+def test_the_two_action_problem_is_written_out_before_the_bench_that_runs_it(client):
+    from urllib.parse import parse_qs, urlsplit
+    from webapp import guide
+    html = client.get("/two-actions").data.decode()
+    # a page of text and formulas: every part of the note, and none of a bench's figures or scripts
+    for part in ('id="setup"', 'id="correct"', 'id="search"', 'id="loss"', 'id="questions"', "By brute force",
+                 "monotonic non-increasing", "the most\n        diverted features"):
+        assert part in html, part
+    assert "<figure" not in html and "<script src" not in html
+    # it is not a bench, so the Overview keeps it out of the figure lists and names it under them
+    assert all(b["endpoint"] != "two_actions" for b in guide.BENCHES)
+    overview = client.get("/overview").data.decode()
+    assert overview.count('<a href="/two-actions">The two-action problem</a>') == 1
+    assert '<a href="/two-actions">The two-action problem</a>' in client.get("/aware").data.decode()
+    # its link opens a two-action world on the bench, in which some rounds have no subset that works
+    link = html.split('" class="go"')[0].rsplit('<a href="', 1)[1].replace("&amp;", "&")
+    world = parse_qs(urlsplit(link).query)
+    assert urlsplit(link).path == "/aware" and world["U"] == ["1,0.5,0;0,1,0.5"] and world["H"] == ["1,0.5,1.5;0,1,0"]
+    data = client.get("/api/world?K=2&n=3&policy=aware&rank=0&" + urlsplit(link).query).get_json()
+    assert data["K"] == 2 and data["policy"]["budget"] == 2 and data["policy"]["judge"] == "belief"
+    assert 0 < sum(count == 0 for count in data["policy"]["worked"]) < data["T"]

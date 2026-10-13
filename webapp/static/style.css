@@ -740,13 +740,16 @@ pre {
 .sigma-det.error { color: #b3261e; }
 .segmented.two { grid-template-columns: 1fr 1fr; }
 .segmented.two label span { border-bottom-width: 0 !important; }
+.segmented.three { grid-template-columns: repeat(3, 1fr); }
+.segmented.three label span { border-bottom-width: 0 !important; border-right-width: 1px; }
+.segmented.three label:last-child span { border-right-width: 0; }
 .chips .chip:disabled { opacity: 0.35; cursor: not-allowed; }
 .rankings.one-table { grid-template-columns: minmax(0, 1fr); }
 #fig-sweep { transition: opacity 0.18s ease; }
 #fig-sweep.stale { opacity: 0.45; }
 /* one line per committed subset in Fig. 7, dashed when smaller than the budget; the one on the bench is ink */
 .c-s0 { stroke: #0d366b; } .c-s1 { stroke: #3987e5; } .c-s2 { stroke: #9ec5f4; }
-.c-s3 { stroke: #6da7ec; } .c-s4 { stroke: #eb6834; } .c-s5 { stroke: #a3a29b; }
+.c-s3 { stroke: #6da7ec; } .c-s4 { stroke: #eb6834; } .c-s5 { stroke: #a3a29b; } .c-s6 { stroke: #1baf7a; }
 .bg-s0 { background: #0d366b; } .bg-s1 { background: #3987e5; } .bg-s2 { background: #9ec5f4; }
 .bg-s3 { background: #6da7ec; } .bg-s4 { background: #eb6834; } .bg-s5 { background: #a3a29b; }
 
@@ -785,8 +788,8 @@ pre {
 .set-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin-top: 34px; padding-top: 14px; border-top: 2px solid var(--ink); }
 .set-head h2 { margin: 0; font: 600 24px/1.15 var(--display); letter-spacing: -0.01em; }
 .set-head p { margin: 0; color: var(--ink-2); }
-.set-head a, .guide a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.set-head a:hover, .guide a:hover { text-decoration-thickness: 2px; }
+.set-head a, .guide a, .reading a { color: var(--ink); text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.set-head a:hover, .guide a:hover, .reading a:hover { text-decoration-thickness: 2px; }
 .set-head + .figs { padding-top: 18px; }
 figcaption b a { color: inherit; text-decoration: none; border-bottom: 1px solid var(--rule-strong); }
 figcaption b a:hover { color: var(--ink); border-bottom-color: var(--ink); }
@@ -857,6 +860,62 @@ figure.absent figcaption { color: var(--ink-2); }
 .guide-table td.own { min-width: 260px; white-space: normal; font: 400 14.5px/1.4 var(--body); color: var(--ink-2); }
 .guide-table ol { margin: 0; padding-left: 1.6em; }
 .guide-table li::marker { font: 500 12px var(--mono); }
+.problem-list { max-width: 46em; margin: 22px 0 0; }
+.problem-list div { padding: 10px 0; border-top: 1px solid var(--rule-strong); }
+.problem-list dt { font: 600 17px/1.25 var(--display); }
+.problem-list dd { margin: 3px 0 0; font-size: 14.5px; line-height: 1.4; color: var(--ink-2); }
+
+/* ---------- a problem written out: each formula beside its reading, no figures ---------- */
+
+.problem .eq { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.problem .math, .problem h4 i { color: var(--ink); font-style: italic; white-space: nowrap; }
+.problem .formula { overflow-x: auto; overflow-y: hidden; }
+.nw { white-space: nowrap; }
+.problem .math.wrap { white-space: normal; }
+/* script letters for the algorithm and the human, as in the proposal */
+.cal { font-family: "STIX Two Math", "Cambria Math", "Noto Sans Math", serif; font-style: normal; }
+/* a superscript set over a subscript: h with (t) above and a,i below */
+.ss { display: inline-flex; flex-direction: column; margin: 0 2px 0 1px; vertical-align: middle; font-size: 0.68em; line-height: 1.2; text-align: left; }
+/* a letter under a bar: the other action */
+.ob { display: inline-block; padding-right: 0.06em; line-height: 0.78; border-top: 0.09em solid currentColor; }
+/* a bracketed column: a vector, or a matrix written row by row */
+.mat { position: relative; display: inline-grid; gap: 3px; margin: 0 5px; padding: 5px 11px; vertical-align: middle; line-height: 1.3; text-align: center; }
+.mat::before, .mat::after { content: ""; position: absolute; top: 0; bottom: 0; width: 6px; border: 1.5px solid var(--ink); }
+.mat::before { left: 0; border-right: 0; }
+.mat::after { right: 0; border-left: 0; }
+/* n over k in round brackets */
+.binom { display: inline-grid; padding: 0 6px; vertical-align: middle; font-size: 0.86em; line-height: 1.12; text-align: center; border: solid var(--ink); border-width: 0 1.5px; border-radius: 9px / 50%; }
+/* a square root: the bar runs over what is under it */
+.root { display: inline-flex; align-items: stretch; margin: 0 3px; vertical-align: middle; }
+.root svg { flex: none; width: 0.62em; height: auto; overflow: visible; fill: none; stroke: var(--ink); stroke-width: 1.5px; stroke-linejoin: round; }
+.root path { vector-effect: non-scaling-stroke; }
+.root > span { padding: 4px 4px 1px 3px; border-top: 1.5px solid var(--ink); }
+.trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 48px; margin-top: 16px; }
+.trio > div { display: grid; grid-template-rows: auto 1fr; }
+.trio .formula { display: flex; align-items: center; justify-content: center; gap: 0.3em; margin: 10px 0 0; padding: 18px 0; }
+.questions { max-width: 40em; margin: 12px 0 0; padding: 0; list-style: none; counter-reset: question; }
+.questions li { position: relative; padding: 14px 0 14px 46px; font: 500 21px/1.35 var(--display); border-bottom: 1px solid var(--rule-strong); text-wrap: pretty; counter-increment: question; }
+.questions li::before { content: "Q" counter(question); position: absolute; left: 0; top: 21px; font: 500 11px/1 var(--mono); letter-spacing: 0.08em; color: var(--ink-2); }
+.for-now { max-width: 46em; margin-top: 30px; }
+.for-now p { margin: 8px 0 0; color: var(--ink-2); text-wrap: pretty; }
+.for-now p + p { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 18px; }
+.guide a.go { flex: none; padding: 11px 18px; font: 500 13px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; border: 1px solid var(--ink); border-radius: 999px; }
+.guide a.go:hover { color: var(--paper); background: var(--ink); }
+.go-note { flex: 1 1 18em; font-size: 15.5px; line-height: 1.4; }
+/* a table on a written-out page: the row's name in the text face, numbers set to the right */
+.problem .guide-table tbody th { min-width: 0; font: 500 16px/1.4 var(--body); white-space: nowrap; }
+.problem .guide-table tbody th span { display: inline; margin: 0; font: inherit; color: inherit; }
+.problem .guide-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+.problem .guide-table { max-width: 62em; }
+.loss-list td { white-space: normal; font: 400 15.5px/1.45 var(--body); color: var(--ink-2); }
+.loss-list td.formula-cell { padding-right: 28px; font: italic 500 17px/1.4 var(--display); color: var(--ink); white-space: nowrap; }
+/* a loss's total with the rank it gives the policy; the policy a loss ranks first is marked */
+.loss-ranks .rank { display: inline-block; min-width: 1.6em; margin-left: 8px; color: var(--ink-2); }
+.loss-ranks .rank::before { content: "#"; }
+.loss-ranks td.best { font-weight: 500; background: linear-gradient(transparent 58%, var(--mark) 58%) no-repeat right 0 top 0 / 6.2em 100%; }
+.loss-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 28px; margin-top: 8px; }
+.chart.narrow { max-width: 640px; }
+.guide figure figcaption { margin-top: 10px; }
 
 ::selection { background: var(--mark); color: var(--ink); }
 
@@ -869,8 +928,14 @@ figure.absent figcaption { color: var(--ink-2); }
   .map { grid-template-columns: minmax(0, 1fr); }
   .rankings { grid-template-columns: minmax(0, 1fr); gap: 30px; }
   .belief-grid { grid-template-columns: minmax(0, 1fr); }
-  .scatter-grid, .effective { grid-template-columns: minmax(0, 1fr); }
-  .loop, .eq, .specimen.half { grid-template-columns: minmax(0, 1fr); }
+  .scatter-grid, .effective, .loss-grid { grid-template-columns: minmax(0, 1fr); }
+  /* the list of losses stacks: name, formula, then what it counts */
+  .loss-list thead { display: none; }
+  .loss-list, .loss-list tbody, .loss-list tr, .loss-list th, .loss-list td { display: block; }
+  .loss-list tr { padding: 10px 0; border-bottom: 1px solid var(--rule-strong); }
+  .loss-list th, .loss-list td { padding: 2px 0; border: 0; }
+  .loss-list td.formula-cell { white-space: normal; }
+  .loop, .eq, .problem .eq, .trio, .specimen.half { grid-template-columns: minmax(0, 1fr); }
   .eq-text, .eq-meta { grid-column: 1; }
   .reading-notes { grid-template-columns: minmax(0, 1fr); }
 }
@@ -886,6 +951,8 @@ figure.absent figcaption { color: var(--ink-2); }
   .guide { padding: 26px 16px 60px; }
   .guide-head h2 { font-size: 34px; }
   .guide .lead { font-size: 18px; }
+  .problem .formula { font-size: 17px; }
+  .questions li { font-size: 19px; }
   .verdict { grid-template-columns: minmax(0, 1fr); gap: 16px; }
   .numeral { font-size: 92px; }
   .numeral.word { font-size: 72px; }

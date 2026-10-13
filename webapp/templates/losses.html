@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{# Alternatives to the regret loss, after Jiang et al. (2014): six losses of a round, simulated on the default
+   world (webapp/app.py, _loss_study). Python computes every number; webapp/static/losses.js draws them. #}
+{% block title %}{{ current.name }} &middot; {{ site_name }}{% endblock %}
+
+{% macro eq_ref(id) %}<a href="{{ url_for('overview') }}#eq-{{ id }}">Eq. {{ equation[id].n }}</a>{% endmacro %}
+{% macro policy(shown) -%}
+{% if shown %}<span class="math">{ {%- for i in shown %}x<sub>{{ i }}</sub>{% if not loop.last %}, {% endif %}{% endfor -%} }</span>
+{%- else %}<a href="{{ url_for('aware') }}">State-aware</a>{% endif %}
+{%- endmacro %}
+
+{% block body %}
+<main class="guide problem">
+  <header class="guide-head">
+    <h2>Alternatives to the regret loss</h2>
+    <p class="lead">Six ways to score a round, run on the three-action world.
+      <a href="https://papers.nips.cc/paper_files/paper/2014/file/dd3ca198a5dc590a040db5ade5b8503f-Paper.pdf">Jiang
+      et al. (2014)</a> score an agent on how it ranks the actions and model its noise; four of the six come from
+      there.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#losses">The losses</a><a href="#margin">Against the margin</a><a href="#rounds">Round by round</a>
+      <a href="#ranking">Which policy each prefers</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="losses">
+    <h3>The losses</h3>
+    <p class="section-sub"><span class="math">&theta; = Ux</span> is what the actions are worth,
+      <span class="math">s</span> the human's scores on the shown features, <span class="math">&ycirc;</span> their
+      pick and <span class="math">y*</span> the best move. <span class="math">&tau; = {{ study.tau|int }}</span>, the
+      paper's scale.</p>
+    <div class="table-scroll"><table class="guide-table loss-list">
+      <thead><tr><th scope="col">Loss</th><th scope="col">Of one round</th><th scope="col">What it counts</th></tr></thead>
+      <tbody>
+        {% for loss in study.losses %}
+        <tr><th scope="row">{{ loss.name }}</th><td class="formula-cell">{{ loss.formula|safe }}</td>
+          <td>{{ loss.text|safe }}{% if loss.key == "regret" %} {{ eq_ref("regret") }}.{% endif %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+  </section>
+
+  <section class="guide-section" id="margin">
+    <h3>Against the margin</h3>
+    <figure>
+      <figcaption><b>Fig. 1</b>Each loss against the human's margin for the best move
+        <span class="cap-note">Two actions, the best worth 1 more. Left of zero the human picks the wrong one. With two
+          actions the first four losses are the same step.</span></figcaption>
+      <div class="chart narrow" id="fig-margin"></div>
+    </figure>
+  </section>
+
+  <section class="guide-section" id="rounds">
+    <h3>Round by round</h3>
+    <figure>
+      <figcaption><b>Fig. 2</b>Each loss over {{ study.T }} rounds, averaged over {{ "{:,}".format(study.draws) }} runs
+        <span class="cap-note">Three actions, three features, a human who has feature 3 backwards and learns what is
+          shown. Four of the eight policies are drawn.</span></figcaption>
+      <div class="legend" id="rounds-legend"></div>
+      <div class="loss-grid" id="fig-rounds"></div>
+    </figure>
+  </section>
+
+  <section class="guide-section" id="ranking">
+    <h3>Which policy each prefers</h3>
+    <p class="section-sub">Each loss summed over the rounds with &delta; = {{ study.delta }}, and the rank it gives each
+      policy: every feature subset kept every round, and State-aware subsets with at most {{ study.budget }} shown.</p>
+    <div class="table-scroll"><table class="guide-table loss-ranks">
+      <thead><tr><th scope="col">Shown</th>{% for loss in study.losses %}<th scope="col" class="num">{{ loss.name }}</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for row in study.policies|sort(attribute="total.regret") %}
+        <tr><th scope="row">{{ policy(row.shown) }}</th>
+          {% for loss in study.losses %}
+          <td class="num{% if row.rank[loss.key] == 1 %} best{% endif %}">{{ "%.2f"|format(row.total[loss.key]) }}<span class="rank">{{ row.rank[loss.key] }}</span></td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table></div>
+    <ul class="conventions">
+      {% for group in study.winners %}
+      <li><b>{{ group.losses|join(", ") }}</b> put {{ policy(group.shown) }} first.</li>
+      {% endfor %}
+      <li>State-aware gets the top pick right most often. The losses that prefer
+        <span class="math">{x<sub>1</sub>, x<sub>2</sub>}</span> also charge for what sits below the top of the
+        ranking, or for a noisy pick.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+  window.LOSS_STUDY = {{ study|tojson }};
+</script>
+<script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('losses.js') }}"></script>
+{% endblock %}

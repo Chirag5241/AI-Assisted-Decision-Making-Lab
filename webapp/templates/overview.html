@@ -138,6 +138,12 @@
         {% endfor %}
       </tbody>
     </table></div>
+    {# the pages that set a problem out and draw nothing (guide.NOTES) #}
+    <dl class="problem-list">
+      {% for note in notes %}
+      <div><dt><a href="{{ url_for(note.endpoint) }}">{{ note.name }}</a></dt><dd>{{ note.summary }}</dd></div>
+      {% endfor %}
+    </dl>
   </section>
 </main>
 

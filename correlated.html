@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791521091">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
 </head>
 <body>
   <header class="mast">
@@ -30,6 +30,10 @@
           
           <a href="timed.html" >Timed hiding</a>
           
+          <a href="two-actions.html" >The two-action problem</a>
+          
+          <a href="losses.html" >Alternatives to the regret loss</a>
+          
           <a href="aware.html" >State-aware subsets</a>
           
           <a href="correlated.html" aria-current="page">Correlated features</a>
@@ -46,9 +50,10 @@
       <fieldset class="card">
         <legend>The algorithm's policy</legend>
         <p class="group-label first">Budget: features shown per round</p>
-        <div class="segmented two" role="radiogroup" aria-label="Budget k">
+        <div class="segmented three" role="radiogroup" aria-label="Budget k">
           <label><input type="radio" name="k" value="1"><span>k = 1</span></label>
           <label><input type="radio" name="k" value="2"><span>k = 2</span></label>
+          <label><input type="radio" name="k" value="3"><span>k = 3</span></label>
         </div>
         <p class="group-label">Explore first</p>
         <div class="row">
@@ -314,6 +319,8 @@
     <p>As in the paper, a weight is learned only on the rounds its feature is shown. A filled-in value never corrects
       the belief about that feature, so a misjudged hidden feature keeps pulling the choice the wrong way. With
       independent features it would be filled in as zero and simply drop out.</p>
+    <p>The budget k is 1, 2 or all 3 features. With k = 3 nothing has to be hidden: exploring shows every feature
+      every round, and committing to all three is the show-everything policy.</p>
     <p>Exploring rotates through every subset of the budgeted size, so each feature is shown equally often. Then the
       algorithm commits to one subset for good. Exploring 0 rounds is the fixed-subset policy of Noti et al.</p>
     <p>The ranking runs every fixed subset and every explore-then-commit policy whose exploration is a whole number
@@ -333,13 +340,13 @@
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.DEFAULT_WORLD = {"C": [1, 1, 0], "H": [[-1.5, -1.0, 1.5], [-0.5, 0.5, 1.5], [1.5, -1.5, -0.5]], "T": 120, "U": [[-1.5, 0.5, 0.0], [0.5, 1.5, -1.0], [1.0, -1.5, 0.0]], "curve": "exponential", "delta": 0.97, "explore": 12, "k": 2, "p1": 0.15, "rho": [0.8, 0.8, 0.6]};
 </script>
-<script src="webapp/static/charts.js?v=1791521077"></script>
+<script src="webapp/static/charts.js?v=1791856097"></script>
 <script src="webapp/static/figures.js?v=1791524128"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791525307"></script>
-<script src="webapp/static/static-api.js?v=1791523695"></script>
-<script src="webapp/static/correlated.js?v=1791521077"></script>
+<script src="webapp/static/probes.js?v=1791916034"></script>
+<script src="webapp/static/static-api.js?v=1791525475"></script>
+<script src="webapp/static/correlated.js?v=1791525576"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

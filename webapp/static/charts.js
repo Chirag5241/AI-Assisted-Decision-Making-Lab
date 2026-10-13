@@ -36,7 +36,7 @@ window.Charts = (function () {
   // series: [{v, cls, name, dash, faded, off: [bool per round]}]   hlines: [{y, label, cls}]   shade: [[start, stop)]
   // A series with `off` is faded from each round marked off to the next one: the stretch where its value is not in use.
   // opts: {ylabel, alt, height, step, lo, hi, pct, yticks: [{v, label}], fmt, noXLabel, dotLabel, width, noLegend, dotRadius, wrongShare,
-  //        xlabel, xscale (point i sits at x = i * xscale), vlines: [{t, label}],
+  //        xlabel, xscale, xstart (point i sits at x = xstart + i * xscale), vlines: [{t, label}],
   //        tipLines(t): extra lines for the tooltip of round t, shown above the series' values,
   //        shadeLabel: what a shaded stretch means, for the legend}
   function line(host, T, series, hlines, shade, opts) {
@@ -78,10 +78,11 @@ window.Charts = (function () {
       svg.append(svgEl("line", { class: "grid", x1: L, x2: L + pw, y1: Y(tick.v), y2: Y(tick.v) }),
         text({ x: L - 8, y: Y(tick.v) + 4, "text-anchor": "end", class: tick.faded ? "faded" : "" }, tick.label));
     }
-    const xscale = opts.xscale || 1, xname = opts.xlabel || "round t";
-    for (const v of niceTicks(0, (T - 1) * xscale, 8).ticks) {
-      svg.append(svgEl("line", { class: "grid", x1: X(v / xscale), x2: X(v / xscale), y1: TOP, y2: TOP + ph }),
-        text({ x: X(v / xscale), y: TOP + ph + 16, "text-anchor": "middle" }, v));
+    const xscale = opts.xscale || 1, xstart = opts.xstart || 0, xname = opts.xlabel || "round t";
+    for (const v of niceTicks(xstart, xstart + (T - 1) * xscale, 8).ticks) {
+      const at = X((v - xstart) / xscale);
+      svg.append(svgEl("line", { class: "grid", x1: at, x2: at, y1: TOP, y2: TOP + ph }),
+        text({ x: at, y: TOP + ph + 16, "text-anchor": "middle" }, v));
     }
     if (!opts.noXLabel) svg.append(text({ x: L + pw / 2, y: H - 4, "text-anchor": "middle" }, xname));
     for (const v of opts.vlines || []) {
@@ -144,7 +145,7 @@ window.Charts = (function () {
       const box = svg.getBoundingClientRect(), sx = (e.clientX - box.left) * (W / box.width);
       const t = Math.min(Math.max(Math.round(((sx - L) / pw) * (T - 1)), 0), T - 1);
       cross.setAttribute("x1", X(t)); cross.setAttribute("x2", X(t)); cross.setAttribute("visibility", "visible");
-      tip.replaceChildren(el("b", "", opts.xlabel ? xname + " " + t * xscale : "round " + t));
+      tip.replaceChildren(el("b", "", opts.xlabel ? xname + " " + +(xstart + t * xscale).toFixed(2) : "round " + t));
       for (const text of opts.tipLines ? opts.tipLines(t) : []) tip.append(document.createElement("br"), text);
       for (const s of series) tip.append(document.createElement("br"), s.name + "  " + fmt(s.v[t]));
       tip.hidden = false;

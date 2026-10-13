@@ -186,7 +186,9 @@
     <p class="callout-sub">Each round it looks for a subset of at most C features from which the human, with the
       beliefs they hold now, picks the best move, and shows the top-ranked one. So the human's choice in Fig. 3 is
       wrong only in the rounds where no such subset exists. Some states cannot be settled by any C features even by
-      the truth: there a hidden feature is needed, and that share is a ceiling no belief can lift.</p>
+      the truth: there a hidden feature is needed, and that share is a ceiling no belief can lift.
+      <a href="{{ url_for('two_actions') }}">The two-action problem</a> writes the search out and lists what it
+      leaves open.</p>
     {% elif timed %}
     <p class="callout"><mark>Holding something back for a while pauses what the human learns about it. It does not undo it.</mark></p>
     <p class="callout-sub">Inside a window the feature or action is out of play: the human decides without it and its

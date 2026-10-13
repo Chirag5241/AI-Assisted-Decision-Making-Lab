@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791521091">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
 </head>
 <body>
   <header class="mast">
@@ -29,6 +29,10 @@
           <a href="worlds.html" >More actions and features</a>
           
           <a href="timed.html" >Timed hiding</a>
+          
+          <a href="two-actions.html" >The two-action problem</a>
+          
+          <a href="losses.html" >Alternatives to the regret loss</a>
           
           <a href="aware.html" aria-current="page">State-aware subsets</a>
           
@@ -280,7 +284,9 @@
     <p class="callout-sub">Each round it looks for a subset of at most C features from which the human, with the
       beliefs they hold now, picks the best move, and shows the top-ranked one. So the human's choice in Fig. 3 is
       wrong only in the rounds where no such subset exists. Some states cannot be settled by any C features even by
-      the truth: there a hidden feature is needed, and that share is a ceiling no belief can lift.</p>
+      the truth: there a hidden feature is needed, and that share is a ceiling no belief can lift.
+      <a href="two-actions.html">The two-action problem</a> writes the search out and lists what it
+      leaves open.</p>
     
   </div>
   <div class="reading-body notes">
@@ -345,12 +351,12 @@
   window.BENCH_MODE = "aware";
   window.MAX_WINDOWS = 12;
 </script>
-<script src="webapp/static/charts.js?v=1791521077"></script>
+<script src="webapp/static/charts.js?v=1791856097"></script>
 <script src="webapp/static/figures.js?v=1791524128"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791525307"></script>
-<script src="webapp/static/static-api.js?v=1791523695"></script>
+<script src="webapp/static/probes.js?v=1791916034"></script>
+<script src="webapp/static/static-api.js?v=1791525475"></script>
 <script src="webapp/static/worlds.js?v=1791523744"></script>
 
   <script>

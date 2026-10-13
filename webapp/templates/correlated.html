@@ -9,9 +9,10 @@
       <fieldset class="card">
         <legend>The algorithm's policy</legend>
         <p class="group-label first">Budget: features shown per round</p>
-        <div class="segmented two" role="radiogroup" aria-label="Budget k">
+        <div class="segmented three" role="radiogroup" aria-label="Budget k">
           <label><input type="radio" name="k" value="1"><span>k = 1</span></label>
           <label><input type="radio" name="k" value="2"><span>k = 2</span></label>
+          <label><input type="radio" name="k" value="3"><span>k = 3</span></label>
         </div>
         <p class="group-label">Explore first</p>
         <div class="row">
@@ -182,6 +183,8 @@
     <p>As in the paper, a weight is learned only on the rounds its feature is shown. A filled-in value never corrects
       the belief about that feature, so a misjudged hidden feature keeps pulling the choice the wrong way. With
       independent features it would be filled in as zero and simply drop out.</p>
+    <p>The budget k is 1, 2 or all 3 features. With k = 3 nothing has to be hidden: exploring shows every feature
+      every round, and committing to all three is the show-everything policy.</p>
     <p>Exploring rotates through every subset of the budgeted size, so each feature is shown equally often. Then the
       algorithm commits to one subset for good. Exploring 0 rounds is the fixed-subset policy of Noti et al.</p>
     <p>The ranking runs every fixed subset and every explore-then-commit policy whose exploration is a whole number

@@ -16,13 +16,13 @@
       <p class="strapline">{{ site_kicker }}</p>
     </div>
     {# the Overview, then the experiments as a menu that names the one you are on #}
-    {% set here = bench.name if bench else ('Experiment 1 figures' if request.endpoint == 'experiments' else none) %}
+    {% set here = current.name if current else ('Experiment 1 figures' if request.endpoint == 'experiments' else none) %}
     <nav class="mast-nav" aria-label="Pages">
       <a href="{{ url_for('overview') }}" {% if request.endpoint == 'overview' %}aria-current="page"{% endif %}>Overview</a>
       <details class="mast-menu">
         <summary {% if here %}class="current"{% endif %} title="Go to an experiment">{{ here or 'Experiments' }}</summary>
         <div class="mast-list">
-          {% for b in benches %}
+          {% for b in menu %}
           <a href="{{ url_for(b.endpoint) }}" {% if request.endpoint == b.endpoint %}aria-current="page"{% endif %}>{{ b.name }}</a>
           {% endfor %}
           <a href="{{ url_for('experiments') }}" {% if request.endpoint == 'experiments' %}aria-current="page"{% endif %} class="apart">Experiment 1 figures</a>

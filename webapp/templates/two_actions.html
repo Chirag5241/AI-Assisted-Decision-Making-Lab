@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{# The problem the State-aware subsets bench runs, written out for two actions: text and formulas, no figures.
+   The notation is the note's own, with the timestep as a superscript: x^(t), H^(t), h^(t)_{a,i}. #}
+{% block title %}{{ current.name }} &middot; {{ site_name }}{% endblock %}
+
+{# In a formula, a .nw piece never breaks inside: a narrow screen breaks between the pieces. #}
+{# a symbol with a superscript over a subscript, as in h^(t)_{a,i} #}
+{% macro ss(top, bottom) -%}<span class="ss"><span>{{ top|safe }}</span><span>{{ bottom|safe }}</span></span>{%- endmacro %}
+{% macro h(sub, time="(t)") -%}h{{ ss(time, sub) }}{%- endmacro %}
+{% macro x(sub) -%}x{{ ss("(t)", sub) }}{%- endmacro %}
+{% macro u(sub) -%}u{{ ss("T", sub) }}{%- endmacro %}
+{# the other action: an a under a drawn bar, which stays legible at subscript size #}
+{% set abar %}<span class="ob">a</span>{% endset %}
+{% set A %}<span class="cal">&#x1D49C;</span>{% endset %}
+{% set H %}<span class="cal">&#x210B;</span>{% endset %}
+{% set over %}&Sigma;<sub>i &isin; F<sub>t</sub></sub>{% endset %}
+{# the margin of a over the other action on the shown features, by the human's weights #}
+{% set margin %}{{ over }} ({{ h("a,i") }} &minus; {{ h(abar ~ ",i") }}) &middot; {{ x("i") }}{% endset %}
+
+{% block body %}
+<main class="guide problem">
+  <header class="guide-head">
+    <h2>The two-action problem</h2>
+    <p class="lead">A constrained version of the problem, with <span class="math">K = 2</span> actions and
+      <span class="math">n &ge; 1</span> features. The algorithm {{ A }} shows all actions to the human {{ H }} and can
+      only suggest features <span class="math">F<sub>t</sub></span> of size <span class="math">c</span> at each
+      timestep <span class="math">t</span>. This is the most direct extension of the Noti et al. problem with
+      actions. To start with, we assume that {{ A }} has full view into everything:
+      <span class="math">U</span>, <span class="math">x<sup>(t)</sup></span> and
+      <span class="math">H<sup>(t)</sup></span>.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#setup">The setup</a><a href="#correct">When the human is correct</a><a href="#search">What the algorithm must solve</a>
+      <a href="#loss">Loss and update</a><a href="#questions">Questions</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="setup">
+    <h3>The setup</h3>
+    <p class="section-sub">At each timestep <span class="math">t</span>.</p>
+    <div class="trio">
+      <div>
+        <h4>The features</h4>
+        <p class="formula"><span>x<sup>(t)</sup> =</span>
+          <span class="mat" role="img" aria-label="the column vector of x 1 to x n at timestep t"><span>{{ x("1") }}</span><span>&#8942;</span><span>{{ x("n") }}</span></span>
+          <span>&isin; &#8477;<sup>n</sup></span></p>
+      </div>
+      <div>
+        <h4>The human's internal utility matrix</h4>
+        <p class="formula"><span>H<sup>(t)</sup> =</span>
+          <span class="mat" role="img" aria-label="the matrix with rows h 1 and h 2 at timestep t"><span>&mdash; {{ h("1") }} &mdash;</span><span>&mdash; {{ h("2") }} &mdash;</span></span></p>
+      </div>
+      <div>
+        <h4>The ground truth utility matrix</h4>
+        <p class="formula"><span>U =</span>
+          <span class="mat" role="img" aria-label="the matrix with rows u 1 and u 2"><span>&mdash; u<sub>1</sub> &mdash;</span><span>&mdash; u<sub>2</sub> &mdash;</span></span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="guide-section" id="correct">
+    <h3>When the human is correct</h3>
+    <article class="eq">
+      <header><h4>The correct move</h4></header>
+      <p class="formula">{{ u("a") }} x<sup>(t)</sup> &ge; {{ u(abar) }} x<sup>(t)</sup></p>
+      <p class="eq-text">Let <span class="math">a &isin; {1, 2}</span> be the correct move, and
+        <span class="math wrap">{{ abar }} &isin; {1, 2} &#8726; {a}</span>. Since <span class="math">a</span> is the correct
+        move, this holds.</p>
+    </article>
+    <article class="eq">
+      <header><h4>{{ H }} is correct on <i>F<sub>t</sub></i></h4></header>
+      <p class="formula"><span class="nw">{{ over }} {{ h("a,i") }} &middot; {{ x("i") }} &gt;</span>
+        <span class="nw">{{ over }} {{ h(abar ~ ",i") }} &middot; {{ x("i") }}</span></p>
+      <p class="eq-text">For a set <span class="math">F<sub>t</sub></span> shown to {{ H }} at a
+        <span class="math">t &gt; 0</span>, {{ H }} is correct if this holds.</p>
+    </article>
+  </section>
+
+  <section class="guide-section" id="search">
+    <h3>What the algorithm must solve</h3>
+    <article class="eq">
+      <header><h4>A subset on which {{ H }} is correct</h4></header>
+      <p class="formula"><span class="nw">{{ margin }} &gt; 0</span></p>
+      <p class="eq-text">Thus {{ A }} must solve the problem of finding a subset
+        <span class="math">F<sub>t</sub></span> with <span class="math">|F<sub>t</sub>| &lt; c</span> for which this
+        holds.</p>
+    </article>
+    <article class="eq">
+      <header><h4>Every such subset</h4></header>
+      <p class="formula"><span class="nw">C<sub>t</sub> = { F<sub>t</sub> &sube; [n] : |F<sub>t</sub>| &lt; c,</span><br>
+        <span class="nw">{{ margin }} &gt; 0 }</span></p>
+      <p class="eq-text">By brute force, {{ A }} can find <span class="math">C<sub>t</sub></span> in
+        <span class="math"><span class="binom" role="img" aria-label="n choose k"><span>n</span><span>k</span></span> &middot; k</span>
+        time.</p>
+    </article>
+  </section>
+
+  <section class="guide-section" id="loss">
+    <h3>Loss and update</h3>
+    <article class="eq">
+      <header><h4>The loss of a wrong round</h4></header>
+      <p class="formula">{{ u("a") }} x<sup>(t)</sup> &minus; {{ u(abar) }} x<sup>(t)</sup></p>
+      <p class="eq-text">When the human is wrong, and picks <span class="math">{{ abar }}</span>, this is the loss for
+        that round.</p>
+    </article>
+    <article class="eq">
+      <header><h4>The update <i>H</i><sup>(t)</sup> &rarr; <i>H</i><sup>(t+1)</sup></h4></header>
+      <p class="formula"><span class="nw">|u<sub>ij</sub> &minus; {{ h("ij", "(t+1)") }}| =</span>
+        <span class="nw"><span class="root" role="img" aria-label="the square root of phi j of t plus 1 over phi j of t"><svg viewBox="0 0 10 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12.5 L2.6 11.5 L6 19.4 L10 0"/></svg><span>&phi;<sub>j</sub>(t + 1) / &phi;<sub>j</sub>(t)</span></span>
+        &middot; |u<sub>ij</sub> &minus; {{ h("ij") }}|</span></p>
+      <p class="eq-text"><span class="math">m<sub>j</sub>(t)</span> is the number of times feature
+        <span class="math">j</span> has been seen at time <span class="math">t</span>, and
+        <span class="math">&phi;(&middot;)</span> is a monotonic non-increasing function with
+        <span class="math">&phi;(0) = 1</span>. For each <span class="math">j &isin; F<sub>t</sub></span>, this update
+        is made to get <span class="math">{{ h("ij", "(t+1)") }}</span>, for each
+        <span class="math">i &isin; [K]</span>.</p>
+      <p class="eq-meta"><span>On the benches the learning curve is written the other way up, as the share of the gap
+        already closed (<a href="{{ url_for('overview') }}#eq-learning">Eq. {{ equation["learning"].n }}</a>). Reading
+        &phi;<sub>j</sub>(t) as &phi;(m<sub>j</sub>(t)), one minus the benches' curve is &radic;&phi; here.</span></p>
+    </article>
+  </section>
+
+  <section class="guide-section" id="questions">
+    <h3>Questions</h3>
+    <ol class="questions">
+      <li>What does {{ A }} do when <span class="math">|C<sub>t</sub>| = 0</span>? What is best to suggest: the most
+        diverted features, since the loss is fixed? Or some other?</li>
+      <li>Which subset to show when <span class="math">|C<sub>t</sub>| &gt; 1</span>? Any? A specific one?</li>
+    </ol>
+    <div class="for-now">
+      <h4>What the bench does for now</h4>
+      <p><a href="{{ url_for('aware') }}">State-aware subsets</a> runs this search in every round, for any number of
+        actions, over the subsets of at most C features. When <span class="math">C<sub>t</sub></span> is empty it
+        shows one of the candidates at random, as a stand-in. When <span class="math">C<sub>t</sub></span> holds
+        several, it prefers one on which the truth also ranks <span class="math">a</span> first, and among those
+        the one with the widest margin, or the one with the most features.</p>
+      <p><a href="{{ bench_link }}" class="go">Open this problem on the bench</a>
+        <span class="go-note">Two actions, three features, at most two shown. The human has feature 3 backwards, so in
+          a few rounds no subset works.</span></p>
+    </div>
+  </section>
+</main>
+{% endblock %}

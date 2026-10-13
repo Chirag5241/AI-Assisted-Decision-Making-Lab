@@ -3,8 +3,9 @@
     python build_pages.py
 
 GitHub Pages cannot run the Flask server, so this renders the site's own pages to index.html,
-overview.html, worlds.html, timed.html, aware.html, correlated.html and experiments.html at the repository root. They load the same
-stylesheet and scripts as the Flask site (from webapp/static), so the two look and behave alike.
+overview.html, worlds.html, timed.html, two-actions.html, losses.html, aware.html, correlated.html
+and experiments.html at the repository root. They load the same stylesheet and scripts as the Flask
+site (from webapp/static), so the two look and behave alike.
 Two extra scripts stand in for the server:
 
   webapp/static/static-api.js   answers /api/run, /api/world and /api/correlated in the browser
@@ -23,9 +24,9 @@ from webapp.app import MAX_FEATURES, N_PROBES, app
 
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "webapp" / "static"
-PAGES = {"/": "index.html", "/overview": "overview.html", "/worlds": "worlds.html", "/timed": "timed.html", "/aware": "aware.html",
-         "/correlated": "correlated.html",
-         "/experiments": "experiments.html"}
+PAGES = {"/": "index.html", "/overview": "overview.html", "/worlds": "worlds.html", "/timed": "timed.html",
+         "/two-actions": "two-actions.html", "/losses": "losses.html", "/aware": "aware.html",
+         "/correlated": "correlated.html", "/experiments": "experiments.html"}
 NOTE = "<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->\n"
 
 
@@ -54,6 +55,7 @@ def build():
         for target, page in PAGES.items():
             html = html.replace(f'<a href="{target}"', f'<a href="{page}"')
             html = html.replace(f'<a href="{target}#', f'<a href="{page}#')    # a link to a place on that page
+            html = html.replace(f'<a href="{target}?', f'<a href="{page}?')    # a shared link to a world on that bench
         # the stand-in for the server has to load before the page's own script asks for data
         stand_in = f'<script src="{versioned("static-api.js")}"></script>\n'
         html = html.replace('<script src="webapp/static/lab.js', stand_in + '<script src="webapp/static/lab.js')

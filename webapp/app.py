@@ -20,7 +20,7 @@ matplotlib.use("Agg")
 import numpy as np
 from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
 
-from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, draws, plotting, simulate
+from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, draws, losses, plotting, simulate
 
 from . import guide
 
@@ -46,8 +46,10 @@ def _static_versioning():
         return url_for("static", filename=filename, v=mtime)
     # the standard figures, the equations and the benches are the same lists on every page (webapp/guide.py)
     bench = next((b for b in guide.BENCHES if b["endpoint"] == request.endpoint), None)
+    # the page menu also lists the pages that set a problem out; `current` is the entry of the page being served
+    current = next((p for p in guide.MENU if p["endpoint"] == request.endpoint), None)
     return dict(static_v=static_v, site_name=SITE_NAME, site_kicker=SITE_KICKER, benches=guide.BENCHES, bench=bench,
-                max_seed=MAX_SEED,
+                menu=guide.MENU, notes=guide.NOTES, current=current, max_seed=MAX_SEED,
                 standard=guide.STANDARD, standard_figures=guide.STANDARD_FIGURES, equations=guide.EQUATIONS,
                 equation=guide.EQUATION)
 
@@ -729,6 +731,117 @@ def aware():
     return _bench_page("aware", DEFAULT_AWARE, "aware")
 
 
+# The two-action problem, as a world for the State-aware subsets bench: the first two actions of the default
+# world. The human has feature 3 backwards, so in a few rounds no subset makes them right.
+TWO_ACTION_WORLD = dict(U=[row[:] for row in DEFAULT_WORLD["U"][:2]], H=[row[:] for row in DEFAULT_WORLD["H"][:2]],
+                        C=2, judge="belief", prefer="margin", curve="exponential", p1=0.05, T=100, delta=0.95, seed=0)
+
+
+def _world_link(endpoint, world):
+    """A shared link to a bench: the world as the query string the bench's page reads (matrices as 'a,b;c,d')."""
+    rows = lambda M: ";".join(",".join(f"{v:g}" for v in row) for row in M)
+    return url_for(endpoint, **{key: rows(value) if key in ("U", "H") else value for key, value in world.items()})
+
+
+@app.route("/two-actions")
+def two_actions():
+    """The problem the State-aware subsets bench runs, written out for two actions. No figures: a page of the
+    setup, the condition for the human to be right, the search, the loss, the update and the open questions."""
+    return render_template("two_actions.html", page="two-actions", bench_link=_world_link("aware", TWO_ACTION_WORLD))
+
+
+# ---------------------------------------------------------------------------
+# Alternatives to the regret loss (after Jiang et al. 2014), simulated on the default world
+# ---------------------------------------------------------------------------
+
+LOSS_DRAWS = 2000      # runs of T rounds, each on its own draw of the states
+LOSSES = [
+    dict(key="regret", name="Regret", formula="&theta;<sub>y*</sub> &minus; &theta;<sub>&ycirc;</sub>",
+         text="The lab's loss."),
+    dict(key="wrong", name="Wrong pick", formula="1[ &ycirc; &ne; y* ]",
+         text="The paper's objective. Ignores how much is lost."),
+    dict(key="pairs", name="Pairs out of order",
+         formula="#{ k &lt; l : s and &theta; order k, l differently }",
+         text="Kendall tau, the log loss of the Mallows model. Counts the whole ranking, not only its top."),
+    dict(key="ranked", name="Ranked regret",
+         formula="&Sigma;<sub>i</sub> ( max<sub>j &ge; i</sub> &theta;<sub>&sigma;(j)</sub> &minus; &theta;<sub>&sigma;(i)</sub> )",
+         text="Regret at every place of the human's ranking &sigma;; its first term is regret. The Plackett-Luce "
+              "log loss of the ranking, at low noise."),
+    dict(key="noisy", name="Noisy regret",
+         formula="&Sigma;<sub>k</sub> p<sub>k</sub> (&theta;<sub>y*</sub> &minus; &theta;<sub>k</sub>)",
+         text="Regret when the pick is a Plackett-Luce draw, p = softmax(s / &tau;). Smooth, and the margin counts."),
+    dict(key="log", name="Log loss", formula="&minus;log p<sub>y*</sub>",
+         text="Cross-entropy of that draw. Smooth. Ignores how much is lost."),
+]
+
+
+def _loss_runs(U, H0, curve, X, budget, prefer):
+    """The human's scores on what is shown, (K, B, T), for every policy on the draws X (B, T, n): each feature
+    subset kept every round, then the state-aware policy as its bench runs it (judged by the human's weights)."""
+    (B, T, n), K = X.shape, len(U)
+    runs = []
+    for F in sorted(_subsets(n).tolist(), key=lambda mask: (sum(mask), [-on for on in mask])):
+        H = U + (H0 - U) * (1.0 - curve(np.arange(T)[:, None] * np.array(F, float)))[:, None, :]      # (T, K, n)
+        runs.append(([i + 1 for i, on in enumerate(F) if on], np.einsum("tkn,btn->kbt", H * np.array(F, float), X)))
+    sets = _aware_sets(n, budget)
+    lots = draws.uniforms(AWARE_STREAM, B * T).reshape(B, T).astype(np.int64)      # the random fallback, per round
+    N, scores, rows = np.zeros((B, n)), np.zeros((K, B, T)), np.arange(B)
+    for t in range(T):
+        H = U + (H0 - U) * (1.0 - curve(N))[:, None, :]                              # (B, K, n): each run's beliefs
+        true = U @ X[:, t].T
+        est = np.einsum("bkn,sn,bn->skb", H, sets, X[:, t])
+        works, chosen = _aware_pick(_aware_margin(est, true), sets, prefer,
+                                    _aware_margin(np.einsum("kn,sn,bn->skb", U, sets, X[:, t]), true))
+        pick = np.where(works.any(axis=0), chosen, (lots[:, t] * len(sets)) >> 32)
+        scores[:, :, t] = est[pick, :, rows].T
+        N += sets[pick]
+    return runs + [(None, scores)]
+
+
+@lru_cache(maxsize=1)
+def _loss_study():
+    """Every loss of simlab.losses, round by round and discounted, for every policy of `_loss_runs` on the default
+    world, averaged over LOSS_DRAWS runs. Also each loss against the human's margin, for two actions a gap of 1
+    apart. An axis top is set once for the page: a round number above every policy's line."""
+    world = DEFAULT_AWARE
+    U, H0 = np.array(world["U"]), np.array(world["H"])
+    (K, n), T, delta = U.shape, world["T"], world["delta"]
+    curve = CURVE_SPECS[world["curve"]]["make"](np.full(n, world["p1"]))
+    X = draws.states(0, LOSS_DRAWS * T, n).reshape(LOSS_DRAWS, T, n)
+    true = np.einsum("kn,btn->kbt", U, X)
+    weight = delta ** np.arange(T)
+    policies = []
+    for shown, scores in _loss_runs(U, H0, curve, X, world["C"], world["prefer"]):
+        series = {key: value.mean(axis=0) for key, value in losses.of_round(scores, true).items()}
+        policies.append(dict(shown=shown, series={key: np.round(value, 4).tolist() for key, value in series.items()},
+                             total={key: float(value @ weight) for key, value in series.items()}))
+    for key in losses.NAMES:
+        for policy in policies:
+            policy.setdefault("rank", {})[key] = 1 + sum(other["total"][key] < policy["total"][key] for other in policies)
+    peak = {key: max(max(policy["series"][key]) for policy in policies) for key in losses.NAMES}
+    value_top = math.ceil(max(peak["regret"], peak["noisy"]) / 0.2) * 0.2
+    top = dict(regret=value_top, noisy=value_top, wrong=1.0, pairs=K * (K - 1) / 2,
+               ranked=math.ceil(peak["ranked"] / 0.2) * 0.2, log=math.ceil(peak["log"] / 0.2) * 0.2)
+    # the losses grouped by the policy each ranks first, in the order the losses are listed
+    winners = {}
+    for loss in LOSSES:
+        first = next(policy["shown"] for policy in policies if policy["rank"][loss["key"]] == 1)
+        winners.setdefault(tuple(first or ()), dict(shown=first, losses=[]))["losses"].append(loss["name"])
+    margin = np.round(np.arange(-3.0, 3.0001, 0.05), 2)
+    against = losses.of_round(np.stack([margin, np.zeros_like(margin)]), np.array([[1.0], [0.0]]))
+    return dict(losses=[dict(loss, top=round(top[loss["key"]], 1)) for loss in LOSSES], policies=policies,
+                winners=list(winners.values()), T=T, delta=delta, draws=LOSS_DRAWS, budget=world["C"], tau=1.0,
+                margin=dict(start=float(margin[0]), step=0.05, top=3.2,
+                            series={key: np.round(value, 4).tolist() for key, value in against.items()}))
+
+
+@app.route("/losses")
+def losses_page():
+    """Alternatives to the regret loss: six losses of a round, each against the human's margin, round by round in
+    a simulation, and summed into the ranking of the policies it gives."""
+    return render_template("losses.html", page="losses", study=_loss_study())
+
+
 @app.route("/api/world")
 def api_world():
     curve_name = request.args.get("curve", "exponential")
@@ -754,7 +867,7 @@ def api_world():
 
 
 # ---------------------------------------------------------------------------
-# Correlated features (Guan et al. 2026): three features, a budget of k per round
+# Correlated features (Guan et al. 2026): three features, a budget of k per round (1, 2 or all 3)
 # ---------------------------------------------------------------------------
 
 CORR_FEATURES, CORR_SCATTER = 3, 300
@@ -967,7 +1080,7 @@ def api_correlated():
         abort(400, "unknown curve")
     spec = CURVE_SPECS[curve_name]
     K, n = int(_num("K", 3, 2, MAX_ACTIONS)), CORR_FEATURES
-    k = int(_num("k", 2, 1, n - 1))
+    k = int(_num("k", 2, 1, n))       # up to all three: then nothing has to be hidden
     T = int(_num("T", 120, 10, 300))
     commit = _mask("C", n)
     if sum(commit) > k:

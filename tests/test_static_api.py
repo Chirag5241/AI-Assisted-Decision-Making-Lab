@@ -74,6 +74,12 @@ QUERIES = [
     "&curve=hyperbolic&p1=5&T=30&delta=0.9&rank=0",
     "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
     "&rho=0.8,0.8,0.6&k=2&explore=12&C=1,1,0&curve=exponential&ps=0.3,0.15,0.02&T=120&delta=0.97",
+    # a budget of all three features: nothing has to be hidden
+    "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
+    "&rho=0.8,0.8,0.6&k=3&explore=10&C=1,1,1&curve=exponential&p1=0.15&T=60&delta=0.97&seed=4",
+    "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=-1.5,-1,1.5;-0.5,0.5,1.5;1.5,-1.5,-0.5"
+    "&rho=0.8,0.8,0.6&k=3&explore=0&C=1,0,1&curve=exponential&p1=0.15&T=40&rank=0",
+    "/api/correlated?K=3&U=-1.5,0.5,0;0.5,1.5,-1;1,-1.5,0&H=0,0,0;0,0,0;0,0,0&rho=0.8,0.8,0.6&k=9&C=1,1,1&T=30&rank=0",   # capped at 3
     "/api/correlated?rho=0.9,0.9,-0.9",            # not a correlation matrix: both sides refuse it
 ]
 

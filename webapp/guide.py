@@ -2,7 +2,8 @@
 
 The Overview page is written from these lists, and every bench draws its figures from them, so a figure
 keeps its number, its title and its meaning wherever it appears. To add a bench, add it to BENCHES; to
-link a derivation once it is written, set that equation's `derivation` to its URL.
+add a page that only sets a problem out, add it to NOTES; to link a derivation once it is written, set
+that equation's `derivation` to its URL.
 
 Titles and formulas are HTML (entities, <sub>, <sup>, <i>); they are written here and nowhere else.
 """
@@ -231,6 +232,25 @@ BENCHES = [
              "against the best possible with the same features, <i>U</i>&nbsp;<i>P</i><sub>S</sub>",
              "How long to explore: discounted regret against the length of the exploration phase, one line per subset committed to"]),
 ]
+
+# ---------------------------------------------------------------------------
+# Pages that are not benches: they set a problem out, or study one question with figures of their own, and
+# draw none of the standard figures. Each is listed in the page menu just before the bench named in `before`.
+# ---------------------------------------------------------------------------
+
+NOTES = [
+    dict(
+        endpoint="two_actions", name="The two-action problem", before="aware",
+        summary="Not a bench: the problem that State-aware subsets runs, written out for two actions and a "
+                "budget of features, with the questions it leaves open."),
+    dict(
+        endpoint="losses_page", name="Alternatives to the regret loss", before="aware",
+        summary="Six losses of a round, after Jiang et al. (2014), simulated on the three-action world: what each "
+                "counts, and which policy each prefers."),
+]
+
+# the page menu: the benches in order, with each note slotted in before its bench
+MENU = [page for b in BENCHES for page in [n for n in NOTES if n["before"] == b["endpoint"]] + [b]]
 
 STANDARD = {figure["key"]: figure for figure in STANDARD_FIGURES}
 EQUATION = {equation["id"]: equation for equation in EQUATIONS}

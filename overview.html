@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791521091">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
 </head>
 <body>
   <header class="mast">
@@ -29,6 +29,10 @@
           <a href="worlds.html" >More actions and features</a>
           
           <a href="timed.html" >Timed hiding</a>
+          
+          <a href="two-actions.html" >The two-action problem</a>
+          
+          <a href="losses.html" >Alternatives to the regret loss</a>
           
           <a href="aware.html" >State-aware subsets</a>
           
@@ -537,16 +541,24 @@
         
       </tbody>
     </table></div>
+    
+    <dl class="problem-list">
+      
+      <div><dt><a href="two-actions.html">The two-action problem</a></dt><dd>Not a bench: the problem that State-aware subsets runs, written out for two actions and a budget of features, with the questions it leaves open.</dd></div>
+      
+      <div><dt><a href="losses.html">Alternatives to the regret loss</a></dt><dd>Six losses of a round, after Jiang et al. (2014), simulated on the three-action world: what each counts, and which policy each prefers.</dd></div>
+      
+    </dl>
   </section>
 </main>
 
 <script>
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "W": "f3:20-25", "curve": "exponential", "delta": 0.95, "p1": 0.05};
 </script>
-<script src="webapp/static/charts.js?v=1791521077"></script>
+<script src="webapp/static/charts.js?v=1791856097"></script>
 <script src="webapp/static/figures.js?v=1791524128"></script>
-<script src="webapp/static/probes.js?v=1791525307"></script>
-<script src="webapp/static/static-api.js?v=1791523695"></script>
+<script src="webapp/static/probes.js?v=1791916034"></script>
+<script src="webapp/static/static-api.js?v=1791525475"></script>
 <script src="webapp/static/overview.js?v=1791496940"></script>
 
   <script>

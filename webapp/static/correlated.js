@@ -61,7 +61,7 @@
     }));
     const explore = value("explore");
     $("policy-hint").textContent = (explore > 0
-      ? `For ${explore} round${explore > 1 ? "s" : ""} it shows every set of ${world.k} in turn, then ${featureList(world.C)} for good.`
+      ? `For ${explore} round${explore > 1 ? "s" : ""} it shows ${world.k === N ? `all ${N} features` : `every set of ${world.k} in turn`}, then ${featureList(world.C)} for good.`
       : `It shows ${featureList(world.C)} every round, the fixed-subset policy.`) + " Regret always counts the full state.";
   }
 
@@ -367,7 +367,7 @@
     const valid = (M) => Array.isArray(M) && M.length >= 2 && M.length <= 6 && M.every((row) => row.length === N && row.every(Number.isFinite));
     if (!valid(U) || !valid(H) || H.length !== U.length) return false;
     world.U = U; world.H = H; world.K = U.length;
-    world.k = String(s.k) === "1" ? 1 : 2;
+    world.k = [1, 2, 3].includes(Number(s.k)) ? Number(s.k) : 2;
     const C = (typeof s.C === "string" ? s.C.split(",") : s.C || []).map((b) => String(b) === "1");
     world.C = C.length === N ? C : [true, true, false];
     fitCommit();

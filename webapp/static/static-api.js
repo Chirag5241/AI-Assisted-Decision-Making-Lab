@@ -780,7 +780,7 @@
     const K = Math.trunc(num(q, "K", 3, 2, MAX_ACTIONS));
     const U = matrix(q, "U", K, CORR_N), H0 = matrix(q, "H", K, CORR_N);
     const rho = parseRho(q);
-    const k = Math.trunc(num(q, "k", 2, 1, CORR_N - 1));
+    const k = Math.trunc(num(q, "k", 2, 1, CORR_N));       // up to all three: then nothing has to be hidden
     const T = Math.trunc(num(q, "T", 120, 10, 300)), delta = num(q, "delta", 0.95, 0.01, 0.99), seed = seedOf(q);
     const explore = Math.trunc(num(q, "explore", 0, 0, T));
     const commit = mask(q, "C", CORR_N);

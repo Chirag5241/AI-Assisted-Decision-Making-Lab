@@ -92,3 +92,22 @@ def test_page_and_navigation(client):
     page = client.get("/correlated")
     assert page.status_code == 200 and b"correlated.js" in page.data and b'aria-current="page">Correlated' in page.data
     assert b'href="/correlated"' in client.get("/worlds").data
+
+
+def test_the_budget_can_be_all_three_features(client):
+    # with k = 3 nothing has to be hidden: committing to all three is the show-everything policy
+    everything = client.get(query(k=3, C=[1, 1, 1], explore=0)).get_json()
+    assert everything["k"] == 3 and np.array(everything["schedule"]).all()
+    assert everything["reg_limit"] == 0 and everything["acc_limit"] == 1          # every weight is learned in the end
+    # exploring with k = 3 shows every feature too, so exploring first changes nothing
+    explored = client.get(query(k=3, C=[1, 1, 1], explore=12) + "&rank=0").get_json()
+    assert explored["beliefs"] == everything["beliefs"] and explored["numeral"] == everything["numeral"]
+    for key in ("reg", "discounted", "value_gap", "acc"):
+        assert explored["series"][key] == everything["series"][key], key
+    # every fixed subset is within the budget now: the seven of them are ranked, the full set among them
+    fixed = [r for r in everything["ranking"]["rows"] if r["explore"] == 0]
+    assert [True, True, True] in [r["mask"] for r in fixed] and len(everything["ranking"]["sweep"]["curves"]) == 7
+    # a smaller commitment is still allowed under the larger budget, and the commitment may not exceed it
+    assert client.get(query(k=3, C=[1, 0, 0]) + "&rank=0").status_code == 200
+    assert client.get(query(k=2, C=[1, 1, 1])).status_code == 400
+    assert 'name="k" value="3"' in client.get("/correlated").data.decode()

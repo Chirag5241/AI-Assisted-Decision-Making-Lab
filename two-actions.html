@@ -1,0 +1,182 @@
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The two-action problem &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
+    </div>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" >Overview</a>
+      <details class="mast-menu">
+        <summary class="current" title="Go to an experiment">The two-action problem</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" >More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="two-actions.html" aria-current="page">The two-action problem</a>
+          
+          <a href="losses.html" >Alternatives to the regret loss</a>
+          
+          <a href="aware.html" >State-aware subsets</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html"  class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
+    </nav>
+  </header>
+  
+<main class="guide problem">
+  <header class="guide-head">
+    <h2>The two-action problem</h2>
+    <p class="lead">A constrained version of the problem, with <span class="math">K = 2</span> actions and
+      <span class="math">n &ge; 1</span> features. The algorithm <span class="cal">&#x1D49C;</span> shows all actions to the human <span class="cal">&#x210B;</span> and can
+      only suggest features <span class="math">F<sub>t</sub></span> of size <span class="math">c</span> at each
+      timestep <span class="math">t</span>. This is the most direct extension of the Noti et al. problem with
+      actions. To start with, we assume that <span class="cal">&#x1D49C;</span> has full view into everything:
+      <span class="math">U</span>, <span class="math">x<sup>(t)</sup></span> and
+      <span class="math">H<sup>(t)</sup></span>.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#setup">The setup</a><a href="#correct">When the human is correct</a><a href="#search">What the algorithm must solve</a>
+      <a href="#loss">Loss and update</a><a href="#questions">Questions</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="setup">
+    <h3>The setup</h3>
+    <p class="section-sub">At each timestep <span class="math">t</span>.</p>
+    <div class="trio">
+      <div>
+        <h4>The features</h4>
+        <p class="formula"><span>x<sup>(t)</sup> =</span>
+          <span class="mat" role="img" aria-label="the column vector of x 1 to x n at timestep t"><span>x<span class="ss"><span>(t)</span><span>1</span></span></span><span>&#8942;</span><span>x<span class="ss"><span>(t)</span><span>n</span></span></span></span>
+          <span>&isin; &#8477;<sup>n</sup></span></p>
+      </div>
+      <div>
+        <h4>The human's internal utility matrix</h4>
+        <p class="formula"><span>H<sup>(t)</sup> =</span>
+          <span class="mat" role="img" aria-label="the matrix with rows h 1 and h 2 at timestep t"><span>&mdash; h<span class="ss"><span>(t)</span><span>1</span></span> &mdash;</span><span>&mdash; h<span class="ss"><span>(t)</span><span>2</span></span> &mdash;</span></span></p>
+      </div>
+      <div>
+        <h4>The ground truth utility matrix</h4>
+        <p class="formula"><span>U =</span>
+          <span class="mat" role="img" aria-label="the matrix with rows u 1 and u 2"><span>&mdash; u<sub>1</sub> &mdash;</span><span>&mdash; u<sub>2</sub> &mdash;</span></span></p>
+      </div>
+    </div>
+  </section>
+
+  <section class="guide-section" id="correct">
+    <h3>When the human is correct</h3>
+    <article class="eq">
+      <header><h4>The correct move</h4></header>
+      <p class="formula">u<span class="ss"><span>T</span><span>a</span></span> x<sup>(t)</sup> &ge; u<span class="ss"><span>T</span><span><span class="ob">a</span></span></span> x<sup>(t)</sup></p>
+      <p class="eq-text">Let <span class="math">a &isin; {1, 2}</span> be the correct move, and
+        <span class="math wrap"><span class="ob">a</span> &isin; {1, 2} &#8726; {a}</span>. Since <span class="math">a</span> is the correct
+        move, this holds.</p>
+    </article>
+    <article class="eq">
+      <header><h4><span class="cal">&#x210B;</span> is correct on <i>F<sub>t</sub></i></h4></header>
+      <p class="formula"><span class="nw">&Sigma;<sub>i &isin; F<sub>t</sub></sub> h<span class="ss"><span>(t)</span><span>a,i</span></span> &middot; x<span class="ss"><span>(t)</span><span>i</span></span> &gt;</span>
+        <span class="nw">&Sigma;<sub>i &isin; F<sub>t</sub></sub> h<span class="ss"><span>(t)</span><span><span class="ob">a</span>,i</span></span> &middot; x<span class="ss"><span>(t)</span><span>i</span></span></span></p>
+      <p class="eq-text">For a set <span class="math">F<sub>t</sub></span> shown to <span class="cal">&#x210B;</span> at a
+        <span class="math">t &gt; 0</span>, <span class="cal">&#x210B;</span> is correct if this holds.</p>
+    </article>
+  </section>
+
+  <section class="guide-section" id="search">
+    <h3>What the algorithm must solve</h3>
+    <article class="eq">
+      <header><h4>A subset on which <span class="cal">&#x210B;</span> is correct</h4></header>
+      <p class="formula"><span class="nw">&Sigma;<sub>i &isin; F<sub>t</sub></sub> (h<span class="ss"><span>(t)</span><span>a,i</span></span> &minus; h<span class="ss"><span>(t)</span><span><span class="ob">a</span>,i</span></span>) &middot; x<span class="ss"><span>(t)</span><span>i</span></span> &gt; 0</span></p>
+      <p class="eq-text">Thus <span class="cal">&#x1D49C;</span> must solve the problem of finding a subset
+        <span class="math">F<sub>t</sub></span> with <span class="math">|F<sub>t</sub>| &lt; c</span> for which this
+        holds.</p>
+    </article>
+    <article class="eq">
+      <header><h4>Every such subset</h4></header>
+      <p class="formula"><span class="nw">C<sub>t</sub> = { F<sub>t</sub> &sube; [n] : |F<sub>t</sub>| &lt; c,</span><br>
+        <span class="nw">&Sigma;<sub>i &isin; F<sub>t</sub></sub> (h<span class="ss"><span>(t)</span><span>a,i</span></span> &minus; h<span class="ss"><span>(t)</span><span><span class="ob">a</span>,i</span></span>) &middot; x<span class="ss"><span>(t)</span><span>i</span></span> &gt; 0 }</span></p>
+      <p class="eq-text">By brute force, <span class="cal">&#x1D49C;</span> can find <span class="math">C<sub>t</sub></span> in
+        <span class="math"><span class="binom" role="img" aria-label="n choose k"><span>n</span><span>k</span></span> &middot; k</span>
+        time.</p>
+    </article>
+  </section>
+
+  <section class="guide-section" id="loss">
+    <h3>Loss and update</h3>
+    <article class="eq">
+      <header><h4>The loss of a wrong round</h4></header>
+      <p class="formula">u<span class="ss"><span>T</span><span>a</span></span> x<sup>(t)</sup> &minus; u<span class="ss"><span>T</span><span><span class="ob">a</span></span></span> x<sup>(t)</sup></p>
+      <p class="eq-text">When the human is wrong, and picks <span class="math"><span class="ob">a</span></span>, this is the loss for
+        that round.</p>
+    </article>
+    <article class="eq">
+      <header><h4>The update <i>H</i><sup>(t)</sup> &rarr; <i>H</i><sup>(t+1)</sup></h4></header>
+      <p class="formula"><span class="nw">|u<sub>ij</sub> &minus; h<span class="ss"><span>(t+1)</span><span>ij</span></span>| =</span>
+        <span class="nw"><span class="root" role="img" aria-label="the square root of phi j of t plus 1 over phi j of t"><svg viewBox="0 0 10 20" preserveAspectRatio="none" aria-hidden="true"><path d="M0 12.5 L2.6 11.5 L6 19.4 L10 0"/></svg><span>&phi;<sub>j</sub>(t + 1) / &phi;<sub>j</sub>(t)</span></span>
+        &middot; |u<sub>ij</sub> &minus; h<span class="ss"><span>(t)</span><span>ij</span></span>|</span></p>
+      <p class="eq-text"><span class="math">m<sub>j</sub>(t)</span> is the number of times feature
+        <span class="math">j</span> has been seen at time <span class="math">t</span>, and
+        <span class="math">&phi;(&middot;)</span> is a monotonic non-increasing function with
+        <span class="math">&phi;(0) = 1</span>. For each <span class="math">j &isin; F<sub>t</sub></span>, this update
+        is made to get <span class="math">h<span class="ss"><span>(t+1)</span><span>ij</span></span></span>, for each
+        <span class="math">i &isin; [K]</span>.</p>
+      <p class="eq-meta"><span>On the benches the learning curve is written the other way up, as the share of the gap
+        already closed (<a href="overview.html#eq-learning">Eq. 4</a>). Reading
+        &phi;<sub>j</sub>(t) as &phi;(m<sub>j</sub>(t)), one minus the benches' curve is &radic;&phi; here.</span></p>
+    </article>
+  </section>
+
+  <section class="guide-section" id="questions">
+    <h3>Questions</h3>
+    <ol class="questions">
+      <li>What does <span class="cal">&#x1D49C;</span> do when <span class="math">|C<sub>t</sub>| = 0</span>? What is best to suggest: the most
+        diverted features, since the loss is fixed? Or some other?</li>
+      <li>Which subset to show when <span class="math">|C<sub>t</sub>| &gt; 1</span>? Any? A specific one?</li>
+    </ol>
+    <div class="for-now">
+      <h4>What the bench does for now</h4>
+      <p><a href="aware.html">State-aware subsets</a> runs this search in every round, for any number of
+        actions, over the subsets of at most C features. When <span class="math">C<sub>t</sub></span> is empty it
+        shows one of the candidates at random, as a stand-in. When <span class="math">C<sub>t</sub></span> holds
+        several, it prefers one on which the truth also ranks <span class="math">a</span> first, and among those
+        the one with the widest margin, or the one with the most features.</p>
+      <p><a href="aware.html?U=1%2C0.5%2C0%3B0%2C1%2C0.5&amp;H=1%2C0.5%2C1.5%3B0%2C1%2C0&amp;C=2&amp;judge=belief&amp;prefer=margin&amp;curve=exponential&amp;p1=0.05&amp;T=100&amp;delta=0.95&amp;seed=0" class="go">Open this problem on the bench</a>
+        <span class="go-note">Two actions, three features, at most two shown. The human has feature 3 backwards, so in
+          a few rounds no subset works.</span></p>
+    </div>
+  </section>
+</main>
+
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
+</body>
+</html>
