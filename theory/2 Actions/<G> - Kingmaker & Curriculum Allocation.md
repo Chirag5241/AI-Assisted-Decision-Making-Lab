@@ -50,10 +50,11 @@ $$\omega_j(\theta) := \min\Big\{ m \ge \tau_j : p_j(m)^2 \sigma_j^2 \ge \theta \
 
 ## 4. The Monotone Panel Sieve (MPS) Algorithm
 
-egin{theorem}[Exact Panel Realizability]
+\begin{theorem}[Exact Panel Realizability]
 A candidate panel $F^* \subseteq [n]$ ($|F^*| = c$) can be made the clinician's autonomous choice at graduation if and only if there exists a threshold $\theta > 0$ such that the total panel qualification and extinguishment cost satisfies:
 $$\text{Cost}(F^*, \theta) := \sum_{j \in F^*} \omega_j(\theta) + \sum_{k \notin F^*} \kappa_k(\theta) \le T$$
 \end{theorem}
+
 
 ### The MPS Algorithm Description
 Rather than searching the exponential space of all allocation vectors $m \in \mathbb{N}^n$:
