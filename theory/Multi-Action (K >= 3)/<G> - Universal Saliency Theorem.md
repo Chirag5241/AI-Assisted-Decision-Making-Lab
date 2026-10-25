@@ -80,3 +80,22 @@ $$\text{Salience}_j(s) = \sigma_j^2 \sum_{1 \le k < \ell \le K} p_k(s) p_\ell(s)
 3. **Symptom-Steered Greedy Algorithm**:
    For any $K \ge 2$ and budget $c$, the clinician autonomously orders the $c$ biomarkers with the largest values of $\text{Salience}_j(s)$.
    Because $p_k(s)$ changes with symptoms $s$, **the test panel $\hat{F}(s)$ dynamically changes with presenting symptoms!**
+
+---
+
+## 5. Exponential Pruning of Inactive Margins (The Active Differential Diagnosis)
+
+In emergency medicine, a presenting symptom $s$ does not leave all $K$ diagnoses actively competing.
+Sort the diseases by prior expected utility given symptoms:
+$$\bar{u}_{(1)}(s) \ge \bar{u}_{(2)}(s) \ge \bar{u}_{(3)}(s) \ge \dots \ge \bar{u}_{(K)}(s)$$
+For any candidate disease $k$, define its clinical deficit relative to the leading diagnosis: $\Delta_k(s) := \bar{u}_{(1)}(s) - \bar{u}_k(s) \ge 0$.
+
+\begin{lemma}[Exponential Suppression of Distant Diseases]
+Let test innovation variances be bounded by $\sigma_{\max}^2 := \max_{k, F} \Omega_{kk}(F)$.
+For any candidate action $k$ whose deficit satisfies $\Delta_k(s) > 3 \sigma_{\max}$:
+$$p_k(s) = \frac{e^{\beta \bar{u}_k(s)}}{\sum_{\ell} e^{\beta \bar{u}_\ell(s)}} \le e^{-\beta \Delta_k(s)} = \mathcal{O}\left( e^{-\Delta_k(s)^2 / 2\sigma_{\max}^2} \right)$$
+Its pairwise product $p_k(s) p_\ell(s)$ is exponentially suppressed for all $\ell$, contributing asymptotically zero to $\text{Salience}_j(s)$.
+\end{lemma}
+
+### Result:
+Only the small active differential diagnosis (diseases where $\Delta_k(s) \le 3\sigma_{\max}$) contribute to biomarker salience. The clinician automatically and dynamically orders tests separating the primary contenders for patient $s$!

@@ -1,39 +1,33 @@
 # Project Roadmap & Research Goals
 
-This document tracks the current status of the project, inventories finalized versus drafted modules, and details the active theoretical and algorithmic targets.
+This document tracks the current status of the project, inventories finalized versus drafted modules, and details active theoretical and algorithmic targets.
 
 ---
 
-## 1. Inventory of Files & Review Status
+## 1. Inventory of Files & Review Queue (Non-Redundant)
 
-| File | Status | Description |
-| :--- | :--- | :--- |
-| `Problem Description.md` | **Finalized (Human Written)** | Core clinical CDS framework: latent vitals $x$, symptoms $s=Bx$, budget $c$, autonomous graduation. |
-| `2 Actions/2 Actions Reduction.md` | **Finalized (Human Written)** | Binary coordinate reduction ($d = u_1 - u_2$, $p = h_1 - h_2$), epistemic contraction, feature classification. |
-| `2 Actions/<G> - Autonomous Test Selection.md` | **Draft (Under Review)** | Value of Information folded Gaussian derivation; proof of symptom-invariance for fixed $K=2$. |
-| `2 Actions/<G> - Graduation Regret & Crowding-Out.md` | **Draft (Under Review)** | Exact Sheppard regret formula; proof of the Crowding-Out Law for loud distractions. |
-| `2 Actions/<G> - Kingmaker & Curriculum Allocation.md` | **Draft (New Theory)** | Novel Monotone Panel Sieve algorithm; exact non-knapsack curriculum optimization for general $c$. |
-| `2 Actions/<G> - Ex-Post Dynamic Teaching.md` | **Draft (New Theory)** | Dynamic runtime teaching algorithm; Bellman threshold policy on stakes $|d^\top x|$; value monotonicity. |
-| `Multi-Action (K >= 3)/<G> - Multi-Action Formulation.md` | **Draft (New Theory)** | Formalization of $K \ge 3$ differential diagnosis; symptom-conditioned Gaussian innovation vector $\tilde{u}$. |
-| `Multi-Action (K >= 3)/<G> - Active Margin Theory.md` | **Draft (New Theory)** | Theorem proving how symptoms $s$ activate top competing disease margins and dictate test selection $\hat{F}(s)$. |
-| `Multi-Action (K >= 3)/<G> - Multi-Action Pedagogical Algorithm.md` | **Draft (New Theory)** | Margin-Cover Curriculum (MCC) algorithm for training multi-class diagnostic matrices without blind spots. |
+All redundant and superseded drafts have been moved to `Archive/`. The active reading queue consists strictly of distinct, non-overlapping modules:
+
+| Module | File | Status | Core Contribution |
+| :--- | :--- | :--- | :--- |
+| **Problem Setup** | `Problem Description.md` | **Finalized (Human Written)** | Core clinical CDS framework: latent vitals $x$, symptoms $s=Bx$, budget $c$, autonomous graduation. |
+| **K = 2 Setup** | `2 Actions/2 Actions Reduction.md` | **Finalized (Human Written)** | Binary coordinate reduction ($d = u_1 - u_2$, $p = h_1 - h_2$), epistemic contraction, feature classification. |
+| **K = 2 VoI** | `2 Actions/<G> - Autonomous Test Selection.md` | **Ready for Review** | Value of Information folded Gaussian derivation; proof of symptom-invariance for fixed $K=2$. |
+| **K = 2 Regret** | `2 Actions/<G> - Graduation Regret & Crowding-Out.md` | **Ready for Review** | Exact Sheppard regret formula; proof of the Crowding-Out Law for loud distractions. |
+| **K = 2 Curriculum**| `2 Actions/<G> - Kingmaker & Curriculum Allocation.md` | **Ready for Review** | The **Monotone Panel Sieve (MPS)** algorithm; exact non-knapsack curriculum optimization for general $c$. |
+| **K = 2 Runtime** | `2 Actions/<G> - Ex-Post Dynamic Teaching.md` | **Ready for Review** | Dynamic runtime teaching algorithm; Bellman threshold policy on stakes $|d^\top x|$; zero-regret teaching. |
+| **K >= 3 Setup** | `Multi-Action (K >= 3)/<G> - Multi-Action Formulation.md` | **Ready for Review** | Formalization of $K \ge 3$ differential diagnosis; symptom-conditioned Gaussian innovation vector $\tilde{u}$. |
+| **K >= 3 Saliency**| `Multi-Action (K >= 3)/<G> - Universal Saliency Theorem.md` | **Ready for Review** | **Closed-form Log-Sum-Exp Hessian expansion** proving universal margin-weighted saliency and exponential pruning for any $K \ge 2$. |
+| **K >= 3 Curriculum**| `Multi-Action (K >= 3)/<G> - Multi-Action Pedagogical Algorithm.md` | **Ready for Review** | The upgraded **Universal Saliency Gradient (USG)** algorithm tracking exact population VoI gradients. |
+| **Joint Scaffolding**| `Multi-Action (K >= 3)/<G> - Joint Action-Feature Scaffolding.md` | **Ready for Review** | Optimal joint $(A_t, F_t)$ curriculum policy; proof that minimal binary candidate menus maximize safe debiasing rate. |
+| **Memory Decay** | `Theory Extensions/<G> - Memory Decay & Restless Bandits.md` | **Ready for Review** | Solving cognitive forgetting via **Restless Multi-Armed Bandits**; proof of Whittle Indexability. |
+| **Simulations** | `Simulations/<G> - Empirical Simulation Results.md` | **Ready for Review** | Full Monte Carlo simulations verifying Theorems 1–4 ($R^2 = 0.99958$), crowding-out transitions, and MPS. |
 
 ---
 
-## 2. Core Research Goals & Theoretical Targets
+## 2. Active Targets & Open Directions
 
-### Goal 1: Beyond Standard Reductions (Novel Algorithmic Contributions)
-* We do **not** merely reduce curriculum allocation to standard 0–1 Knapsack and call an existing solver.
-* We develop **domain-tailored algorithms** that exploit the structural properties unique to pedagogical assistance:
-  1. **Monotone Saliency Separation**: In autonomous graduation, chosen panels are determined by relative salience ordering $p_j(m_j)^2 > p_k(m_k)^2$, creating an exact threshold geometry.
-  2. **Contraction Duality**: The deterministic contraction $p_j(m_j) = (1 - \psi(m_j))d_j + \psi(m_j)p_j^{(0)}$ imposes strict monotonicity constraints that eliminate vast swaths of the combinatorial search space.
-  3. **Zero-Regret State Coupling**: Under ex-post state observation, Sheppard's arcsine law enables free teaching at zero operational cost.
-
-### Goal 2: Multi-Action Triage ($K \ge 3$)
-* Establish why $K=2$ is symptom-invariant (single specialized clinic) whereas $K \ge 3$ is **dynamically symptom-driven** (general emergency triage).
-* Prove the **Active Margin Theorem**: symptoms $s$ filter the $K$ choices down to the active differential diagnosis, reducing multi-action test selection to pairwise margin saliency.
-* Formulate the **Margin-Cover Curriculum (MCC)** algorithm to schedule teaching across multiple competing diseases.
-
-### Goal 3: Publications & Translational Product Impact
-* **Target Venues**: ACM EC (Economics and Computation), NeurIPS, or CHIL (Conference on Health, Inference, and Learning).
-* **Clinical Product**: Pedagogical Clinical Decision Support (P-CDS)—an EHR residency preceptor that eliminates physician deskilling and automation bias by training doctors to autonomous competence.
+* [ ] **Human Review**: Review the clean queue above from `<G>` drafts to finalized modules.
+* [ ] **Non-Gaussian Robustness (Copula Transport / Berry-Esseen)**: Establish formal bounds for discrete vital sign scores (e.g., categorical Glasgow Coma Scale) via central limit projections.
+* [ ] **Empirical Benchmark on MIMIC-IV**: Adapt simulation scripts to run on real-world emergency triage EHR data (e.g., MIMIC-IV ED triage vitals and ICD-10 dispositions).
+* [ ] **Conference Paper Draft**: Package the theory and empirical simulations into an ACM EC / NeurIPS format monograph.
