@@ -28,8 +28,7 @@ To start, we consider that $\mathcal{A}$ has full access to $U, H^{(0)}, \psi$ .
 
 
 To confirm/further:
-- [ ] consider lossy H after graduation... if some feature isn't seen in some time window, can be forgotten?
-- [ ] what happens algm is able to reduce subset of actions shown
+- [ ] learning dependent on error (?) so then the curriculum is not just number of times i need to show this feature, but when i must show the feautre? or as a function? 
 - [ ] moving from gaussian to arbitrary distribution where certain symptoms/underlying conditions more frequent than others -- standardize and turn into gaussian?
 - [ ] Should $s = Bx$ where there is one $B$ matrix for each patient, or $B$ is dependent on each patient -- mask for what they disclose to doctor
 
