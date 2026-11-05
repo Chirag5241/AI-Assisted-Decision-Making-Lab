@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Distribution Map</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="index.html">Distribution Basics</a></h1>
+      <p class="strapline">A companion to the decision lab · 35 distributions, their shapes, and how they connect</p>
+    </div>
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="index.html">Explorer</a>
+      <a href="map.html" aria-current="page">Map</a>
+      <a class="lab" href="../overview.html">Decision lab</a>
+    </nav>
+  </header>
+
+  <div class="map-wrap">
+    <main class="map-main">
+      <div class="map-tools">
+        <button id="zoom-out" aria-label="Zoom out">−</button>
+        <button id="zoom-fit">Fit</button>
+        <button id="zoom-in" aria-label="Zoom in">+</button>
+        <label><input type="checkbox" id="all-labels"> Label every arrow</label>
+        <div class="legend" id="legend"></div>
+      </div>
+      <div class="map-scroll" id="scroll">
+        <svg id="map" role="img" aria-label="Map of 35 probability distributions with arrows for how each one turns into another"></svg>
+      </div>
+    </main>
+    <aside class="side" id="side" aria-live="polite"></aside>
+  </div>
+
+  <script src="dist.js"></script>
+  <script src="map.js"></script>
+</body>
+</html>

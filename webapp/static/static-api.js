@@ -8,6 +8,9 @@
   const MEAN_ABS_X = Math.sqrt(2 / Math.PI);          // E|x| for x ~ N(0, 1)
   const MAX_ACTIONS = 6, MAX_FEATURES = 6, MAX_WINDOWS = 12, MAX_SEED = 999;
   const AWARE_STREAM = 7919;    // the random fallback of the state-aware policy draws from its own stream of the seed
+  const PLAN_FEATURES = 3, PLAN_ROUNDS = 100;      // the planner searches over (round, counts): a few features only
+  const PLAN_RULES = { optimal: "the optimal plan", myopic: "the myopic rule" };
+  const ROOT_2PI = Math.sqrt(2 * Math.PI), PLAN_TIE = 1e-9;
 
   const sigmoid = (p, m) => {
     const w = p / 5, s = 1 / (1 + Math.exp(-(m - p) / w)), s0 = 1 / (1 + Math.exp(p / w));
@@ -261,15 +264,127 @@
     return windows;
   }
 
+  // ---- planning before the state is drawn, for two actions (simlab/planning.py) ----
+  //
+  // d is the true gap between the two actions' rows and g the gap the human believes on the shown features
+  // (zero on a hidden one). For x ~ N(0, I) the expected regret of a round is (|d| - g.d / |g|) / sqrt(2 pi).
+  function expectedRegret(g, d) {
+    let size = 0, dot = 0, norm = 0;
+    for (let j = 0; j < d.length; j++) { size += g[j] * g[j]; dot += g[j] * d[j]; norm += d[j] * d[j]; }
+    return (Math.sqrt(norm) - (size > 1e-24 ? dot / Math.sqrt(size) : 0)) / ROOT_2PI;
+  }
+  // every non-empty subset of at most `budget` features: smaller first, then the lower-numbered features
+  function planCandidates(n, budget) {
+    const size = (m) => m.filter(Boolean).length;
+    return subsets(n).filter((m) => size(m) <= budget).sort((a, b) => {
+      if (size(a) !== size(b)) return size(a) - size(b);
+      for (let j = 0; j < n; j++) if (a[j] !== b[j]) return a[j] ? -1 : 1;
+      return 0;
+    });
+  }
+  // The schedules for T rounds, set before any state is drawn: `optimal` has the least expected discounted
+  // regret, by dynamic programming over (round, how often each feature has been shown),
+  //     V_t(m) = min_F [ L(F, m) + delta V_{t+1}(m + 1_F) ],   V_T = 0,
+  // and `myopic` shows, each round, the subset losing least in that round. Each is {schedule, loss, gaveUp};
+  // `fixed[i][t]` is the expected regret of candidate i kept every round. phis[j][m] is feature j's curve.
+  let lastPlan = null;
+  function planSchedules(d, g0, phis, budget, delta, T) {
+    const key = JSON.stringify([d, g0, phis.map((phi) => phi.slice(0, T)), budget, delta, T]);
+    if (lastPlan && lastPlan.key === key) return lastPlan.made;
+    const n = d.length, sets = planCandidates(n, budget), S = sets.length;
+    const members = sets.map((set) => set.reduce((js, on, j) => (on ? js.concat(j) : js), []));
+    const believed = d.map((dj, j) => Array.from({ length: T }, (_, m) => dj + (g0[j] - dj) * (1 - phis[j][m])));
+    // each candidate's loss over the counts of its own features, the last of them changing fastest
+    const g = Array(n).fill(0), count = Array(n).fill(0);
+    const loss = members.map((js) => {
+      const table = new Float64Array(Math.pow(T, js.length));
+      g.fill(0); count.fill(0);
+      for (let i = 0; i < table.length; i++) {
+        for (const j of js) g[j] = believed[j][count[j]];
+        table[i] = expectedRegret(g, d);
+        for (let a = js.length - 1; a >= 0; a--) { if (++count[js[a]] < T) break; count[js[a]] = 0; }
+      }
+      return table;
+    });
+    const at = (i, m) => loss[i][members[i].reduce((index, j) => index * T + m[j], 0)];
+
+    const follow = (choose) => {
+      const m = Array(n).fill(0), schedule = [], cost = [], gaveUp = [], now = Array(S);
+      for (let t = 0; t < T; t++) {
+        let least = Infinity;
+        for (let i = 0; i < S; i++) { now[i] = at(i, m); if (now[i] < least) least = now[i]; }
+        const i = choose(t, m, now);
+        schedule.push(sets[i]); cost.push(now[i]); gaveUp.push(now[i] > least + PLAN_TIE);
+        for (const j of members[i]) m[j]++;
+      }
+      return { schedule, loss: cost, gaveUp };
+    };
+
+    // backwards over the rounds: in round t no feature has been shown more than t times. A count vector is
+    // one index, the last feature changing fastest; the rows of that last feature are worked through together.
+    const side = T + 1, last = n - 1, strides = Array.from({ length: n }, (_, j) => Math.pow(side, last - j));
+    const shift = members.map((js) => js.reduce((sum, j) => sum + strides[j], 0));      // to the counts after showing it
+    const hasLast = sets.map((set) => set[last]);
+    let later = new Float64Array(Math.pow(side, n)), value = new Float64Array(later.length);
+    const picks = [], lead = Array(last).fill(0), base = Array(S);
+    for (let t = T - 1; t >= 0; t--) {
+      const width = t + 1, pick = new Uint8Array(Math.pow(width, n));
+      lead.fill(0);
+      for (let row = 0; row < pick.length; row += width) {
+        let start = 0;
+        for (let j = 0; j < last; j++) start += lead[j] * strides[j];
+        // where each candidate's loss for this row begins: its own features among the leading ones
+        for (let i = 0; i < S; i++) {
+          let index = 0;
+          for (const j of members[i]) index = index * T + (j === last ? 0 : lead[j]);
+          base[i] = index;
+        }
+        for (let i = 0; i < S; i++) {
+          const table = loss[i], from = base[i], step = hasLast[i] ? 1 : 0, next = start + shift[i];
+          for (let c = 0; c < width; c++) {
+            const v = table[from + step * c] + delta * later[next + c];
+            if (i === 0) value[start + c] = v;
+            else if (v < value[start + c] - PLAN_TIE) { value[start + c] = v; pick[row + c] = i; }
+          }
+        }
+        for (let a = last - 1; a >= 0; a--) { if (++lead[a] < width) break; lead[a] = 0; }
+      }
+      picks[t] = pick;
+      [later, value] = [value, later];
+    }
+    const firstLeast = (now) => {
+      let best = 0;
+      for (let i = 1; i < S; i++) if (now[i] < now[best] - PLAN_TIE) best = i;
+      return best;
+    };
+    const made = {
+      sets,
+      optimal: follow((t, m) => picks[t][m.reduce((index, count) => index * (t + 1) + count, 0)]),
+      myopic: follow((t, m, now) => firstLeast(now)),
+      fixed: members.map((js, i) => Array.from({ length: T }, (_, t) => loss[i][js.reduce((index) => index * T + t, 0)])),
+    };
+    lastPlan = { key, made };
+    return made;
+  }
+
   async function world(q, signal) {
     const curveName = q.has("curve") ? q.get("curve") : "exponential";
     if (!(curveName in CURVES)) throw new BadRequest("unknown curve");
     const spec = CURVES[curveName];
-    const K = Math.trunc(num(q, "K", 3, 2, MAX_ACTIONS)), n = Math.trunc(num(q, "n", 3, 1, MAX_FEATURES));
-    const T = Math.trunc(num(q, "T", 100, 10, 300));
+    const policyName = q.get("policy");
+    const K = Math.trunc(num(q, "K", policyName === "planned" ? 2 : 3, 2, MAX_ACTIONS)), n = Math.trunc(num(q, "n", 3, 1, MAX_FEATURES));
+    let T = Math.trunc(num(q, "T", 100, 10, 300));
     let Fbase = mask(q, "F", n), Abase = mask(q, "A", K), windows = parseWindows(q, K, n, T);
+    // a schedule set before any state is drawn: two actions, a few features, every action offered
+    let planned = null;
+    if (policyName === "planned") {
+      if (K !== 2 || n > PLAN_FEATURES) throw new BadRequest(`a plan is made for two actions and at most ${PLAN_FEATURES} features`);
+      T = Math.min(T, PLAN_ROUNDS);
+      Fbase = Array(n).fill(true); Abase = Array(K).fill(true); windows = [];
+      planned = { budget: Math.trunc(num(q, "C", 2, 1, n)), rule: q.get("rule") === "myopic" ? "myopic" : "optimal" };
+    }
     // the state-aware policy chooses the features itself, within a budget, and offers every action
-    const aware = q.get("policy") === "aware"
+    const aware = policyName === "aware"
       ? { budget: Math.trunc(num(q, "C", 2, 1, n)), judge: q.get("judge") === "truth" ? "truth" : "belief",
         prefer: q.get("prefer") === "most" ? "most" : "margin" } : null;
     if (aware) { Fbase = Array(n).fill(true); Abase = Array(K).fill(true); windows = []; }
@@ -309,6 +424,8 @@
       bestTrue[p] = hi;
       regretCap = Math.max(regretCap, hi - lo); valueCap = Math.max(valueCap, hi, believed);
     }
+
+    const trueGap = planned ? U[0].map((u, j) => u - U[1][j]) : null;      // d = u_1 - u_2, for the closed form
 
     // The round's own loss, at the state x drawn for it and with the weights W[k][j] the human holds then:
     // regret, value gap, the pick and the best move. Actions that tie share the regret; the pick is the first.
@@ -385,16 +502,19 @@
       const acc = [], reg = [], vgap = [], beliefs = [], real = [];
       let disc = 0, mean = 0;
       for (let t = 0; t < T; t++) {
-        const [a, r, g] = evaluate(Ft[t], At[t], N);
-        acc.push(a); reg.push(r); vgap.push(g); mean += Math.pow(delta, t) * r;
         const W = U.map((row, k) => row.map((u, j) => u + (H0[k][j] - u) * (1 - phis[j][N[k][j]])));
+        let [a, r, g] = evaluate(Ft[t], At[t], N);
+        // two actions and every one offered: the average of the regret over states has a closed form
+        if (planned) r = expectedRegret(Ft[t].map((on, j) => (on ? W[0][j] - W[1][j] : 0)), trueGap);
+        acc.push(a); reg.push(r); vgap.push(g); mean += Math.pow(delta, t) * r;
         real.push(realized(W, Ft[t], At[t], xDraw[t]));
         disc += Math.pow(delta, t) * real[t].reg;
         if (keep) beliefs.push(W);
         for (let k = 0; k < K; k++) if (At[t][k]) for (let j = 0; j < n; j++) if (Ft[t][j]) N[k][j]++;
       }
       // once everything shown is learned: the last round's choice, kept up until every weight in use is right
-      const [accLimit, regLimit] = evaluate(Ft[T - 1], At[T - 1], null);
+      let [accLimit, regLimit] = evaluate(Ft[T - 1], At[T - 1], null);
+      if (planned) regLimit = expectedRegret(Ft[T - 1].map((on, j) => (on ? trueGap[j] : 0)), trueGap);
       return { acc, reg, vgap, disc, mean, real, accLimit, regLimit, beliefs };
     }
 
@@ -514,6 +634,13 @@
       }
     }
 
+    let made = null;
+    if (planned) {
+      made = planSchedules(trueGap, H0[0].map((h, j) => h - H0[1][j]), phis, planned.budget, delta, T);
+      candidates = made.sets;
+      Fbench = made[planned.rule].schedule;
+    }
+
     const now = score(Fbench, Abench, true);
     if (aware) {
       // Averaged over states, the bench is not the subset it happened to show: in another state it would have
@@ -571,12 +698,14 @@
     let rankings = null;
     if (full) {
       // Rank one family of fixed subsets; the bench is one of them unless its windows change this
-      // family over the rounds, and then it is ranked as an extra row.
+      // family over the rounds, and then it is ranked as an extra row. A plan is ranked by what it was
+      // made to minimise, the expected discounted regret.
       const rank = async (sets, bench, noun, policy) => {
         const fixed = steady(bench) && !aware, results = [];     // the state-aware policy is never one of the fixed subsets
         for (const set of sets) { results.push(fixed && same(set, bench[0]) ? now : score(...policy(set))); await breathe(); }
         if (!fixed) results.push(now);
-        const order = results.map((_, i) => i).sort((a, b) => results[a].disc - results[b].disc || a - b);
+        const by = planned ? "mean" : "disc";
+        const order = results.map((_, i) => i).sort((a, b) => results[a][by] - results[b][by] || a - b);
         const place = {};
         order.forEach((i, r) => { place[i] = r + 1; });
         const here = fixed ? sets.findIndex((set) => same(set, bench[0])) : sets.length;
@@ -586,17 +715,19 @@
           rows: listed.map((i) => {
             const extra = i === sets.length;
             return { rank: place[i], mask: extra ? null : sets[i],
-              label: extra ? (aware ? "the policy on the bench" : "the schedule on the bench") : describe(sets[i], noun),
+              label: extra ? (aware ? "the policy on the bench" : planned ? "the plan on the bench" : "the schedule on the bench") : describe(sets[i], noun),
               discounted: results[i].disc, mean: results[i].mean, start: results[i].acc[0], end: results[i].acc[T - 1], floor: results[i].regLimit,
               current: i === here, scheduled: extra };
           }),
           total: results.length, rank: place[here], best: { set: sets[best], disc: results[best].disc },
         };
       };
-      // (the state-aware policy is set against the fixed subsets within its budget, and no action subsets)
-      const byFeature = await rank(aware ? candidates : subsets(n), Fbench, "feature", (set) => [every(set), Abench]);
-      const byAction = aware ? null : await rank(subsets(K), Abench, "action", (set) => [Fbench, every(set)]);
-      if (!aware) {
+      // (a policy that chooses the features itself is set against the fixed subsets within its budget, and
+      // no action subsets)
+      const chosen = aware || planned;
+      const byFeature = await rank(chosen ? candidates : subsets(n), Fbench, "feature", (set) => [every(set), Abench]);
+      const byAction = chosen ? null : await rank(subsets(K), Abench, "action", (set) => [Fbench, every(set)]);
+      if (!chosen) {
         const kept = scheduled ? " every round" : "";       // a fixed subset, against a schedule that changes
         const featureHelps = byFeature.best.disc < now.disc - 1e-9;
         if (featureHelps) sentence += `On this draw, showing ${describe(byFeature.best.set, "feature")}${kept} instead would cut the discounted regret to ${f2(byFeature.best.disc)}. `;
@@ -633,6 +764,27 @@
     }
     if (rankings) delete rankings.features.best;
 
+    // a plan has its own sentence: what it expects, what it gives up, and what the simpler rules expect
+    let plan = null;
+    if (planned) {
+      const total = (series) => series.reduce((sum, v, t) => sum + Math.pow(delta, t) * v, 0);
+      const { budget, rule } = planned, other = rule === "optimal" ? "myopic" : "optimal";
+      const cost = { optimal: total(made.optimal.loss), myopic: total(made.myopic.loss) };
+      const fixedCost = made.fixed.map(total);
+      let bestFixed = 0;
+      fixedCost.forEach((v, i) => { if (v < fixedCost[bestFixed]) bestFixed = i; });
+      const bestName = describe(candidates[bestFixed], "feature");
+      const gaveUp = [];
+      made[rule].gaveUp.forEach((given, t) => { if (given) gaveUp.push(t); });
+      const most = budget < n ? `at most ${budget} of the ${n} features` : (n > 1 ? `any of the ${n} features` : "the one feature");
+      const capital = (text) => text[0].toUpperCase() + text.slice(1);
+      sentence = `Choosing ${most} for every round before its state is drawn, ${PLAN_RULES[rule]} expects a discounted regret of ${f2(cost[rule])}. `
+        + (gaveUp.length ? `It gives up ${gaveUp.length} round${gaveUp.length === 1 ? "" : "s"} to teach: there it shows a subset that loses more in that round than another would. `
+          : "It gives no round up: every round shows the subset that loses least in that round. ")
+        + `${capital(PLAN_RULES[other])} expects ${f2(cost[other])} and the best fixed subset, ${bestName}, ${f2(fixedCost[bestFixed])}.`;
+      plan = { budget, rule, other, cost, fixedCost, bestFixed, bestName, gaveUp };
+    }
+
     const changed = (rounds, t) => !same(rounds[t], rounds[t - 1]);
     const changes = [];
     for (let t = 1; t < T; t++) if (changed(Fbench, t) || changed(Abench, t)) changes.push(t);
@@ -656,9 +808,23 @@
         note: aware.ceiling > 1 - 1e-9 ? "by the truth, some subset within the budget ranks the best move first in every state"
           : `by the truth, with at most ${aware.budget} feature${aware.budget > 1 ? "s" : ""}; the rest need a hidden feature, whatever the human believes` };
     }
+    if (plan) {
+      const { rule, other, cost, fixedCost, bestFixed, bestName, gaveUp } = plan;
+      const apart = (v) => (Math.abs(v) < 0.005 ? "0.00" : signed2(v));       // no signed zero for two equal costs
+      stats.splice(0, stats.length,
+        { label: "On this draw", value: f2(now.disc), note: "the same schedule, on the states that were drawn after it was set" },
+        { label: `Against ${PLAN_RULES[other]}`, value: apart(cost[rule] - cost[other]), note: `expected; ${PLAN_RULES[other]} costs ${f2(cost[other])}` },
+        { label: "Against the best fixed subset", value: apart(cost[rule] - fixedCost[bestFixed]),
+          note: `expected; ${bestName} every round costs ${f2(fixedCost[bestFixed])}` },
+        { label: "Rounds given up to teach", value: String(gaveUp.length),
+          note: gaveUp.length ? "rounds showing a subset that loses more in that round than another would"
+            : "every round shows the subset that loses least in that round" });
+    }
 
     return {
-      K, n, T, seed, numeral: f2(now.disc), numeral_label: "discounted regret on this draw",
+      K, n, T, seed,
+      // a plan is made for the average over states, so that is its headline number
+      numeral: f2(planned ? now.mean : now.disc), numeral_label: planned ? "expected discounted regret" : "discounted regret on this draw",
       sentence: sentence.trim(), rankings, full, stats,
       // reg, discounted and value_gap are taken at the state drawn in each round; the *_mean series are their
       // averages over all states, and acc is the share of states with the best move
@@ -682,7 +848,15 @@
       // the state-aware policy: its budget, how many candidate subsets there are, and how many of them made the
       // human right in each round (0 means a random one was shown)
       policy: aware ? { budget: aware.budget, judge: aware.judge, prefer: aware.prefer, candidates: candidates.length, worked,
-        ceiling: aware.ceiling } : null,
+        ceiling: aware.ceiling }
+        // a plan: its budget and rule, the rounds it gives up, and the expected regret of each round under it, under
+        // the other rule and under the best fixed subset. `top` is the regret of a human who is always wrong and
+        // `guess` of one who cannot tell the actions apart; they depend on the truth alone.
+        : plan ? { budget: plan.budget, rule: plan.rule, candidates: candidates.length, gave_up: plan.gaveUp,
+          compare: ["optimal", "myopic"].map((key) => ({ key, total: plan.cost[key], series: made[key].loss.map((v) => round(v, 4)) }))
+            .concat([{ key: "fixed", mask: candidates[plan.bestFixed], total: plan.fixedCost[plan.bestFixed],
+              series: made.fixed[plan.bestFixed].map((v) => round(v, 4)) }]),
+          top: 2 * expectedRegret(Array(n).fill(0), trueGap), guess: expectedRegret(Array(n).fill(0), trueGap) } : null,
       choice: { picks: now.real.map((r) => r.pick + 1), best: now.real.map((r) => r.best + 1), missed: now.real.map((r) => r.reg > 1e-9) },
       acc_limit: now.accLimit, reg_limit: now.regLimit,
       regret_cap: regretCap, value_cap: valueCap,

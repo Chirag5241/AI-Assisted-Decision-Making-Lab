@@ -271,21 +271,57 @@ def test_timed_page_and_the_page_menu(client):
     assert 'id="add-window"' not in plain and 'window.BENCH_MODE = "fixed"' in plain
     # every page offers the Overview and every experiment, and the menu names the experiment you are on
     for path, name in (("/", "1 feature, 2 actions"), ("/worlds", "More actions and features"), ("/timed", "Timed hiding"),
-                       ("/two-actions", "The two-action problem"),
-                       ("/losses", "Alternatives to the regret loss"),
+                       ("/planned", "Planned subsets"), ("/two-actions", "The two-action problem"),
+                       ("/losses", "Alternatives to the regret loss"), ("/one-feature", "One feature a round"),
                        ("/aware", "State-aware subsets"), ("/correlated", "Correlated features"),
                        ("/experiments", "Experiment 1 figures")):
         html = client.get(path).data.decode()
         assert f'<summary class="current" title="Go to an experiment">{name}</summary>' in html
         assert f'<a href="{path}" aria-current="page"' in html and '<a href="/overview" >Overview</a>' in html
-        for other in ("/", "/worlds", "/timed", "/two-actions", "/losses", "/aware", "/correlated", "/experiments"):
+        for other in ("/", "/worlds", "/timed", "/planned", "/two-actions", "/losses", "/one-feature", "/aware", "/correlated",
+                      "/experiments"):
             assert f'<a href="{other}" ' in html
         # the problem written out, and the study of its loss, sit in the menu just before the bench that runs it
-        assert (html.index('<a href="/timed" ') < html.index('<a href="/two-actions" ')
-                < html.index('<a href="/losses" ') < html.index('<a href="/aware" '))
+        assert (html.index('<a href="/timed" ') < html.index('<a href="/planned" ') < html.index('<a href="/two-actions" ')
+                < html.index('<a href="/losses" ') < html.index('<a href="/one-feature" ') < html.index('<a href="/aware" '))
     overview = client.get("/overview").data.decode()
     assert '<a href="/overview" aria-current="page">Overview</a>' in overview
     assert '<summary  title="Go to an experiment">Experiments</summary>' in overview
+
+
+def test_the_one_feature_page_simulates_the_solution_and_where_correlation_breaks_it(client):
+    from webapp import guide
+    from webapp.app import _one_feature_study
+    html = client.get("/one-feature").data.decode()
+    for part in ('id="solved"', 'id="broken"', 'id="sweep"', 'id="fig-score"', 'id="fig-solved"', 'id="fig-broken"',
+                 'id="fig-plan"', 'id="imputed"', 'id="fig-imputed"', 'id="fig-imputed-plan"', 'id="fig-sweep"',
+                 "window.ONE_FEATURE = ", "/static/one_feature.js", 'href="/correlated">Correlated features</a> bench'):
+        assert part in html, part
+    assert html.count("<figure") == 7 and html.count("<table") == 3
+    assert all(b["endpoint"] != "one_feature_page" for b in guide.BENCHES)
+    assert client.get("/overview").data.decode().count('<a href="/one-feature">One feature a round</a>') == 1
+    study = _one_feature_study()
+    # independent: the search agrees with the solution, and the simulation with both
+    solved = study["solved"]
+    assert not solved["switches"] and solved["plan"] == [solved["rule"]] * study["T"]
+    best = min(solved["policies"], key=lambda p: p["total"])
+    assert best["total"] == solved["plan_value"] == solved["solution"] and abs(best["total_sim"] - best["total"]) < 0.02
+    assert study["check"]["rule"] == study["check"]["constant"] == 0 and study["check"]["worst"] < 1e-12
+    # correlated: the plan shows the proxy x2 first, then x1, and beats every feature kept forever
+    broken = study["broken"]
+    assert broken["switches"] and broken["plan"][:8] == [1] * 7 + [0] and broken["rule"] == 0
+    assert broken["policies"][-1]["name"] == "the plan" and broken["plan_value"] < min(p["total"] for p in broken["policies"][:2])
+    # filling in the backwards x2 keeps x1 wrong forever: the plan teaches x2 for two rounds first
+    imputed = study["imputed"]
+    assert imputed["rule"] == 0 and imputed["plan"][:3] == [1, 1, 0] and imputed["runs"] == [[1, 2], [0, 0]]
+    assert imputed["policies"][0]["total"] > 5 * imputed["plan_value"]
+    # and a human who fills in can be best taught a little at a time
+    assert study["interleaved"]["runs"] == [[1, 1], [0, 4], [1, 1], [0, 0]]
+    # it breaks more often as the features move together, and more often for the human who fills in
+    sweep = study["sweep"]
+    assert all(sweep[key][0] == 0 for key in ("rule", "constant", "imputed_rule", "imputed_constant"))
+    assert sweep["rule"][-1] > 0.3 and sweep["constant"][-1] > 0.05
+    assert sweep["imputed_rule"][-1] > sweep["rule"][-1] and sweep["imputed_constant"][-1] > 3 * sweep["constant"][-1]
 
 
 def test_the_losses_page_simulates_six_losses_and_ranks_the_policies_by_each(client):
@@ -359,7 +395,7 @@ def test_each_feature_can_have_its_own_learning_speed(client):
     fast = np.array(client.get(corr + "&p1=0.15").get_json()["beliefs"])
     np.testing.assert_array_equal(slow[:2], fast[:2])
     assert np.abs(slow[2]).max() < np.abs(fast[2]).max()                      # feature 3 has barely moved
-    for path in ("/worlds", "/timed", "/aware", "/correlated"):
+    for path in ("/worlds", "/timed", "/planned", "/aware", "/correlated"):
         assert 'id="each-speed"' in client.get(path).data.decode()
 
 
@@ -368,7 +404,7 @@ def test_every_bench_lists_the_same_six_figures_under_the_same_numbers(client):
     from webapp import guide
     titles = [figure["title"] for figure in guide.STANDARD_FIGURES]
     assert [figure["n"] for figure in guide.STANDARD_FIGURES] == [1, 2, 3, 4, 5, 6]
-    own = {"/": 2, "/worlds": 0, "/timed": 0, "/aware": 1, "/correlated": 3}
+    own = {"/": 2, "/worlds": 0, "/timed": 0, "/planned": 1, "/aware": 1, "/correlated": 3}
     for path, extra in own.items():
         html = client.get(path).data.decode()
         captions = re.findall(r"<figcaption><b>(?:<a [^>]*>)?Fig\. (\d+)(?:</a>)?</b>(.*?)(?:<span|</figcaption>)", html, re.S)
@@ -591,3 +627,84 @@ def test_the_two_action_problem_is_written_out_before_the_bench_that_runs_it(cli
     data = client.get("/api/world?K=2&n=3&policy=aware&rank=0&" + urlsplit(link).query).get_json()
     assert data["K"] == 2 and data["policy"]["budget"] == 2 and data["policy"]["judge"] == "belief"
     assert 0 < sum(count == 0 for count in data["policy"]["worked"]) < data["T"]
+
+
+def test_a_plan_set_before_the_states_are_drawn_gives_rounds_up_to_teach(client):
+    import numpy as np
+    from simlab import planning
+    world = "/api/world?policy=planned&K=2&n=3&U=1,0.5,1.5;0,1,0&H=1,0.5,0;0,1,1.5&curve=exponential&p1=0.1&T=100"
+    data = client.get(world + "&C=2&delta=0.95").get_json()
+    plan, schedule = data["policy"], np.array(data["schedule"]["F"]).T              # [round][feature]
+    # the human has feature 3 backwards: the plan shows it anyway, with feature 1, and gives those rounds up
+    assert plan["gave_up"] == list(range(7)) and (schedule[:7] == [1, 0, 1]).all()
+    # once feature 3 has turned round its weight is still too small to share a round with feature 1
+    assert (schedule[7:10] == [0, 0, 1]).all() and (schedule[10:] == [1, 0, 1]).all()
+    assert (np.array(data["schedule"]["A"]) == 1).all() and data["F"] == [True] * 3
+    optimal, myopic, fixed = plan["compare"]
+    assert [c["key"] for c in plan["compare"]] == ["optimal", "myopic", "fixed"] and fixed["mask"] == [True, False, True]
+    assert optimal["total"] < fixed["total"] < myopic["total"]
+    assert data["numeral"] == f"{optimal['total']:.2f}" == "5.41" and data["numeral_label"] == "expected discounted regret"
+    assert [s["value"] for s in data["stats"][1:]] == ["-0.56", "-0.19", "7"] and "gives up 7 rounds to teach" in data["sentence"]
+    # the average over states is the closed form at the beliefs of each round, and the plan's own account of it
+    beliefs = np.array(data["beliefs"])                                               # [feature][action][round]
+    gap, believed = np.array([1, -0.5, 1.5]), (beliefs[:, 0] - beliefs[:, 1]).T
+    np.testing.assert_allclose(data["series"]["reg_mean"], planning.expected_regret(believed * schedule, gap), atol=2e-3)
+    assert data["series"]["reg_mean"] == optimal["series"]
+    # a human who guesses loses half of what one who is always wrong does; the axis of Fig. 7 stops at the latter
+    assert plan["top"] == pytest.approx(np.sqrt(3.5 * 2 / np.pi)) and plan["guess"] == pytest.approx(plan["top"] / 2)
+    assert max(max(c["series"]) for c in plan["compare"]) <= plan["top"]
+    # ranked by the expectation: the plan first, an extra row above all six fixed subsets within the budget
+    rows = data["rankings"]["features"]["rows"]
+    assert [r["mean"] for r in rows] == sorted(r["mean"] for r in rows) and len(rows) == 7 and data["rankings"]["actions"] is None
+    assert rows[0]["scheduled"] and rows[0]["current"] and rows[0]["label"] == "the plan on the bench"
+    assert rows[1]["mask"] == [True, False, True] and rows[1]["mean"] == pytest.approx(fixed["total"])
+    # the draw moves the regret of the rounds and not the plan
+    other = client.get(world + "&C=2&delta=0.95&seed=3&rank=0").get_json()
+    assert other["schedule"] == data["schedule"] and other["policy"] == plan and other["series"]["reg"] != data["series"]["reg"]
+    assert other["stats"][0]["value"] != data["stats"][0]["value"] and other["numeral"] == "5.41"
+
+    # the myopic rule never shows the backwards feature, so the human never learns it
+    short = client.get(world + "&C=2&delta=0.95&rule=myopic&rank=0").get_json()
+    assert (np.array(short["schedule"]["F"]).T == [1, 1, 0]).all() and short["policy"]["gave_up"] == []
+    assert short["numeral"] == "5.97" and short["stats"][1]["label"] == "Against the optimal plan" and short["stats"][1]["value"] == "+0.56"
+    assert set(np.array(short["beliefs"])[2, 0]) == {0.0}
+
+    # an impatient algorithm does not teach: the optimal plan is then one fixed subset, a row of the table
+    hasty = client.get(world + "&C=2&delta=0.8").get_json()
+    assert (np.array(hasty["schedule"]["F"]).T == [1, 1, 0]).all() and hasty["policy"]["gave_up"] == []
+    rows = hasty["rankings"]["features"]["rows"]
+    assert len(rows) == 6 and rows[0]["current"] and not rows[0]["scheduled"] and rows[0]["mask"] == [True, True, False]
+    assert [s["value"] for s in hasty["stats"][1:]] == ["0.00", "0.00", "0"]
+    # patience is what buys the teaching: the plan is never worse than the myopic rule or a fixed subset
+    for delta in (0.5, 0.9, 0.97, 0.99):
+        for C in (1, 2, 3):
+            got = client.get(world + f"&C={C}&delta={delta}&rank=0").get_json()["policy"]
+            optimal, myopic, fixed = got["compare"]
+            assert optimal["total"] <= min(myopic["total"], fixed["total"]) + 1e-9, (delta, C)
+            assert got["candidates"] == [3, 6, 7][C - 1] and got["budget"] == C
+
+    # two actions, at most three features and a hundred rounds
+    assert client.get(world.replace("K=2", "K=3").replace("U=1,0.5,1.5;0,1,0", "U=1,0.5,1.5;0,1,0;0,0,0")
+                      .replace("H=1,0.5,0;0,1,1.5", "H=1,0.5,0;0,1,1.5;0,0,0")).status_code == 400
+    assert client.get("/api/world?policy=planned&n=4&U=1,0,0,0;0,1,0,0&H=0,0,0,0;0,0,0,0").status_code == 400
+    assert client.get(world.replace("T=100", "T=300") + "&rank=0").get_json()["T"] == 100
+    page = client.get("/planned").data.decode()
+    for part in ('window.BENCH_MODE = "planned"', 'id="fig-plan"', 'name="rule"', 'data-budget', 'max="100" step="10"',
+                 "before any state is drawn", '<a href="/aware">State-aware subsets</a>'):
+        assert part in page, part
+    assert 'id="K"' not in page and 'id="feature-chips"' not in page and 'id="fig-worked"' not in page
+    assert 'max="300" step="10"' in client.get("/worlds").data.decode()
+
+
+def test_the_distributions_companion_is_linked_from_every_page_and_served_as_is(client):
+    # every lab page links to the companion site, which lives apart in distributions/ as plain files
+    for path in ("/", "/overview", "/worlds", "/sepsis"):
+        assert '<a href="/distributions/"' in client.get(path).data.decode()
+    index, explorer = client.get("/distributions/"), client.get("/distributions/explorer.js")
+    assert index.status_code == 200 and b'<script src="dist.js"></script>' in index.data and b'href="map.html"' in index.data
+    assert explorer.status_code == 200 and client.get("/distributions/map.html").status_code == 200
+    assert client.get("/distributions/nope.js").status_code == 404
+    # its pages link back to the static build's overview.html, which the Flask site sends to /overview
+    assert b'href="../overview.html"' in index.data
+    back = client.get("/overview.html")
+    assert back.status_code == 302 and back.headers["Location"].endswith("/overview")

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1793865885">
 </head>
 <body>
   <header class="mast">
@@ -30,17 +30,25 @@
           
           <a href="timed.html" >Timed hiding</a>
           
+          <a href="planned.html" >Planned subsets</a>
+          
           <a href="two-actions.html" >The two-action problem</a>
           
           <a href="losses.html" >Alternatives to the regret loss</a>
           
+          <a href="one-feature.html" >One feature a round</a>
+          
           <a href="aware.html" aria-current="page">State-aware subsets</a>
+          
+          <a href="sepsis.html" >Sepsis, from data</a>
           
           <a href="correlated.html" >Correlated features</a>
           
           <a href="experiments.html"  class="apart">Experiment 1 figures</a>
         </div>
       </details>
+      
+      <a href="distributions/index.html" title="Distribution basics: an explorer and a map">Distributions</a>
     </nav>
   </header>
   
@@ -77,17 +85,21 @@
 
       <fieldset class="card">
         <legend>World size</legend>
+        
         <div class="row">
           <label for="K"><span class="sym plain">actions</span></label>
           <input type="range" id="K" data-size="K" min="2" max="6" step="1">
           <input type="number" data-size="K" min="2" max="6" step="1" aria-label="number of actions">
         </div>
+        
         <div class="row">
           <label for="n"><span class="sym plain">features</span></label>
           <input type="range" id="n" data-size="n" min="1" max="6" step="1">
           <input type="number" data-size="n" min="1" max="6" step="1" aria-label="number of features">
         </div>
+        
         <p class="hint">Growing the world adds random truth weights and zero beliefs; new features and actions start switched on.</p>
+        
       </fieldset>
 
       <fieldset class="card">
@@ -266,8 +278,11 @@
         <h2 class="section-title">Against a fixed subset</h2>
         <p class="section-sub" id="ranking-features-sub"></p>
         <div class="table-scroll"><table class="ranking">
-          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th><th scope="col" class="num">Discounted regret, this draw</th>
-            <th scope="col" class="num">Averaged over states</th><th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th>
+            
+            <th scope="col" class="num">Discounted regret, this draw</th><th scope="col" class="num">Averaged over states</th>
+            
+            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
           <tbody id="ranking-features"></tbody>
         </table></div>
       </div>
@@ -351,13 +366,13 @@
   window.BENCH_MODE = "aware";
   window.MAX_WINDOWS = 12;
 </script>
-<script src="webapp/static/charts.js?v=1791856097"></script>
+<script src="webapp/static/charts.js?v=1793865885"></script>
 <script src="webapp/static/figures.js?v=1791524128"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791916034"></script>
-<script src="webapp/static/static-api.js?v=1791525475"></script>
-<script src="webapp/static/worlds.js?v=1791523744"></script>
+<script src="webapp/static/probes.js?v=1793866242"></script>
+<script src="webapp/static/static-api.js?v=1793865885"></script>
+<script src="webapp/static/worlds.js?v=1793865885"></script>
 
   <script>
     // the page menu closes on Escape and on a click anywhere else

@@ -14,6 +14,7 @@ pytestmark = pytest.mark.skipif(shutil.which("node") is None or not (STATIC / "p
                                 reason="needs Node and a built webapp/static/probes.js (python build_pages.py)")
 
 W = "K=3&n=3&U=1,0.5,0;0,1,0.5;-0.5,0,1&H=1,0.5,1.5;0,1,0;-0.5,0,-1.5"
+P = "K=2&n=3&U=1,0.5,1.5;0,1,0&H=1,0.5,0;0,1,1.5"        # two actions; feature 3 is believed backwards
 QUERIES = [
     "/api/run?u1=1.2&u2=1&h1=0&h2=1.5&curve=exponential&p1=0.1&T=80&delta=0.95",
     "/api/run?u1=1&u2=0.5&h1=3&h2=2.8&curve=exponential&p1=0.3&p2=0.03&split=1&T=80&delta=0.9",   # p2 and split are ignored
@@ -56,6 +57,18 @@ QUERIES = [
     "/api/world?K=4&n=2&U=1,2;-1,0.5;0,0;2,-2&H=0,0;0,0;0,0;0,0&policy=aware&C=1&T=40&seed=3",   # blank beliefs: nothing works at first
     "/api/world?K=5&n=5&U=" + ";".join(",".join(str(((i * j) % 5 - 2) / 2) for j in range(5)) for i in range(5))
     + "&H=" + ";".join(",".join(str(((i + 2 * j) % 4 - 1.5) / 2) for j in range(5)) for i in range(5)) + "&policy=aware&C=3&T=50&seed=21",
+    # a schedule set before any state is drawn, for two actions: the optimal plan and the myopic rule
+    f"/api/world?{P}&policy=planned&C=2&curve=exponential&p1=0.1&T=100&delta=0.95",
+    f"/api/world?{P}&policy=planned&C=2&rule=myopic&curve=exponential&p1=0.1&T=100&delta=0.95&seed=4",
+    f"/api/world?{P}&policy=planned&C=3&ps=0.05,0.2,0.1&T=60&delta=0.98&seed=8",
+    f"/api/world?{P}&policy=planned&C=1&curve=sigmoid&p1=12&T=80&delta=0.97&rank=0",
+    f"/api/world?{P}&policy=planned&C=2&curve=hyperbolic&p1=5&T=50&delta=0.8",               # too impatient to teach: one fixed subset
+    f"/api/world?{P}&policy=planned&C=9&F=1,0,0&A=1,0&W=f1:0-5&T=300&delta=0.9&rank=0",        # the budget and the horizon are capped
+    "/api/world?policy=planned&n=2&U=1,-2;0,0&H=-1,1;0,0&C=1&curve=power%20law&p1=0.5&T=40&delta=0.99&seed=2",
+    "/api/world?policy=planned&n=1&U=1;0&H=0;1&C=1&p1=0.2&T=30",
+    "/api/world?policy=planned&n=2&U=1,1;1,1&H=0,0;0,0&C=2&T=20",                              # nothing to tell apart
+    f"/api/world?K=3&n=3&U=1,0.5,0;0,1,0.5;-0.5,0,1&H=1,0.5,1.5;0,1,0;-0.5,0,-1.5&policy=planned",   # three actions: both sides refuse it
+    "/api/world?policy=planned&n=4&U=1,0,0,0;0,1,0,0&H=0,0,0,0;0,0,0,0",                       # too many features
     # two moves that are equally good everywhere: either is correct, here and in the state-aware search
     "/api/world?K=3&n=3&U=1,1,0;1,1,0;0,0,1&H=1,0.5,1.5;0,1,0;-0.5,0,-1.5&policy=aware&C=2&T=120&seed=2",
     "/api/world?K=3&n=3&U=1,1,0;1,1,0;0,0,1&H=0,0,0;0,0,0;0,0,0&F=1,1,0&T=40&seed=2&rank=0",

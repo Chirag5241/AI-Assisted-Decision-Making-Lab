@@ -7,3 +7,6 @@ __pycache__/
 # one-off output of `python -m experiments.exp01_single_feature_flip --u ... --h0 ...`
 results/exp01/custom.png
 .obsidian/
+
+# PhysioNet 2019 raw data and derived patient arrays (see experiments/sepsis_data.py to fetch)
+data/

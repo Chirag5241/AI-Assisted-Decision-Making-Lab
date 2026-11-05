@@ -967,3 +967,16 @@ figure.absent figcaption { color: var(--ink-2); }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
+
+/* ---------- sepsis page: bars and their legend keys ---------- */
+
+.chart .bar { stroke: none; }
+.chart .bar.c-ink { fill: var(--ink); } .chart .bar.c-a1 { fill: var(--a1); } .chart .bar.c-a2 { fill: var(--a2); }
+.legend i.bar-key { height: 8px; width: 12px; vertical-align: 0; }
+.legend i.bar-key.c-a1 { background: var(--a1); } .legend i.bar-key.c-a2 { background: var(--a2); } .legend i.bar-key.c-ink { background: var(--ink); }
+
+/* two charts side by side, one per fill-in rule; stacked when there is no room */
+.pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 28px; }
+.pair-head { margin: 14px 0 4px; font: 500 12px/1.4 var(--mono); color: var(--ink); }
+@media (max-width: 900px) { .pair { grid-template-columns: minmax(0, 1fr); gap: 8px; } }
+.problem .guide-table tbody th span.source { display: block; margin-top: 3px; font: 400 14.5px/1.4 var(--body); color: var(--ink-2); }

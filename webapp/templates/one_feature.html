@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{# One feature a round, two actions: the solution's single-feature schedule simulated, then correlated states that
+   break it (webapp/app.py, _one_feature_study; simlab/one_feature.py). Python computes every number;
+   webapp/static/one_feature.js draws them. #}
+{% block title %}{{ current.name }} &middot; {{ site_name }}{% endblock %}
+
+{% macro vec(values) -%}({% for v in values %}{{ "%g"|format(v) }}{% if not loop.last %}, {% endif %}{% endfor %}){%- endmacro %}
+{% macro world(e) -%}
+<span class="math">d = {{ vec(e.d) }}</span>, <span class="math">g<sup>(0)</sup> = {{ vec(e.g0) }}</span>,
+<span class="math">&psi;(m) = {{ e.rate }}<sup>m</sup></span>, <span class="math">&delta; = {{ e.delta }}</span>
+{%- endmacro %}
+{% macro totals(e) %}
+<div class="table-scroll"><table class="guide-table">
+  <thead><tr><th scope="col">Shown</th><th scope="col" class="num">Discounted regret</th>
+    <th scope="col" class="num">Simulated, {{ "{:,}".format(study.runs) }} runs</th></tr></thead>
+  <tbody>
+    {% for p in e.policies|sort(attribute="total") %}
+    <tr><th scope="row">{{ p.name }}{% if loop.first %} <span>(best)</span>{% endif %}</th>
+      <td class="num">{{ "%.3f"|format(p.total) }}</td><td class="num">{{ "%.3f"|format(p.total_sim) }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div>
+{% endmacro %}
+
+{% block body %}
+<main class="guide problem">
+  <header class="guide-head">
+    <h2>One feature a round</h2>
+    <p class="lead">Two actions, one feature shown a round, <span class="math">x ~ N(0, I)</span>. The solution: show
+      the feature with the largest <span class="math">s<sub>j</sub> = |d<sub>j</sub>| (2&delta;<sup>&tau;<sub>j</sub></sup> &minus; 1)</span>
+      every round, where <span class="math">&tau;<sub>j</sub></span> is the number of showings before the human's
+      belief takes the sign of <span class="math">d<sub>j</sub></span>.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#solved">The solution, simulated</a><a href="#broken">Correlated features</a>
+      <a href="#imputed">Filling in the hidden features</a><a href="#sweep">How often it breaks</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="solved">
+    <h3>The solution, simulated</h3>
+    <p class="section-sub">The solution's worked example: {{ world(study.solved) }}. Feature 2 starts backwards.</p>
+    <figure>
+      <figcaption><b>Fig. 1</b>Each feature's score against the discount
+        <span class="cap-note">Teach x₂ once &delta; &gt; &radic;(2/3) &asymp; {{ "%.3f"|format(study.score.teach) }}.</span></figcaption>
+      <div class="chart narrow" id="fig-score"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 2</b>Expected regret of each round, &delta; = {{ study.solved.delta }}
+        <span class="cap-note">Simulated. A search of every schedule finds x{{ study.solved.plan[0] + 1 }} every round, the
+          solution's pick.</span></figcaption>
+      <div class="chart narrow" id="fig-solved"></div>
+    </figure>
+    {{ totals(study.solved) }}
+    <ul class="conventions">
+      <li>Solution's <span class="math">V* = {{ "%.3f"|format(study.solved.solution) }}</span>.</li>
+      <li><b>{{ "{:,}".format(study.worlds) }} random worlds</b> (3 features, <span class="math">d, g<sup>(0)</sup> ~ N(0, I)</span>,
+        <span class="math">&psi;(m) = r<sup>m</sup></span>, <span class="math">r ~ U(0.3, 0.8)</span>,
+        <span class="math">&delta; ~ U(0.6, 0.98)</span>): a search of every schedule finds one feature forever, the
+        largest <span class="math">s<sub>j</sub></span>, in {{ "{:,}".format(((1 - study.check.rule) * study.worlds)|round|int) }}.
+        Largest gap to <span class="math">V*</span>: {{ "%.0e"|format(study.check.worst) }}.</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="broken">
+    <h3>Correlated features</h3>
+    <p class="section-sub"><span class="math">x ~ N(0, &Sigma;)</span>, the human still uses only the shown feature.
+      Showing <span class="math">x<sub>j</sub></span> costs
+      <span class="math">(&radic;(d<sup>T</sup>&Sigma;d) &minus; sgn(g<sub>j</sub>) (&Sigma;d)<sub>j</sub>) / &radic;(2&pi;)</span>:
+      the right sign is that of <span class="math">(&Sigma;d)<sub>j</sub></span>, but learning takes
+      <span class="math">g<sub>j</sub></span> to the sign of <span class="math">d<sub>j</sub></span>.</p>
+    <p class="section-sub">{{ world(study.broken) }}, correlation {{ study.broken.rho }}:
+      <span class="math">&Sigma;d = {{ vec(study.broken.reach|map("round", 2)) }}</span>. x₂ stands in for x₁, so the human's
+      wrong belief about x₂ picks well, until they learn it.</p>
+    <figure>
+      <figcaption><b>Fig. 3</b>Expected regret of each round, correlated
+        <span class="cap-note">Simulated. The solution picks x{{ study.broken.rule + 1 }} every round.</span></figcaption>
+      <div class="chart narrow" id="fig-broken"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 4</b>The plan: what it shows each round</figcaption>
+      <div class="chart" id="fig-plan"></div>
+    </figure>
+    {{ totals(study.broken) }}
+  </section>
+
+  <section class="guide-section" id="imputed">
+    <h3>Filling in the hidden features</h3>
+    <p class="section-sub">As on the <a href="{{ url_for('correlated_page') }}">Correlated features</a> bench: the
+      human fills in <span class="math">x&#770;<sub>i</sub> = &Sigma;<sub>ij</sub> x<sub>j</sub></span> and scores
+      <span class="math">(&Sigma;g)<sub>j</sub> x<sub>j</sub></span>. Showing <span class="math">x<sub>j</sub></span> costs
+      <span class="math">(&radic;(d<sup>T</sup>&Sigma;d) &minus; sgn((&Sigma;g)<sub>j</sub>) (&Sigma;d)<sub>j</sub>) / &radic;(2&pi;)</span>:
+      it hangs on the beliefs about the hidden features, which showing <span class="math">x<sub>j</sub></span> never teaches.</p>
+    <p class="section-sub">{{ world(study.imputed) }}, correlation {{ study.imputed.rho }}. x₂ is backwards, so filling
+      it in spoils x₁: x₁ every round is wrong forever.</p>
+    <figure>
+      <figcaption><b>Fig. 5</b>Expected regret of each round, hidden features filled in
+        <span class="cap-note">Simulated. The solution picks x{{ study.imputed.rule + 1 }} every round.</span></figcaption>
+      <div class="chart narrow" id="fig-imputed"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 6</b>The plan: what it shows each round</figcaption>
+      <div class="chart" id="fig-imputed-plan"></div>
+    </figure>
+    {{ totals(study.imputed) }}
+    {% set e = study.interleaved %}
+    <ul class="conventions">
+      <li><b>Taught a little at a time.</b> {{ world(e) }}, correlation {{ e.rho }}: the plan shows
+        {% for j, k in e.runs %}{% if loop.last %}then x{{ j + 1 }} every round{% else %}x{{ j + 1 }}{% if k > 1 %} &times;{{ k }}{% endif %}, {% endif %}{% endfor %}
+        ({{ "%.3f"|format(e.plan_value) }}, against {{ "%.3f"|format((e.policies[:-1]|map(attribute="total")|min)) }} for the best
+        single feature).</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="sweep">
+    <h3>How often it breaks</h3>
+    <figure>
+      <figcaption><b>Fig. 7</b>Share of random worlds where each fails, against the correlation of every pair
+        <span class="cap-note">The same worlds as above: {{ "{:,}".format(study.worlds) }} for the human who uses the shown
+          feature alone, the first {{ study.imputed_worlds }} for the one who fills in.</span></figcaption>
+      <div class="chart narrow" id="fig-sweep"></div>
+    </figure>
+  </section>
+</main>
+
+<script>
+  window.ONE_FEATURE = {{ study|tojson }};
+</script>
+<script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('one_feature.js') }}"></script>
+{% endblock %}

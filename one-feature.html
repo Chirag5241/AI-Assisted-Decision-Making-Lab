@@ -1,0 +1,225 @@
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>One feature a round &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1793865885">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
+    </div>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" >Overview</a>
+      <details class="mast-menu">
+        <summary class="current" title="Go to an experiment">One feature a round</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" >More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="planned.html" >Planned subsets</a>
+          
+          <a href="two-actions.html" >The two-action problem</a>
+          
+          <a href="losses.html" >Alternatives to the regret loss</a>
+          
+          <a href="one-feature.html" aria-current="page">One feature a round</a>
+          
+          <a href="aware.html" >State-aware subsets</a>
+          
+          <a href="sepsis.html" >Sepsis, from data</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html"  class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
+      
+      <a href="distributions/index.html" title="Distribution basics: an explorer and a map">Distributions</a>
+    </nav>
+  </header>
+  
+<main class="guide problem">
+  <header class="guide-head">
+    <h2>One feature a round</h2>
+    <p class="lead">Two actions, one feature shown a round, <span class="math">x ~ N(0, I)</span>. The solution: show
+      the feature with the largest <span class="math">s<sub>j</sub> = |d<sub>j</sub>| (2&delta;<sup>&tau;<sub>j</sub></sup> &minus; 1)</span>
+      every round, where <span class="math">&tau;<sub>j</sub></span> is the number of showings before the human's
+      belief takes the sign of <span class="math">d<sub>j</sub></span>.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#solved">The solution, simulated</a><a href="#broken">Correlated features</a>
+      <a href="#imputed">Filling in the hidden features</a><a href="#sweep">How often it breaks</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="solved">
+    <h3>The solution, simulated</h3>
+    <p class="section-sub">The solution's worked example: <span class="math">d = (1, 3)</span>, <span class="math">g<sup>(0)</sup> = (2, -3)</span>,
+<span class="math">&psi;(m) = 0.6<sup>m</sup></span>, <span class="math">&delta; = 0.9</span>. Feature 2 starts backwards.</p>
+    <figure>
+      <figcaption><b>Fig. 1</b>Each feature's score against the discount
+        <span class="cap-note">Teach x₂ once &delta; &gt; &radic;(2/3) &asymp; 0.816.</span></figcaption>
+      <div class="chart narrow" id="fig-score"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 2</b>Expected regret of each round, &delta; = 0.9
+        <span class="cap-note">Simulated. A search of every schedule finds x2 every round, the
+          solution's pick.</span></figcaption>
+      <div class="chart narrow" id="fig-solved"></div>
+    </figure>
+    
+<div class="table-scroll"><table class="guide-table">
+  <thead><tr><th scope="col">Shown</th><th scope="col" class="num">Discounted regret</th>
+    <th scope="col" class="num">Simulated, 20,000 runs</th></tr></thead>
+  <tbody>
+    
+    <tr><th scope="row">x2 every round <span>(best)</span></th>
+      <td class="num">5.195</td><td class="num">5.193</td></tr>
+    
+    <tr><th scope="row">x1 every round</th>
+      <td class="num">8.626</td><td class="num">8.635</td></tr>
+    
+  </tbody>
+</table></div>
+
+    <ul class="conventions">
+      <li>Solution's <span class="math">V* = 5.195</span>.</li>
+      <li><b>1,000 random worlds</b> (3 features, <span class="math">d, g<sup>(0)</sup> ~ N(0, I)</span>,
+        <span class="math">&psi;(m) = r<sup>m</sup></span>, <span class="math">r ~ U(0.3, 0.8)</span>,
+        <span class="math">&delta; ~ U(0.6, 0.98)</span>): a search of every schedule finds one feature forever, the
+        largest <span class="math">s<sub>j</sub></span>, in 1,000.
+        Largest gap to <span class="math">V*</span>: 9e-16.</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="broken">
+    <h3>Correlated features</h3>
+    <p class="section-sub"><span class="math">x ~ N(0, &Sigma;)</span>, the human still uses only the shown feature.
+      Showing <span class="math">x<sub>j</sub></span> costs
+      <span class="math">(&radic;(d<sup>T</sup>&Sigma;d) &minus; sgn(g<sub>j</sub>) (&Sigma;d)<sub>j</sub>) / &radic;(2&pi;)</span>:
+      the right sign is that of <span class="math">(&Sigma;d)<sub>j</sub></span>, but learning takes
+      <span class="math">g<sub>j</sub></span> to the sign of <span class="math">d<sub>j</sub></span>.</p>
+    <p class="section-sub"><span class="math">d = (1, -0.5)</span>, <span class="math">g<sup>(0)</sup> = (-1, 1.5)</span>,
+<span class="math">&psi;(m) = 0.8<sup>m</sup></span>, <span class="math">&delta; = 0.9</span>, correlation 0.9:
+      <span class="math">&Sigma;d = (0.55, 0.4)</span>. x₂ stands in for x₁, so the human's
+      wrong belief about x₂ picks well, until they learn it.</p>
+    <figure>
+      <figcaption><b>Fig. 3</b>Expected regret of each round, correlated
+        <span class="cap-note">Simulated. The solution picks x1 every round.</span></figcaption>
+      <div class="chart narrow" id="fig-broken"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 4</b>The plan: what it shows each round</figcaption>
+      <div class="chart" id="fig-plan"></div>
+    </figure>
+    
+<div class="table-scroll"><table class="guide-table">
+  <thead><tr><th scope="col">Shown</th><th scope="col" class="num">Discounted regret</th>
+    <th scope="col" class="num">Simulated, 20,000 runs</th></tr></thead>
+  <tbody>
+    
+    <tr><th scope="row">the plan <span>(best)</span></th>
+      <td class="num">1.200</td><td class="num">1.200</td></tr>
+    
+    <tr><th scope="row">x1 every round</th>
+      <td class="num">1.675</td><td class="num">1.672</td></tr>
+    
+    <tr><th scope="row">x2 every round</th>
+      <td class="num">2.291</td><td class="num">2.289</td></tr>
+    
+  </tbody>
+</table></div>
+
+  </section>
+
+  <section class="guide-section" id="imputed">
+    <h3>Filling in the hidden features</h3>
+    <p class="section-sub">As on the <a href="correlated.html">Correlated features</a> bench: the
+      human fills in <span class="math">x&#770;<sub>i</sub> = &Sigma;<sub>ij</sub> x<sub>j</sub></span> and scores
+      <span class="math">(&Sigma;g)<sub>j</sub> x<sub>j</sub></span>. Showing <span class="math">x<sub>j</sub></span> costs
+      <span class="math">(&radic;(d<sup>T</sup>&Sigma;d) &minus; sgn((&Sigma;g)<sub>j</sub>) (&Sigma;d)<sub>j</sub>) / &radic;(2&pi;)</span>:
+      it hangs on the beliefs about the hidden features, which showing <span class="math">x<sub>j</sub></span> never teaches.</p>
+    <p class="section-sub"><span class="math">d = (1, 0.2)</span>, <span class="math">g<sup>(0)</sup> = (1, -3)</span>,
+<span class="math">&psi;(m) = 0.6<sup>m</sup></span>, <span class="math">&delta; = 0.9</span>, correlation 0.8. x₂ is backwards, so filling
+      it in spoils x₁: x₁ every round is wrong forever.</p>
+    <figure>
+      <figcaption><b>Fig. 5</b>Expected regret of each round, hidden features filled in
+        <span class="cap-note">Simulated. The solution picks x1 every round.</span></figcaption>
+      <div class="chart narrow" id="fig-imputed"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 6</b>The plan: what it shows each round</figcaption>
+      <div class="chart" id="fig-imputed-plan"></div>
+    </figure>
+    
+<div class="table-scroll"><table class="guide-table">
+  <thead><tr><th scope="col">Shown</th><th scope="col" class="num">Discounted regret</th>
+    <th scope="col" class="num">Simulated, 20,000 runs</th></tr></thead>
+  <tbody>
+    
+    <tr><th scope="row">the plan <span>(best)</span></th>
+      <td class="num">1.662</td><td class="num">1.651</td></tr>
+    
+    <tr><th scope="row">x2 every round</th>
+      <td class="num">2.825</td><td class="num">2.829</td></tr>
+    
+    <tr><th scope="row">x1 every round</th>
+      <td class="num">9.280</td><td class="num">9.283</td></tr>
+    
+  </tbody>
+</table></div>
+
+    
+    <ul class="conventions">
+      <li><b>Taught a little at a time.</b> <span class="math">d = (1, 0.3)</span>, <span class="math">g<sup>(0)</sup> = (1.5, -2.5)</span>,
+<span class="math">&psi;(m) = 0.7<sup>m</sup></span>, <span class="math">&delta; = 0.9</span>, correlation 0.7: the plan shows
+        x2, x1 &times;4, x2, then x1 every round
+        (1.477, against 3.075 for the best
+        single feature).</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="sweep">
+    <h3>How often it breaks</h3>
+    <figure>
+      <figcaption><b>Fig. 7</b>Share of random worlds where each fails, against the correlation of every pair
+        <span class="cap-note">The same worlds as above: 1,000 for the human who uses the shown
+          feature alone, the first 250 for the one who fills in.</span></figcaption>
+      <div class="chart narrow" id="fig-sweep"></div>
+    </figure>
+  </section>
+</main>
+
+<script>
+  window.ONE_FEATURE = {"T": 30, "broken": {"d": [1.0, -0.5], "delta": 0.9, "g0": [-1.0, 1.5], "plan": [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "plan_value": 1.2000119070516828, "policies": [{"exact": [0.4554, 0.4554, 0.4554, 0.4554, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166], "name": "x1 every round", "schedule": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.4528, 0.4548, 0.4529, 0.4586, 0.0166, 0.0167, 0.0168, 0.0166, 0.0151, 0.0166, 0.0172, 0.0162, 0.0164, 0.0166, 0.0166, 0.0159, 0.0166, 0.0166, 0.0162, 0.0168, 0.0166, 0.0161, 0.0164, 0.0174, 0.0163, 0.0172, 0.0171, 0.017, 0.0161, 0.0161], "total": 1.675150570029274, "total_sim": 1.6715747084775814}, {"exact": [0.0764, 0.0764, 0.0764, 0.0764, 0.0764, 0.0764, 0.0764, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956, 0.3956], "name": "x2 every round", "schedule": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "sim": [0.0772, 0.0774, 0.0761, 0.0761, 0.0769, 0.0776, 0.077, 0.3938, 0.3981, 0.3944, 0.3945, 0.3895, 0.3975, 0.3929, 0.3968, 0.3915, 0.395, 0.3994, 0.3956, 0.3979, 0.3935, 0.3909, 0.3933, 0.3963, 0.391, 0.3965, 0.3942, 0.3913, 0.3945, 0.3966], "total": 2.290908086060332, "total_sim": 2.2893256585541257}, {"exact": [0.0764, 0.0764, 0.0764, 0.0764, 0.0764, 0.0764, 0.0764, 0.4554, 0.4554, 0.4554, 0.4554, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166, 0.0166], "name": "the plan", "schedule": [1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.0764, 0.0771, 0.0766, 0.0758, 0.0739, 0.0754, 0.0767, 0.4609, 0.4575, 0.4534, 0.4521, 0.0167, 0.0163, 0.0165, 0.0159, 0.0166, 0.0167, 0.0166, 0.0171, 0.0167, 0.0168, 0.0167, 0.0175, 0.0165, 0.0169, 0.0168, 0.0162, 0.0166, 0.0165, 0.0165], "total": 1.200011907051683, "total_sim": 1.199600672568668}], "rate": 0.8, "reach": [0.55, 0.4], "rho": 0.9, "rule": 0, "runs": [[1, 7], [0, 0]], "scores": [0.31220000000000003, -0.02170309999999992], "solution": 3.2148124909686557, "switches": true, "tau": [4, 7], "top": 0.5}, "check": {"constant": 0.0, "imputed_constant": 0.0, "imputed_rule": 0.0, "rule": 0.0, "worst": 8.524287177075786e-16}, "imputed": {"d": [1.0, 0.2], "delta": 0.9, "g0": [1.0, -3.0], "impute": true, "plan": [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "plan_value": 1.6619551577921388, "policies": [{"exact": [0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928, 0.928], "name": "x1 every round", "schedule": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.9237, 0.9287, 0.9248, 0.9318, 0.9339, 0.9298, 0.9262, 0.9332, 0.9365, 0.9174, 0.9305, 0.9309, 0.933, 0.923, 0.9232, 0.938, 0.9258, 0.9272, 0.9292, 0.9224, 0.93, 0.9236, 0.9298, 0.9245, 0.9301, 0.9237, 0.916, 0.93, 0.9298, 0.9254], "total": 9.2801569443379, "total_sim": 9.283128194915344}, {"exact": [0.8642, 0.8642, 0.8642, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663, 0.0663], "name": "x2 every round", "schedule": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "sim": [0.8678, 0.8626, 0.8671, 0.0644, 0.0663, 0.0658, 0.0671, 0.067, 0.0684, 0.0664, 0.0665, 0.0656, 0.0664, 0.0674, 0.0667, 0.0632, 0.0658, 0.0662, 0.0667, 0.066, 0.0669, 0.0646, 0.066, 0.0689, 0.0683, 0.064, 0.0654, 0.066, 0.0664, 0.0655], "total": 2.825270847442717, "total_sim": 2.829385488983205}, {"exact": [0.8642, 0.8642, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025, 0.0025], "name": "the plan", "schedule": [1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.8659, 0.8502, 0.0025, 0.0024, 0.0026, 0.0026, 0.0026, 0.0026, 0.0024, 0.0025, 0.0026, 0.0024, 0.0024, 0.0025, 0.0025, 0.0026, 0.0025, 0.0025, 0.0027, 0.0025, 0.0023, 0.0025, 0.0025, 0.0025, 0.0025, 0.0026, 0.0026, 0.0023, 0.0026, 0.0021], "total": 1.661955157792139, "total_sim": 1.6514596085231077}], "rate": 0.6, "reach": [1.1600000000000001, 1.0], "rho": 0.8, "rule": 0, "runs": [[1, 2], [0, 0]], "scores": [1.0, 0.012576400000000022], "solution": 0.07900614111389276, "switches": true, "tau": [0, 6], "top": 1.0}, "imputed_worlds": 250, "interleaved": {"d": [1.0, 0.3], "delta": 0.9, "g0": [1.5, -2.5], "impute": true, "plan": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "plan_value": 1.4773585157893636, "policies": [{"exact": [0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729, 0.9729], "name": "x1 every round", "schedule": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.9686, 0.974, 0.9702, 0.9765, 0.9794, 0.9749, 0.971, 0.9775, 0.9805, 0.9617, 0.9758, 0.9758, 0.9785, 0.9666, 0.9681, 0.9833, 0.97, 0.9719, 0.9742, 0.9667, 0.9755, 0.9684, 0.9734, 0.9696, 0.9754, 0.9682, 0.9604, 0.9749, 0.9753, 0.9698], "total": 9.729486407805995, "total_sim": 9.7320342327349}, {"exact": [0.8892, 0.8892, 0.8892, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913, 0.0913], "name": "x2 every round", "schedule": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "sim": [0.8915, 0.8903, 0.8925, 0.0915, 0.0911, 0.0921, 0.0926, 0.0925, 0.0939, 0.0913, 0.0897, 0.0909, 0.0907, 0.0936, 0.0922, 0.0874, 0.0895, 0.0938, 0.0935, 0.0907, 0.0901, 0.0905, 0.0903, 0.0927, 0.0915, 0.0884, 0.0909, 0.0909, 0.0901, 0.0911], "total": 3.0751291707100967, "total_sim": 3.0830501661171854}, {"exact": [0.8892, 0.0075, 0.0075, 0.0075, 0.0075, 0.8892, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075, 0.0075], "name": "the plan", "schedule": [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.8892, 0.0079, 0.0074, 0.0076, 0.0075, 0.8917, 0.0079, 0.0076, 0.0073, 0.0076, 0.0079, 0.0074, 0.0074, 0.0077, 0.0075, 0.0079, 0.0076, 0.0076, 0.008, 0.0073, 0.0072, 0.0074, 0.0075, 0.0078, 0.0076, 0.0077, 0.0077, 0.0072, 0.0076, 0.0066], "total": 1.4773585157893636, "total_sim": 1.4797145282824025}], "rate": 0.7, "reach": [1.21, 1.0], "rho": 0.7, "rule": 0, "runs": [[1, 1], [0, 4], [1, 1], [0, 0]], "scores": [1.0, -0.013021859999999951], "solution": 0.17565688274036886, "switches": true, "tau": [0, 7], "top": 1.0}, "runs": 20000, "score": {"nothing": 0.7071067811865475, "series": [[1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0], [-1.5, -1.4394, -1.3776, -1.3146, -1.2504, -1.185, -1.1184, -1.0506, -0.9816, -0.9114, -0.84, -0.7674, -0.6936, -0.6186, -0.5424, -0.465, -0.3864, -0.3066, -0.2256, -0.1434, -0.06, 0.0246, 0.1104, 0.1974, 0.2856, 0.375, 0.4656, 0.5574, 0.6504, 0.7446, 0.84, 0.9366, 1.0344, 1.1334, 1.2336, 1.335, 1.4376, 1.5414, 1.6464, 1.7526, 1.86, 1.9686, 2.0784, 2.1894, 2.3016, 2.415, 2.5296, 2.6454, 2.7624, 2.8806]], "start": 0.5, "step": 0.01, "teach": 0.816496580927726}, "solved": {"d": [1.0, 3.0], "delta": 0.9, "g0": [2.0, -3.0], "plan": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "plan_value": 5.195336194634153, "policies": [{"exact": [0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626, 0.8626], "name": "x1 every round", "schedule": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0], "sim": [0.8586, 0.8588, 0.8636, 0.8767, 0.8599, 0.8544, 0.8682, 0.8674, 0.8647, 0.8593, 0.8611, 0.8742, 0.854, 0.8749, 0.8677, 0.8453, 0.8634, 0.879, 0.8654, 0.8709, 0.8495, 0.8697, 0.8872, 0.8651, 0.845, 0.8747, 0.8613, 0.8622, 0.8643, 0.8665], "total": 8.626239806086478, "total_sim": 8.63525464872845}, {"exact": [2.4584, 2.4584, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647, 0.0647], "name": "x2 every round", "schedule": [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], "sim": [2.467, 2.4451, 0.0654, 0.0665, 0.0651, 0.0625, 0.0641, 0.0643, 0.0676, 0.0632, 0.0636, 0.0631, 0.0675, 0.0651, 0.0659, 0.0652, 0.0655, 0.0677, 0.0642, 0.063, 0.0632, 0.0623, 0.0651, 0.0674, 0.063, 0.0629, 0.0658, 0.0636, 0.0693, 0.0658], "total": 5.195336194634153, "total_sim": 5.193279166498645}], "rate": 0.6, "reach": [1.0, 3.0], "rho": 0.0, "rule": 1, "runs": [[1, 0]], "scores": [1.0, 1.8600000000000003], "solution": 5.195336194634153, "switches": false, "tau": [0, 2], "top": 2.5}, "sweep": {"constant": [0.0, 0.0, 0.001, 0.004, 0.005, 0.007, 0.008, 0.013, 0.017, 0.018, 0.021, 0.025, 0.032, 0.039, 0.044, 0.052, 0.063, 0.074, 0.093, 0.106], "imputed_constant": [0.0, 0.008, 0.028, 0.044, 0.1, 0.108, 0.128, 0.192, 0.232, 0.256, 0.288, 0.296, 0.308, 0.32, 0.32, 0.324, 0.324, 0.352, 0.36, 0.368], "imputed_rule": [0.0, 0.044, 0.112, 0.136, 0.168, 0.196, 0.232, 0.272, 0.324, 0.356, 0.384, 0.388, 0.408, 0.424, 0.432, 0.44, 0.448, 0.48, 0.488, 0.496], "rule": [0.0, 0.021, 0.048, 0.065, 0.089, 0.108, 0.124, 0.143, 0.155, 0.168, 0.179, 0.195, 0.221, 0.244, 0.254, 0.266, 0.281, 0.304, 0.329, 0.343], "start": 0.0, "step": 0.05}, "worlds": 1000};
+</script>
+<script src="webapp/static/charts.js?v=1793865885"></script>
+<script src="webapp/static/one_feature.js?v=1792555194"></script>
+
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
+</body>
+</html>

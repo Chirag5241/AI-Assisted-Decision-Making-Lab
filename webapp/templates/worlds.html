@@ -1,7 +1,8 @@
 {% extends "base.html" %}
-{# One bench, three pages: "More actions and features" keeps the same subsets every round; "Timed hiding"
-   (timed) adds windows of rounds in which a feature or an action is held back; "State-aware subsets" (aware)
-   lets the algorithm choose the features for each round's state, within a budget. #}
+{# One bench, four pages: "More actions and features" keeps the same subsets every round; "Timed hiding"
+   (timed) adds windows of rounds in which a feature or an action is held back; "Planned subsets" (planned)
+   lets the algorithm set the features of every round before any state is drawn, for two actions; "State-aware
+   subsets" (aware) lets it choose them for each round's state. The last two work within a budget. #}
 {% from "_figures.html" import standard_set, own_head, own with context %}
 {% block title %}{{ bench.name }} &middot; {{ site_name }}{% endblock %}
 
@@ -33,13 +34,28 @@
           human picks the best move, so the round has no error. Every action is offered.
           <b>If no subset works, it shows one at random, for now.</b> It tries every subset, which grows
           exponentially with the number of features.</p>
+        {% elif planned %}
+        <p class="group-label first">Features it may show in a round</p>
+        <div class="row">
+          <label for="budget"><span class="sym plain">at most C</span></label>
+          <input type="range" id="budget" data-budget min="1" max="{{ max_features }}" step="1">
+          <input type="number" data-budget min="1" max="{{ max_features }}" step="1" aria-label="the most features shown in a round">
+        </div>
+        <p class="group-label">It shows, each round</p>
+        <div class="segmented two" role="radiogroup" aria-label="How the schedule is chosen">
+          <label><input type="radio" name="rule" value="optimal" checked><span>the optimal plan</span></label>
+          <label><input type="radio" name="rule" value="myopic"><span>what loses least now</span></label>
+        </div>
+        <p class="hint">The algorithm sets F<sub>t</sub> for every round <b>before any state is drawn</b>: it knows
+          U, H<sub>0</sub>, the learning curve and that x<sub>t</sub> ~ N(0, I), not x<sub>t</sub> itself. Every
+          action is offered.</p>
         {% else %}
         <p class="group-label first">Features it shows</p>
         <div class="chips" id="feature-chips"></div>
         <p class="group-label">Actions it offers</p>
         <div class="chips" id="action-chips"></div>
         {% endif %}
-        {% if aware %}{% elif timed %}
+        {% if aware or planned %}{% elif timed %}
         <p class="group-label">Hidden for a while</p>
         <div class="windows" id="windows"></div>
         <div class="actions"><button type="button" id="add-window">Add a window</button></div>
@@ -52,17 +68,23 @@
 
       <fieldset class="card">
         <legend>World size</legend>
+        {% if not planned %}
         <div class="row">
           <label for="K"><span class="sym plain">actions</span></label>
           <input type="range" id="K" data-size="K" min="2" max="{{ max_actions }}" step="1">
           <input type="number" data-size="K" min="2" max="{{ max_actions }}" step="1" aria-label="number of actions">
         </div>
+        {% endif %}
         <div class="row">
           <label for="n"><span class="sym plain">features</span></label>
           <input type="range" id="n" data-size="n" min="1" max="{{ max_features }}" step="1">
           <input type="number" data-size="n" min="1" max="{{ max_features }}" step="1" aria-label="number of features">
         </div>
+        {% if planned %}
+        <p class="hint">Two actions and at most {{ max_features }} features here: the plan is searched over how often each feature has been shown. A new feature gets random truth weights and zero beliefs.</p>
+        {% else %}
         <p class="hint">Growing the world adds random truth weights and zero beliefs; new features and actions start switched on.</p>
+        {% endif %}
       </fieldset>
 
       <fieldset class="card">
@@ -117,8 +139,8 @@
         <p class="hint">&delta; is the algorithm's patience: one number in (0, 1), as in the proposal, Noti et al. and Guan et al. Near 0 only the first rounds count; near 1 later rounds count almost as much.</p>
         <div class="row">
           <label for="T"><span class="sym plain">rounds</span></label>
-          <input type="range" id="T" data-key="T" min="10" max="300" step="10">
-          <input type="number" data-key="T" min="10" max="300" step="10" aria-label="number of rounds">
+          <input type="range" id="T" data-key="T" min="10" max="{{ max_rounds }}" step="10">
+          <input type="number" data-key="T" min="10" max="{{ max_rounds }}" step="10" aria-label="number of rounds">
         </div>
       </fieldset>
     </form>
@@ -143,27 +165,32 @@
 
     {{ standard_set() }}
 
-    {% if aware %}
+    {% if aware or planned %}
     {{ own_head() }}
     <section class="figs one">
       <figure>
         {{ own(1) }}
-        <div class="chart" id="fig-worked"></div>
+        <div class="chart" id="{{ 'fig-plan' if planned else 'fig-worked' }}"></div>
       </figure>
     </section>
     {% endif %}
 
-    <section class="rankings{% if aware %} one-table{% endif %}">
+    <section class="rankings{% if aware or planned %} one-table{% endif %}">
       <div>
-        <h2 class="section-title">{{ "Against a fixed subset" if aware else "Which features should it show?" }}</h2>
+        <h2 class="section-title">{{ "Against a fixed subset" if aware or planned else "Which features should it show?" }}</h2>
         <p class="section-sub" id="ranking-features-sub"></p>
         <div class="table-scroll"><table class="ranking">
-          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th><th scope="col" class="num">Discounted regret, this draw</th>
-            <th scope="col" class="num">Averaged over states</th><th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th>
+            {% if planned %}
+            <th scope="col" class="num">Expected discounted regret</th><th scope="col" class="num">On this draw</th>
+            {% else %}
+            <th scope="col" class="num">Discounted regret, this draw</th><th scope="col" class="num">Averaged over states</th>
+            {% endif %}
+            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
           <tbody id="ranking-features"></tbody>
         </table></div>
       </div>
-      {% if not aware %}
+      {% if not aware and not planned %}
       <div>
         <h2 class="section-title">Which actions should it offer?</h2>
         <p class="section-sub" id="ranking-actions-sub"></p>
@@ -189,6 +216,11 @@
       the truth: there a hidden feature is needed, and that share is a ceiling no belief can lift.
       <a href="{{ url_for('two_actions') }}">The two-action problem</a> writes the search out and lists what it
       leaves open.</p>
+    {% elif planned %}
+    <p class="callout"><mark>Without seeing the state, the algorithm can only choose what to teach. Some rounds are worth losing for that.</mark></p>
+    <p class="callout-sub">The schedule is set before round 0, so each round is weighed by its average over states.
+      Showing a feature the human has backwards loses more now than hiding it, and is the only way they learn it.
+      <a href="{{ url_for('aware') }}">State-aware subsets</a> is the same budget with the state seen first.</p>
     {% elif timed %}
     <p class="callout"><mark>Holding something back for a while pauses what the human learns about it. It does not undo it.</mark></p>
     <p class="callout-sub">Inside a window the feature or action is out of play: the human decides without it and its
@@ -209,7 +241,19 @@
     <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
       state. The grey in the figures, the bar at the top and the &ldquo;averaged over states&rdquo; numbers therefore
       score each round over 2,000 probe states drawn from <span class="math">N(0, I)</span>.</p>
-    {% if aware %}
+    {% if planned %}
+    <p>With two actions only the gap between their rows matters: <span class="math">d = u<sub>1</sub> &minus; u<sub>2</sub></span>
+      is the true gap and g the gap the human believes on the shown features. The average regret of a round is then exact:</p>
+    <p class="formula">L(F, m) = ( |d| &minus; g&middot;d / |g| ) / &radic;(2&pi;)</p>
+    <p>Only the direction of g counts. A feature whose gap the human has backwards pulls g away from d, so showing
+      it loses more than hiding it, until enough rounds have turned it round.</p>
+    <p class="formula">V<sub>t</sub>(m) = min<sub>|F| &le; C</sub> [ L(F, m) + &delta; V<sub>t+1</sub>(m + 1<sub>F</sub>) ]</p>
+    <p><b>The optimal plan</b> solves this over the counts m of how often each feature has been shown.
+      <b>What loses least now</b> takes the smallest L(F, m) each round and never looks ahead. Fig. 7 sets the two
+      against the best fixed subset; a grey box is a round the plan on the bench gives up.</p>
+    <p>The table ranks by the expected discounted regret, which the plan minimises, so the optimal plan is never
+      below a fixed subset. One draw of the states can still order them differently.</p>
+    {% elif aware %}
     <p>A subset F works in round t when the best move
       <span class="math">a = argmax<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub></span> ranks first on the shown features alone:</p>
     <p class="formula">&Sigma;<sub>i &isin; F</sub> w<sub>ai</sub> x<sub>i</sub> &gt; &Sigma;<sub>i &isin; F</sub> w<sub>ki</sub> x<sub>i</sub>&ensp;for every k &ne; a,&emsp;|F| &le; C</p>
@@ -248,7 +292,7 @@
     <p>Actions work like features: dropping one the human misjudges removes those mistakes, but it can never be picked
       when it is the best move, and it is never learned.</p>
     {% endif %}
-    {% if aware %}{% elif timed %}
+    {% if aware or planned %}{% elif timed %}
     <p>A window names one feature or one action, a first round and a last round. Windows may overlap, and one that runs
       past the horizon is cut off there. Every round must still show at least one feature and offer at least one
       action. The chips above the windows switch a feature or an action off for every round.</p>

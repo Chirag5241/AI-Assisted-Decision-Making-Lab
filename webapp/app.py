@@ -8,6 +8,7 @@ only collects the inputs and draws what comes back.
 from __future__ import annotations
 
 import itertools
+import json
 import math
 import os
 import re
@@ -18,9 +19,10 @@ import matplotlib
 
 matplotlib.use("Agg")
 import numpy as np
-from flask import Flask, abort, jsonify, render_template, request, send_from_directory, url_for
+from flask import Flask, abort, jsonify, redirect, render_template, request, send_from_directory, url_for
 
-from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, draws, losses, plotting, simulate
+from experiments import sepsis_data
+from simlab import CountLearner, ScheduledMasks, analysis, correlated, curves, draws, losses, one_feature, planning, plotting, simulate
 
 from . import guide
 
@@ -230,6 +232,19 @@ def overview():
     return render_template("overview.html", default_world=DEFAULT_TIMED, page="overview")
 
 
+@app.route("/distributions/")
+@app.route("/distributions/<path:name>")
+def distributions(name="index.html"):
+    """The companion site on probability distributions, plain static files kept in distributions/."""
+    return send_from_directory(ROOT / "distributions", name)
+
+
+@app.route("/overview.html")
+def overview_file():
+    """The companion site links back to the static build's overview.html; under Flask that is /overview."""
+    return redirect(url_for("overview"))
+
+
 @app.route("/")
 def lab():
     specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
@@ -265,6 +280,14 @@ DEFAULT_WORLD = dict(
 DEFAULT_TIMED = dict(DEFAULT_WORLD, W="f3:20-25")
 # the same world again, with at most two features shown and the algorithm choosing which for each state
 DEFAULT_AWARE = dict(DEFAULT_WORLD, C=2, judge="belief", prefer="margin")
+
+# The planner searches over (round, how often each feature has been shown): (t + 1)^n count vectors in round t,
+# so its bench keeps to a few features and a shorter horizon. It is for two actions (simlab/planning.py).
+PLAN_FEATURES, PLAN_ROUNDS = 3, 100
+# two actions; the human is right about features 1 and 2 and has feature 3, the one that matters most, backwards
+DEFAULT_PLANNED = dict(U=[[1.0, 0.5, 1.5], [0.0, 1.0, 0.0]], H=[[1.0, 0.5, 0.0], [0.0, 1.0, 1.5]],
+                       C=2, rule="optimal", curve="exponential", p1=0.1, T=100, delta=0.95)
+PLAN_RULES = dict(optimal="the optimal plan", myopic="the myopic rule")
 
 
 def _human_list(items):
@@ -468,8 +491,18 @@ def _aware_average(H, U, X, sets, judge, prefer, truth_margin):
     return tuple(float(np.where(found, of[chosen, cols], of.mean(axis=0)).mean()) for of in (right, regret, gap))
 
 
+@lru_cache(maxsize=64)
+def _plan(U_rows, H_rows, curve_name, speeds, T, delta, budget):
+    """The schedules set before any state is drawn, for a two-action world (simlab/planning.py). Kept apart
+    from `run_general` because it does not depend on the draw."""
+    U, H0 = np.array(U_rows), np.array(H_rows)
+    phi = CURVE_SPECS[curve_name]["make"](np.array(speeds))(np.arange(T)[:, None]).T          # (n, T)
+    return planning.plan(U[0] - U[1], H0[0] - H0[1], phi, budget, delta)
+
+
 @lru_cache(maxsize=512)
-def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=(), seed=0, aware=None):
+def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full=True, windows=(), seed=0, aware=None,
+                planned=None):
     """Score the chosen policy: the features and actions switched on, minus each window's rounds.
     `speeds` holds one learning speed per feature (all equal when the features share a curve).
     `seed` picks the draw of the states x_0 .. x_{T-1}: the loss of round t is taken at x_t, as in the
@@ -481,7 +514,11 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
     `aware` = (budget, judge, prefer) swaps the fixed choice for the state-aware policy: every action
     offered, and for each round's state a feature subset of at most `budget` on which the best move ranks
     first, judged by the truth or by the human's weights (see `_aware_schedule`). It is ranked against the
-    fixed subsets within the same budget."""
+    fixed subsets within the same budget.
+    `planned` = (budget, rule) swaps it for a schedule set before any state is drawn, for two actions: the
+    one with the least expected discounted regret ("optimal") or the one that shows, each round, the subset
+    losing least in that round ("myopic"). There the average of the regret over states is exact (a closed
+    form), and the fixed subsets within the budget are ranked by it."""
     U, H0 = np.array(U_rows), np.array(H_rows)
     K, n = U.shape
     F_base, A_base = np.array(F_now), np.array(A_now)
@@ -492,6 +529,10 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         budget, judge, prefer = aware
         sets = _aware_sets(n, budget)
         F_bench, worked = _aware_schedule(U, H0, curve, x_draw, sets, judge, prefer, seed)
+    if planned:
+        budget, rule = planned
+        made = _plan(U_rows, H_rows, curve_name, speeds, T, delta, budget)
+        sets, F_bench = made["sets"], made[rule]["schedule"]
 
     def every(sets):
         """Fixed subsets, the same every round: (count, size) to (T, count, size)."""
@@ -505,8 +546,9 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         # One batch holds every candidate policy: each feature subset with the bench's actions, each
         # action subset with the bench's features, then the bench itself and the world where nothing
         # is held back.
-        # (the state-aware policy is set against the fixed subsets within its budget, and no action subsets)
-        feature_sets, action_sets = (sets, np.zeros((0, K), bool)) if aware else (_subsets(n), _subsets(K))
+        # (a policy that chooses the features itself is set against the fixed subsets within its budget, and
+        # no action subsets)
+        feature_sets, action_sets = (sets, np.zeros((0, K), bool)) if aware or planned else (_subsets(n), _subsets(K))
         n_f, n_a = len(feature_sets), len(action_sets)
         F = np.concatenate([every(feature_sets), along(F_bench, n_a + 1), np.ones((T, 1, n), bool)], axis=1)
         A = np.concatenate([along(A_bench, n_f), every(action_sets), along(A_bench), np.ones((T, 1, K), bool)], axis=1)
@@ -535,6 +577,11 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         for t in range(T):
             acc[t, now], reg[t, now], value_gap[t, now] = _aware_average(res.H[t, now], U, X, sets, judge, prefer, truth_margin)
         acc_limit[now], reg_limit[now], _ = _aware_average(U, U, X, sets, judge, prefer, truth_margin)
+    if planned:
+        # two actions and every one offered: the average of the regret over states has a closed form
+        gap = U[0] - U[1]
+        reg = planning.expected_regret((res.H[:T, :, 0] - res.H[:T, :, 1]) * F, gap)
+        reg_limit = planning.expected_regret(gap * F[-1], gap)
     # The round's own loss, at the state drawn for it: regret l(x_t, y_hat_t), value gap, the pick and the
     # best move, each (T, B). The objective is their discounted sum on this draw; `mean_discounted` is the
     # same sum of the averages over states.
@@ -552,12 +599,14 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
 
     def ranking(offset, sets, bench, noun):
         """Rank one family of fixed subsets by discounted regret; list the best 8 and the bench. The bench
-        is one of them unless its windows change this family over the rounds: then it is an extra row."""
+        is one of them unless its windows change this family over the rounds: then it is an extra row. A
+        plan is ranked by what it was made to minimise, the expected discounted regret."""
         fixed = offset + np.arange(len(sets))
         steady = bool((bench == bench[0]).all()) and not aware      # the state-aware policy is never one of them
         here = offset + int(np.flatnonzero((sets == bench[0]).all(axis=1))[0]) if steady else now
         ids = fixed if steady else np.append(fixed, now)
-        order = ids[np.argsort(discounted[ids], kind="stable")]
+        by = mean_discounted if planned else discounted
+        order = ids[np.argsort(by[ids], kind="stable")]
         rank = {int(b): i + 1 for i, b in enumerate(order)}
         listed = sorted(set(order[:8].tolist()) | {here}, key=rank.get)
         rows = []
@@ -565,16 +614,17 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
             scheduled = b == now and not steady
             rows.append(dict(
                 rank=rank[b], mask=None if scheduled else [bool(v) for v in sets[b - offset]],
-                label=("the policy on the bench" if aware else "the schedule on the bench") if scheduled
+                label=("the policy on the bench" if aware else "the plan on the bench" if planned
+                       else "the schedule on the bench") if scheduled
                 else _describe(sets[b - offset], noun),
                 discounted=float(discounted[b]), mean=float(mean_discounted[b]), start=float(acc[0, b]), end=float(acc[-1, b]),
                 floor=float(reg_limit[b]), current=b == here, scheduled=scheduled))
-        return dict(rows=rows, total=len(ids), rank=rank[here], best=int(fixed[discounted[fixed].argmin()]))
+        return dict(rows=rows, total=len(ids), rank=rank[here], best=int(fixed[by[fixed].argmin()]))
 
     rankings = None
     if full:
         by_feature = ranking(0, feature_sets, F_bench, "feature")
-        by_action = None if aware else ranking(n_f, action_sets, A_bench, "action")
+        by_action = None if aware or planned else ranking(n_f, action_sets, A_bench, "action")
 
     # What the last round holds back decides the lasting loss. Usually that is what was held back all
     # along; a window that runs to the end of the horizon leaves something out that was in use before.
@@ -602,7 +652,7 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         sentence += "Once everything shown is learned, the human always picks the best move. "
     else:
         sentence += "Once everything shown at the end is learned, the human always picks the best move. "
-    if full and not aware:
+    if full and not aware and not planned:
         best_f, best_a = by_feature["best"], by_action["best"]
         kept = " every round" if scheduled else ""       # a fixed subset, against a schedule that changes
         feature_helps = discounted[best_f] < discounted[now] - 1e-9
@@ -646,6 +696,26 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
             del by_feature["best"]
             rankings = dict(features=by_feature, actions=None)
 
+    if planned:
+        # a plan has its own sentence: what it expects, what it gives up, and what the simpler rules expect
+        cost = {key: float(weights @ made[key]["loss"]) for key in PLAN_RULES}
+        fixed_cost = made["fixed"] @ weights
+        best_fixed = int(fixed_cost.argmin())
+        best_name = _describe(sets[best_fixed], "feature")
+        other = "myopic" if rule == "optimal" else "optimal"
+        gave_up = np.flatnonzero(made[rule]["gave_up"]).tolist()
+        most = f"at most {budget} of the {n} features" if budget < n else (f"any of the {n} features" if n > 1 else "the one feature")
+        sentence = (f"Choosing {most} for every round before its state is drawn, {PLAN_RULES[rule]} expects a discounted "
+                    f"regret of {cost[rule]:.2f}. ")
+        sentence += (f"It gives up {len(gave_up)} round{'' if len(gave_up) == 1 else 's'} to teach: there it shows a subset "
+                     "that loses more in that round than another would. " if gave_up
+                     else "It gives no round up: every round shows the subset that loses least in that round. ")
+        sentence += (f"{PLAN_RULES[other].capitalize()} expects {cost[other]:.2f} and the best fixed subset, {best_name}, "
+                     f"{fixed_cost[best_fixed]:.2f}.")
+        if full:
+            del by_feature["best"]
+            rankings = dict(features=by_feature, actions=None)
+
     held_back = not (F_bench.all() and A_bench.all())
     stats = [
         dict(label="Averaged over states", value=f"{mean_discounted[now]:.2f}",
@@ -671,11 +741,28 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
                               f"by the truth, with at most {budget} feature{'s' if budget > 1 else ''}; the rest need a "
                               "hidden feature, whatever the human believes"))
 
+    if planned:
+        apart = lambda v: "0.00" if abs(v) < 0.005 else f"{v:+.2f}"       # no signed zero for two equal costs
+        stats = [
+            dict(label="On this draw", value=f"{discounted[now]:.2f}",
+                 note="the same schedule, on the states that were drawn after it was set"),
+            dict(label=f"Against {PLAN_RULES[other]}", value=apart(cost[rule] - cost[other]),
+                 note=f"expected; {PLAN_RULES[other]} costs {cost[other]:.2f}"),
+            dict(label="Against the best fixed subset", value=apart(cost[rule] - fixed_cost[best_fixed]),
+                 note=f"expected; {best_name} every round costs {fixed_cost[best_fixed]:.2f}"),
+            dict(label="Rounds given up to teach", value=str(len(gave_up)),
+                 note=("rounds showing a subset that loses more in that round than another would" if gave_up
+                       else "every round shows the subset that loses least in that round")),
+        ]
+
     # The human's choice and the best move at the state drawn in each round. A round is missed when the
     # pick costs regret there.
     picks, best_moves, missed = real_pick[:, now], real_best[:, now], real_reg[:, now] > 1e-9
     return dict(
-        K=K, n=n, T=T, seed=seed, numeral=f"{discounted[now]:.2f}", numeral_label="discounted regret on this draw",
+        K=K, n=n, T=T, seed=seed,
+        # a plan is made for the average over states, so that is its headline number
+        numeral=f"{mean_discounted[now] if planned else discounted[now]:.2f}",
+        numeral_label="expected discounted regret" if planned else "discounted regret on this draw",
         sentence=sentence.strip(), rankings=rankings, full=full, stats=stats,
         # The browser draws the figures from these. reg, discounted and value_gap are taken at the state
         # drawn in each round; the *_mean series are their averages over all states, and acc is the share
@@ -698,7 +785,16 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
         # the state-aware policy: its budget, how many candidate subsets there are, and how many of them made
         # the human right in each round (0 means a random one was shown)
         policy=dict(budget=budget, judge=judge, prefer=prefer, candidates=len(sets), worked=worked.tolist(),
-                    ceiling=ceiling) if aware else None,
+                    ceiling=ceiling) if aware else
+        # a plan: its budget and rule, the rounds it gives up, and the expected regret of each round under it,
+        # under the other rule and under the best fixed subset. `top` is the regret of a human who is always
+        # wrong and `guess` of one who cannot tell the actions apart; they depend on the truth alone.
+        dict(budget=budget, rule=rule, candidates=len(sets), gave_up=gave_up,
+             compare=[dict(key=key, total=cost[key], series=np.round(made[key]["loss"], 4).tolist()) for key in PLAN_RULES]
+             + [dict(key="fixed", mask=sets[best_fixed].tolist(), total=float(fixed_cost[best_fixed]),
+                     series=np.round(made["fixed"][best_fixed], 4).tolist())],
+             top=float(2 * planning.expected_regret(np.zeros(n), gap)),
+             guess=float(planning.expected_regret(np.zeros(n), gap))) if planned else None,
         choice=dict(picks=(picks + 1).tolist(), best=(best_moves + 1).tolist(), missed=missed.tolist()),
         acc_limit=float(acc_limit[now]), reg_limit=float(reg_limit[now]),
         regret_cap=regret_cap, value_cap=value_cap,
@@ -706,12 +802,15 @@ def run_general(U_rows, H_rows, F_now, A_now, curve_name, speeds, T, delta, full
 
 
 def _bench_page(page, default_world, mode):
-    """One bench, three pages: `mode` is "fixed" (the same subsets every round), "timed" (windows of rounds in
-    which something is held back) or "aware" (the features are chosen for each round's state)."""
+    """One bench, four pages: `mode` is "fixed" (the same subsets every round), "timed" (windows of rounds in
+    which something is held back), "planned" (the features of every round are set before any state is drawn)
+    or "aware" (the features are chosen for each round's state)."""
     specs = {name: {k: v for k, v in spec.items() if k != "make"} for name, spec in CURVE_SPECS.items()}
+    planned = mode == "planned"
     return render_template("worlds.html", curve_specs=specs, default_world=default_world, page=page, mode=mode,
-                           timed=mode == "timed", aware=mode == "aware",
-                           max_actions=MAX_ACTIONS, max_features=MAX_FEATURES, max_windows=MAX_WINDOWS)
+                           timed=mode == "timed", aware=mode == "aware", planned=planned,
+                           max_actions=MAX_ACTIONS, max_features=PLAN_FEATURES if planned else MAX_FEATURES,
+                           max_rounds=PLAN_ROUNDS if planned else 300, max_windows=MAX_WINDOWS)
 
 
 @app.route("/worlds")
@@ -723,6 +822,11 @@ def worlds():
 def timed():
     """The same bench, with windows of rounds in which a feature or an action is held back."""
     return _bench_page("timed", DEFAULT_TIMED, "timed")
+
+
+@app.route("/planned")
+def planned():
+    return _bench_page("planned", DEFAULT_PLANNED, "planned")
 
 
 @app.route("/aware")
@@ -842,16 +946,139 @@ def losses_page():
     return render_template("losses.html", page="losses", study=_loss_study())
 
 
+# ---------------------------------------------------------------------------
+# One feature a round, two actions: the solution's single-feature schedule, and correlated states that break it
+# ---------------------------------------------------------------------------
+
+ONE_RUNS, ONE_WORLDS, ONE_T = 20000, 1000, 30       # Monte Carlo runs per schedule, random worlds per check, rounds drawn
+ONE_IMPUTED_WORLDS = 250                            # the first of those worlds, for the slower search over every count
+ONE_PSI_LEN = 400                                   # counts the learning curve is tabled for; every flip is well before
+# the solution's worked example; a pair of features moving together where the plan switches; the same for a human
+# who fills in the hidden feature; and one where that human is best taught a little at a time
+ONE_SOLVED = dict(d=[1.0, 3.0], g0=[2.0, -3.0], rate=0.6, delta=0.9, rho=0.0)
+ONE_BROKEN = dict(d=[1.0, -0.5], g0=[-1.0, 1.5], rate=0.8, delta=0.9, rho=0.9)
+ONE_IMPUTED = dict(d=[1.0, 0.2], g0=[1.0, -3.0], rate=0.6, delta=0.9, rho=0.8, impute=True)
+ONE_INTERLEAVED = dict(d=[1.0, 0.3], g0=[1.5, -2.5], rate=0.7, delta=0.9, rho=0.7, impute=True)
+
+
+def _equicorrelated(n, rho):
+    return (1.0 - rho) * np.eye(n) + rho * np.ones((n, n))
+
+
+def _one_costs(d, g0, psi, Sigma, impute):
+    """The search's value and plan for ONE_PSI_LEN rounds, and the per-round cost of any schedule."""
+    if impute:
+        C = one_feature.imputed_costs(d, g0, psi, Sigma, one_feature.imputed_caps(d, g0, psi, Sigma))
+        return C, (lambda delta, T: one_feature.optimal_grid(C, delta, T)), (lambda s: one_feature.grid_schedule_costs(C, s))
+    c = one_feature.costs(d, g0, psi, Sigma)
+    return c, (lambda delta, T: one_feature.optimal(c, delta, T)), (lambda s: one_feature.schedule_costs(c, s))
+
+
+def _one_example(world):
+    """Per-round regret of each single feature kept forever and of the plan, exact and simulated."""
+    d, g0, delta, impute = np.array(world["d"]), np.array(world["g0"]), world["delta"], world.get("impute", False)
+    psi, Sigma = world["rate"] ** np.arange(ONE_PSI_LEN), _equicorrelated(len(d), world["rho"])
+    table, search, cost_of = _one_costs(d, g0, psi, Sigma, impute)
+    value, plan = search(delta, ONE_PSI_LEN)
+    weight = delta ** np.arange(ONE_PSI_LEN)
+    rule = int(one_feature.scores(d, g0, psi, delta).argmax())
+
+    def run(name, schedule, seed):
+        # summed over ONE_PSI_LEN rounds, by which every cost here has settled, then the last cost forever
+        exact = cost_of(schedule)
+        sim = one_feature.simulate(d, g0, psi, schedule[:ONE_T], ONE_RUNS, Sigma, seed, impute)
+        later = exact[ONE_T:] @ weight[ONE_T:] + exact[-1] * delta ** ONE_PSI_LEN / (1.0 - delta)
+        return dict(name=name, schedule=[int(j) for j in schedule[:ONE_T]], exact=np.round(exact[:ONE_T], 4).tolist(),
+                    sim=np.round(sim, 4).tolist(), total=float(exact[:ONE_T] @ weight[:ONE_T] + later),
+                    total_sim=float(sim @ weight[:ONE_T] + later))
+
+    n = len(d)
+    policies = [run(f"x{j + 1} every round", np.full(ONE_PSI_LEN, j), j) for j in range(n)]
+    switches = bool((plan != plan[0]).any())
+    if switches:
+        policies.append(run("the plan", plan, n))
+    # the plan as runs of one feature, up to the one it keeps: [[feature, rounds], ...]
+    last = int(np.flatnonzero(plan != plan[-1])[-1]) + 1 if switches else 0
+    runs = [[int(j), len(list(group))] for j, group in itertools.groupby(plan[:last])] + [[int(plan[-1]), 0]]
+    return dict(world, policies=policies, plan=[int(j) for j in plan[:ONE_T]], plan_value=value, switches=switches, runs=runs,
+                rule=rule, tau=one_feature.flip_counts(d, g0, psi).tolist(),
+                scores=one_feature.scores(d, g0, psi, delta).tolist(), reach=(Sigma @ d).tolist(),
+                solution=float(one_feature.solution_value(d, g0, psi, delta)), top=float(np.ceil(table.max() / 0.5) * 0.5))
+
+
+def _one_worlds(rho, seed=0):
+    """Over ONE_WORLDS random three-feature worlds with every pair correlated rho: how often the solution's rule
+    (computed as if the features were independent) misses the optimum, and how often no single feature forever
+    reaches it; the same for the human who fills in hidden features, over the first ONE_IMPUTED_WORLDS of them.
+    Also the largest gap between the search and the solution's V* (meaningful at rho = 0, where V* should hold)."""
+    rng = np.random.default_rng(seed)
+    Sigma = _equicorrelated(3, rho)
+    misses = dict(rule=0, constant=0, imputed_rule=0, imputed_constant=0)
+    worst = 0.0
+    for world in range(ONE_WORLDS):
+        d, g0 = rng.standard_normal(3), rng.standard_normal(3)
+        psi, delta = rng.uniform(0.3, 0.8) ** np.arange(ONE_PSI_LEN), rng.uniform(0.6, 0.98)
+        pick = one_feature.scores(d, g0, psi, delta).argmax()
+        c = one_feature.costs(d, g0, psi, Sigma)
+        value, _ = one_feature.optimal(c, delta, 1)
+        J = one_feature.constant_values(c, delta)
+        misses["rule"] += J[pick] > value + 1e-9
+        misses["constant"] += J.min() > value + 1e-9
+        worst = max(worst, abs(value - one_feature.solution_value(d, g0, psi, delta)) / value)
+        if world < ONE_IMPUTED_WORLDS:
+            C = one_feature.imputed_costs(d, g0, psi, Sigma, one_feature.imputed_caps(d, g0, psi, Sigma))
+            value, _ = one_feature.optimal_grid(C, delta, 1)
+            J = one_feature.grid_constant_values(C, delta)
+            misses["imputed_rule"] += J[pick] > value + 1e-9
+            misses["imputed_constant"] += J.min() > value + 1e-9
+    share = {key: float(count / (ONE_IMPUTED_WORLDS if key.startswith("imputed") else ONE_WORLDS))
+             for key, count in misses.items()}
+    return dict(share, worst=float(worst))
+
+
+@lru_cache(maxsize=1)
+def _one_feature_study():
+    """Every number on the one-feature page: the worked example's scores against the discount, the examples
+    simulated, and the random worlds checked against the plan at each correlation."""
+    solved = ONE_SOLVED
+    psi, deltas = solved["rate"] ** np.arange(ONE_PSI_LEN), np.round(np.arange(0.5, 0.9901, 0.01), 2)
+    scores = np.array([one_feature.scores(solved["d"], solved["g0"], psi, delta) for delta in deltas])
+    rhos = np.round(np.arange(0.0, 0.9501, 0.05), 2)
+    sweep = [_one_worlds(rho) for rho in rhos]
+    return dict(solved=_one_example(solved), broken=_one_example(ONE_BROKEN), imputed=_one_example(ONE_IMPUTED),
+                interleaved=_one_example(ONE_INTERLEAVED), runs=ONE_RUNS, worlds=ONE_WORLDS,
+                imputed_worlds=ONE_IMPUTED_WORLDS, T=ONE_T,
+                score=dict(start=float(deltas[0]), step=0.01, series=np.round(scores.T, 4).tolist(),
+                           teach=float(np.sqrt(2 / 3)), nothing=float(1 / np.sqrt(2))),
+                sweep=dict(start=float(rhos[0]), step=0.05,
+                           **{key: [s[key] for s in sweep] for key in ("rule", "constant", "imputed_rule", "imputed_constant")}),
+                check=sweep[0])
+
+
+@app.route("/one-feature")
+def one_feature_page():
+    """One feature a round: the solution's single-feature schedule simulated, then correlated states that break it."""
+    return render_template("one_feature.html", page="one-feature", study=_one_feature_study())
+
+
 @app.route("/api/world")
 def api_world():
     curve_name = request.args.get("curve", "exponential")
     if curve_name not in CURVE_SPECS:
         abort(400, "unknown curve")
     spec = CURVE_SPECS[curve_name]
-    K, n = int(_num("K", 3, 2, MAX_ACTIONS)), int(_num("n", 3, 1, MAX_FEATURES))
+    policy = request.args.get("policy")
+    K, n = int(_num("K", 2 if policy == "planned" else 3, 2, MAX_ACTIONS)), int(_num("n", 3, 1, MAX_FEATURES))
     T = int(_num("T", 100, 10, 300))
-    F, A, windows, aware = _mask("F", n), _mask("A", K), _windows(K, n, T), None
-    if request.args.get("policy") == "aware":
+    F, A, windows, aware, planned = _mask("F", n), _mask("A", K), _windows(K, n, T), None, None
+    if policy == "planned":
+        # a schedule set before any state is drawn: two actions, a few features, every action offered
+        if K != 2 or n > PLAN_FEATURES:
+            abort(400, f"a plan is made for two actions and at most {PLAN_FEATURES} features")
+        T = min(T, PLAN_ROUNDS)
+        F, A, windows = (True,) * n, (True,) * K, ()
+        planned = (int(_num("C", 2, 1, n)), "myopic" if request.args.get("rule") == "myopic" else "optimal")
+    if policy == "aware":
         # the state-aware policy chooses the features itself, within a budget, and offers every action
         F, A, windows = (True,) * n, (True,) * K, ()
         aware = (int(_num("C", 2, 1, n)), "truth" if request.args.get("judge") == "truth" else "belief",
@@ -862,7 +1089,7 @@ def api_world():
             abort(400, f"round {empty[0]} would {problem}")
     return jsonify(run_general(
         _matrix("U", K, n), _matrix("H", K, n), F, A, curve_name, _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
-        full=request.args.get("rank", "1") != "0", windows=windows, seed=_seed(), aware=aware,
+        full=request.args.get("rank", "1") != "0", windows=windows, seed=_seed(), aware=aware, planned=planned,
     ))
 
 
@@ -1090,6 +1317,28 @@ def api_correlated():
         _speeds(spec, n), T, _num("delta", 0.95, 0.01, 0.99),
         full=request.args.get("rank", "1") != "0", seed=_seed(),
     ))
+
+
+SEPSIS_KEYS = ("patients", "train", "test", "prevalence", "prevalence_A", "prevalence_B", "onset_at_admission",
+               "coverage", "labs", "vitals", "demographics", "symptoms", "min_coverage", "Sigma", "d", "tau", "cost_miss",
+               "auroc", "roc", "transfer")
+
+
+@lru_cache(maxsize=1)
+def _sepsis_study():
+    """The fit to the PhysioNet 2019 data and the teaching study run on it, both written by experiments/sepsis_fit.py
+    (results/sepsis/fit.json and study.json): the page needs neither the raw data nor scikit-learn."""
+    fit = json.loads((RESULTS / "sepsis" / "fit.json").read_text())
+    study = json.loads((RESULTS / "sepsis" / "study.json").read_text())
+    # every candidate variable, labs then symptoms, in the data's order (the page's JSON sorts mapping keys)
+    return dict({key: fit[key] for key in SEPSIS_KEYS}, all_labs=sepsis_data.LABS,
+                all_symptoms=sepsis_data.VITALS + sepsis_data.DEMOGRAPHICS, **study)
+
+
+@app.route("/sepsis")
+def sepsis_page():
+    """Sepsis, from data: Sigma, B and U of the two-action problem fitted to real ICU patients, then taught."""
+    return render_template("sepsis.html", page="sepsis", study=_sepsis_study())
 
 
 @app.route("/experiments")

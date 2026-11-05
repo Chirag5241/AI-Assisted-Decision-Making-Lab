@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1793865885">
 </head>
 <body>
   <header class="mast">
@@ -30,17 +30,25 @@
           
           <a href="timed.html" >Timed hiding</a>
           
+          <a href="planned.html" >Planned subsets</a>
+          
           <a href="two-actions.html" >The two-action problem</a>
           
           <a href="losses.html" >Alternatives to the regret loss</a>
           
+          <a href="one-feature.html" >One feature a round</a>
+          
           <a href="aware.html" >State-aware subsets</a>
+          
+          <a href="sepsis.html" >Sepsis, from data</a>
           
           <a href="correlated.html" >Correlated features</a>
           
           <a href="experiments.html"  class="apart">Experiment 1 figures</a>
         </div>
       </details>
+      
+      <a href="distributions/index.html" title="Distribution basics: an explorer and a map">Distributions</a>
     </nav>
   </header>
   
@@ -197,6 +205,26 @@
       </p>
     </article>
     
+    <article class="eq" id="eq-two-action-regret">
+      <header><b>Eq. 12</b><h4>Expected regret of a round, with two actions</h4></header>
+      <p class="formula">E<sub>x</sub>[&#8467;] = ( |d| &minus; g&middot;d / |g| ) / &radic;(2&pi;),&emsp;d = u<sub>1</sub> &minus; u<sub>2</sub>,&ensp;g<sub>j</sub> = h<sub>1j,t</sub> &minus; h<sub>2j,t</sub> for j &isin; F<sub>t</sub>, else 0</p>
+      <p class="eq-text">With two actions only the gap between their rows matters. The human picks action 1 when g&middot;x &gt; 0 and it is best when d&middot;x &gt; 0, so for x ~ N(0, I) the average regret depends only on the angle between g and d: zero when they point the same way, |d| / &radic;(2&pi;) for a human who cannot tell the actions apart, twice that for one who is always wrong. The size of g does not matter, only its direction.</p>
+      <p class="eq-meta">
+        
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
+    <article class="eq" id="eq-plan">
+      <header><b>Eq. 13</b><h4>Planning before the state is drawn</h4></header>
+      <p class="formula">V<sub>t</sub>(m) = min<sub>|F| &le; C</sub> [ L(F, m) + &delta; V<sub>t+1</sub>(m + 1<sub>F</sub>) ],&emsp;V<sub>T</sub> = 0</p>
+      <p class="eq-text">On the Planned subsets bench the algorithm sets F<sub>t</sub> before x<sub>t</sub> is drawn, so it can only weigh a round by its average, L(F, m), the expected regret above with the beliefs that the counts m give. m<sub>j</sub> is how often feature j has been shown; showing F adds one to each of its counts. V<sub>0</sub>(0) is the least expected discounted regret, and the F that attain it are the plan.</p>
+      <p class="eq-meta">
+        
+        <span class="derivation pending">Derivation not written yet</span>
+      </p>
+    </article>
+    
   </section>
 
   <section class="guide-section" id="figures">
@@ -232,6 +260,9 @@
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="planned.html">Planned subsets</a></dt>
+              <dd>The plan, set before round 0. Every action is offered.</dd></div>
             
             <div><dt><a href="aware.html">State-aware subsets</a></dt>
               <dd>Chosen afresh for each round's state: the top-ranked subset on which the best move ranks first, or a random one. Every action is offered.</dd></div>
@@ -269,6 +300,9 @@
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
             
+            <div><dt><a href="planned.html">Planned subsets</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
             <div><dt><a href="aware.html">State-aware subsets</a></dt>
               <dd>These depend on the draw: what is shown, and so what is learned, follows the states.</dd></div>
             
@@ -302,6 +336,9 @@
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="planned.html">Planned subsets</a></dt>
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="aware.html">State-aware subsets</a></dt>
@@ -339,6 +376,9 @@
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
             
+            <div><dt><a href="planned.html">Planned subsets</a></dt>
+              <dd>The dashed average is exact here, a closed form, and it is what the plan minimises.</dd></div>
+            
             <div><dt><a href="aware.html">State-aware subsets</a></dt>
               <dd>Drawn as described.</dd></div>
             
@@ -372,6 +412,9 @@
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
+              <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="planned.html">Planned subsets</a></dt>
               <dd>Drawn as described.</dd></div>
             
             <div><dt><a href="aware.html">State-aware subsets</a></dt>
@@ -408,6 +451,9 @@
             
             <div><dt><a href="timed.html">Timed hiding</a></dt>
               <dd>Drawn as described.</dd></div>
+            
+            <div><dt><a href="planned.html">Planned subsets</a></dt>
+              <dd>Counted over the probe states, as on the other benches.</dd></div>
             
             <div><dt><a href="aware.html">State-aware subsets</a></dt>
               <dd>Here: the share of states in which the human picks the best move from the subset the algorithm would show there. The dashed level is the ceiling the budget sets.</dd></div>
@@ -504,6 +550,24 @@
         </tr>
         
         <tr>
+          <th scope="row"><a href="planned.html">Planned subsets</a><span>Two actions. The algorithm sets the features of every round before any state is drawn, to minimise the expected discounted regret, and is set against the myopic rule and every fixed subset.</span></th>
+          
+          <td>drawn</td>
+          
+          <td>2.1 to 2.n</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td>drawn</td>
+          
+          <td class="own"><ol start="7"><li>Expected regret of each round: the optimal plan, the myopic rule and the best fixed subset</li></ol></td>
+        </tr>
+        
+        <tr>
           <th scope="row"><a href="aware.html">State-aware subsets</a><span>For each round&#39;s state the algorithm shows the top-ranked subset of at most C features from which the human picks the best move (or, as an option, on which the truth ranks it first). When no subset within the budget works, it shows one at random, for now.</span></th>
           
           <td>drawn</td>
@@ -548,6 +612,10 @@
       
       <div><dt><a href="losses.html">Alternatives to the regret loss</a></dt><dd>Six losses of a round, after Jiang et al. (2014), simulated on the three-action world: what each counts, and which policy each prefers.</dd></div>
       
+      <div><dt><a href="one-feature.html">One feature a round</a></dt><dd>Two actions and one feature shown a round: the solution&#39;s one-feature-forever schedule simulated and checked against a search of every schedule, then correlated features, where it breaks.</dd></div>
+      
+      <div><dt><a href="sepsis.html">Sepsis, from data</a></dt><dd>The two-action problem fitted to 40,336 ICU patients (PhysioNet 2019): the labs are the hidden features, the vitals the symptoms, U a logistic fit; then the human is taught with a budget of labs.</dd></div>
+      
     </dl>
   </section>
 </main>
@@ -555,10 +623,10 @@
 <script>
   window.DEFAULT_WORLD = {"A": [1, 1, 1], "F": [1, 1, 1], "H": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0], [-0.5, 0.0, -1.5]], "T": 100, "U": [[1.0, 0.5, 0.0], [0.0, 1.0, 0.5], [-0.5, 0.0, 1.0]], "W": "f3:20-25", "curve": "exponential", "delta": 0.95, "p1": 0.05};
 </script>
-<script src="webapp/static/charts.js?v=1791856097"></script>
+<script src="webapp/static/charts.js?v=1793865885"></script>
 <script src="webapp/static/figures.js?v=1791524128"></script>
-<script src="webapp/static/probes.js?v=1791916034"></script>
-<script src="webapp/static/static-api.js?v=1791525475"></script>
+<script src="webapp/static/probes.js?v=1793866242"></script>
+<script src="webapp/static/static-api.js?v=1793865885"></script>
 <script src="webapp/static/overview.js?v=1791496940"></script>
 
   <script>

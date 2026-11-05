@@ -82,7 +82,7 @@ window.Charts = (function () {
     for (const v of niceTicks(xstart, xstart + (T - 1) * xscale, 8).ticks) {
       const at = X((v - xstart) / xscale);
       svg.append(svgEl("line", { class: "grid", x1: at, x2: at, y1: TOP, y2: TOP + ph }),
-        text({ x: at, y: TOP + ph + 16, "text-anchor": "middle" }, v));
+        text({ x: at, y: TOP + ph + 16, "text-anchor": "middle" }, +v.toPrecision(12)));   // 0.6, not 0.6000000000000001
     }
     if (!opts.noXLabel) svg.append(text({ x: L + pw / 2, y: H - 4, "text-anchor": "middle" }, xname));
     for (const v of opts.vlines || []) {

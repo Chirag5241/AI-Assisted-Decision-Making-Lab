@@ -28,6 +28,8 @@
           <a href="{{ url_for('experiments') }}" {% if request.endpoint == 'experiments' %}aria-current="page"{% endif %} class="apart">Experiment 1 figures</a>
         </div>
       </details>
+      {# the companion site on distributions lives apart from the lab (distributions/) #}
+      <a href="/distributions/" title="Distribution basics: an explorer and a map">Distributions</a>
     </nav>
   </header>
   {% block body %}{% endblock %}

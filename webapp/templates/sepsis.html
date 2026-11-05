@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{# Sepsis, from data: the two-action problem with Sigma, B and U fitted to PhysioNet 2019, then the human taught
+   (experiments/sepsis_fit.py writes every number; simlab/sepsis.py is the model; webapp/static/sepsis.js draws). #}
+{% block title %}{{ current.name }} &middot; {{ site_name }}{% endblock %}
+
+{% macro pct(v) -%}{{ "%.1f"|format(100 * v) }}%{%- endmacro %}
+
+{% block body %}
+<main class="guide problem">
+  <header class="guide-head">
+    <h2>Sepsis, from data</h2>
+    <p class="lead">The two-action problem on {{ "{:,}".format(study.patients) }} ICU patients (PhysioNet/CinC 2019).
+      The labs are the hidden <span class="math">x</span>, the vitals and demographics are the symptoms
+      <span class="math">s</span>, and <span class="math">U</span> is a logistic fit on the labs. The human starts with random beliefs.</p>
+    <nav class="guide-toc" aria-label="On this page">
+      <a href="#world">The mapping</a><a href="#data">&Sigma;</a><a href="#utility">U</a><a href="#lossy">B</a>
+      <a href="#teach">Teaching</a>
+    </nav>
+  </header>
+
+  <section class="guide-section" id="world">
+    <h3>The mapping</h3>
+    <div class="table-scroll"><table class="guide-table">
+      <thead><tr><th scope="col">Theory</th><th scope="col">Here</th></tr></thead>
+      <tbody>
+        <tr><th scope="row"><span class="math">x</span></th>
+          <td class="own">{{ study.labs|length }} labs</td></tr>
+        <tr><th scope="row"><span class="math">s</span></th>
+          <td class="own">{{ study.vitals|length }} vitals and {{ study.demographics|length }} demographics ({{ study.demographics|join(", ") }}), seen every round</td></tr>
+        <tr><th scope="row"><span class="math">(x, s) ~ N(0, &Sigma;)</span></th>
+          <td class="own">risk scores: each value &rarr; its bin's log-odds of sepsis &rarr; normal score</td></tr>
+        <tr><th scope="row"><span class="math">s = Bx + &epsilon;</span></th>
+          <td class="own">implied by &Sigma;: <span class="math">B = &Sigma;<sub>sx</sub>&Sigma;<sub>xx</sub><sup>&minus;1</sup></span>, the noise is what that leaves</td></tr>
+        <tr><th scope="row"><span class="math">F, |F| &le; c</span></th><td class="own">labs ordered</td></tr>
+        <tr><th scope="row"><span class="math">d = u<sub>stay</sub> &minus; u<sub>home</sub></span></th>
+          <td class="own">logistic weights on the labs; treat above risk &tau; = {{ "%.3f"|format(study.tau) }} (the average patient's), so no offset</td></tr>
+        <tr><th scope="row"><span class="math">H<sup>(0)</sup>, &psi;</span></th>
+          <td class="own"><span class="math">p<sup>(0)</sup> ~ N(0, {{ "%.2f"|format(study.belief_scale) }}&sup2; I)</span>, {{ study.humans }} humans;
+            <span class="math">&psi;(m) = {{ study.rate }}<sup>m</sup></span></td></tr>
+        <tr><th scope="row">Hidden labs</th><td class="own">filled in by one of two rules, compared side by side under <a href="#teach">Teaching</a></td></tr>
+      </tbody>
+    </table></div>
+    <ul class="conventions">
+      <li><b>One decision per patient.</b> Septic ({{ pct(study.prevalence) }}): 6 h before onset. Others: an hour drawn
+        from the same distribution of hours. Values are carried forward to that hour.</li>
+      <li><b>Regret is exact.</b> <span class="math">(&radic;(d&#7488;&Sigma;d) &minus; d&#7488;&Sigma;q / &radic;(q&#7488;&Sigma;q)) / &radic;(2&pi;)</span>, where
+        <span class="math">q</span> is the weight the human puts on <span class="math">(x, s)</span> and <span class="math">d</span> is zero on <span class="math">s</span>.</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="data">
+    <h3>The data and &Sigma;</h3>
+    <figure>
+      <figcaption><b>Fig. 1</b>Share of patients with each variable measured by the decision hour
+        <span class="cap-note">Variables below {{ (100 * study.min_coverage)|int }}% are dropped. Labs are ordered more often for septic patients; filling them in ignores that.</span></figcaption>
+      <div class="chart narrow" id="fig-coverage"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 2</b>&Sigma;: correlation of the risk scores
+        <span class="cap-note">Labs, then symptoms. The off-diagonal block is the noisy map between them. Hover a cell for its value.</span></figcaption>
+      <div class="chart narrow" id="fig-sigma"></div>
+    </figure>
+  </section>
+
+  <section class="guide-section" id="utility">
+    <h3>U from logistic regression</h3>
+    <figure>
+      <figcaption><b>Fig. 3</b>The true weights <span class="math">d</span>
+        <span class="cap-note">L2 logistic regression on {{ "{:,}".format(study.train) }} patients, penalty chosen by 5-fold CV.</span></figcaption>
+      <div class="chart narrow" id="fig-weights"></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 4</b>ROC on {{ "{:,}".format(study.test) }} held-out patients</figcaption>
+      <div class="chart narrow" id="fig-roc"></div>
+    </figure>
+    <ul class="conventions">
+      <li><b>{{ "%.3f"|format(study.auroc.labs) }}</b> the linear <span class="math">U</span> used here, labs only.
+        <b>{{ "%.3f"|format(study.auroc.gbm_filled) }}</b> gradient boosting on the same labs: the gap is the cost of linearity.
+        <b>{{ "%.3f"|format(study.auroc.gbm) }}</b> with the gaps left as gaps: what the ordering pattern says.
+        <b>{{ "%.3f"|format(study.auroc.all) }}</b> labs and symptoms together: what <span class="math">U</span> leaves out.</li>
+      <li><b>Across hospitals:</b> fit on A, scored on B, {{ "%.3f"|format(study.transfer.A_to_B) }}; B on A,
+        {{ "%.3f"|format(study.transfer.B_to_A) }}.</li>
+    </ul>
+  </section>
+
+  <section class="guide-section" id="lossy">
+    <h3>How lossy B is</h3>
+    <figure>
+      <figcaption><b>Fig. 5</b>Share of each lab's variance the symptoms explain, <span class="math">1 &minus; &Gamma;<sub>jj</sub></span>
+        <span class="cap-note">Low: <span class="math">&mu;(s)</span> stays near 0, so a hidden lab counts as about average.</span></figcaption>
+      <div class="chart narrow" id="fig-explained"></div>
+    </figure>
+  </section>
+
+  <section class="guide-section" id="teach">
+    <h3>Teaching the human</h3>
+    <p class="section-sub">{{ study.T }} training rounds. Then the human orders the panel they value most. The teacher
+      shows the labs whose correction would cut that graduation regret most. Two ways to fill in the hidden labs:</p>
+    <div class="table-scroll"><table class="guide-table">
+      <thead><tr><th scope="col">Fill-in</th><th scope="col">Hidden labs</th><th scope="col">Value of a panel</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">From the symptoms<span class="source">Problem Description</span></th>
+          <td><span class="math">&mu;<sub>H</sub>(s) = (As)<sub>H</sub></span></td>
+          <td><span class="math">p<sub>F</sub>&#7488;&Gamma;<sub>FF</sub>p<sub>F</sub></span></td></tr>
+        <tr><th scope="row">From the symptoms and the shown labs<span class="source">Guan, Raman &amp; Fang</span></th>
+          <td><span class="math">E[x<sub>H</sub> | x<sub>F</sub>, s]</span></td>
+          <td><span class="math">(&Gamma;p)<sub>F</sub>&#7488;&Gamma;<sub>FF</sub><sup>&minus;1</sup>(&Gamma;p)<sub>F</sub></span></td></tr>
+      </tbody>
+    </table></div>
+    <ul class="conventions">
+      <li><b>Value of a panel:</b> the variance, given <span class="math">s</span>, of the margin the human will compute.
+        From the symptoms and shown labs with <span class="math">p = d</span>, that margin is
+        <span class="math">E[d&#7488;x | x<sub>F</sub>, s]</span>, so the panel valued most is the panel of least regret.</li>
+    </ul>
+    <div class="segmented three" role="radiogroup" aria-label="Budget c" style="max-width: 360px">
+      {% for c in study.budgets %}
+      <label><input type="radio" name="budget" value="{{ c }}" {% if loop.last %}checked{% endif %}><span>c = {{ c }}</span></label>
+      {% endfor %}
+    </div>
+    <figure>
+      <figcaption><b>Table</b>The panel valued most against the panel of least regret, both with the true weights</figcaption>
+      <div class="table-scroll"><table class="guide-table" id="panels"></table></div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 6</b>Graduation regret if training stopped at round t
+        <span class="cap-note">Mean over {{ study.humans }} random humans.</span></figcaption>
+      <div class="pair">
+        {% for key, name in study.fills.items() %}
+        <div><p class="pair-head">{{ name }}</p><div class="chart" id="fig-graduation-{{ key }}"></div></div>
+        {% endfor %}
+      </div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 7</b>Expected regret of each training round</figcaption>
+      <div class="pair">
+        {% for key, name in study.fills.items() %}
+        <div><p class="pair-head">{{ name }}</p><div class="chart" id="fig-training-{{ key }}"></div></div>
+        {% endfor %}
+      </div>
+    </figure>
+    <figure>
+      <figcaption><b>Fig. 8</b>What the teacher shows, one human</figcaption>
+      {% for key, name in study.fills.items() %}
+      <p class="pair-head">{{ name }}</p><div class="chart" id="fig-schedule-{{ key }}"></div>
+      {% endfor %}
+    </figure>
+    <figure>
+      <figcaption><b>Table</b>Graduates on {{ "{:,}".format(study.test) }} held-out real patients
+        <span class="cap-note">Cost per patient in false alarms; a miss costs {{ "%.1f"|format(study.cost_miss) }}.</span></figcaption>
+      <div class="table-scroll"><table class="guide-table" id="clinical"></table></div>
+    </figure>
+  </section>
+</main>
+
+<script>
+  window.SEPSIS = {{ study|tojson }};
+</script>
+<script src="{{ static_v('charts.js') }}"></script>
+<script src="{{ static_v('sepsis.js') }}"></script>
+{% endblock %}

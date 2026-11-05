@@ -98,7 +98,7 @@ This document maps the theoretical landscape surrounding **Pedagogical AI Assist
 | :--- | :--- | :--- | :--- |
 | **Decision Task** | Continuous prediction ($y \in \mathbb{R}$) | Continuous prediction ($y \in \mathbb{R}$) | Discrete action selection ($\hat{y} \in [K]$) |
 | **Loss Function** | MSE: $(y - \hat{y})^2$ | MSE: $(y - \hat{y})^2$ | Decision Regret: $\max_k u_k^\top x - u_{\hat{y}}^\top x$ |
-| **Feature Space** | Independent | Correlated ($\mathcal{N}(0, \Sigma)$) | Independent (or general $\Sigma$), $x \sim \mathcal{N}(0, I_n)$ |
+| **Feature Space** | Independent | Correlated ($\mathcal{N}(0, \Sigma)$) | Mostly $x \sim \mathcal{N}(0, I_n)$; general $\Sigma$ is the next stage (in progress) |
 | **Action Menu Control** | None ($K=1$) | None ($K=1$) | Dynamic subsets $A_t \subseteq [K]$ ($a_{\min} \le \|A_t\| \le a_{\max}$) |
 | **Feature Control** | Ex-ante subset $F_t$ | Ex-ante subset $F_t$ | Ex-ante & Ex-post subsets $F_t \subseteq [n]$ |
 | **Optimal Policy** | Stationary ($A_t = A^*$) | Explore-then-Commit ($T_d$ then commit) | Dynamic Curriculum $\to$ Graduation |

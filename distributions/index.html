@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Distribution Basics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="index.html">Distribution Basics</a></h1>
+      <p class="strapline">A companion to the decision lab · 35 distributions, their shapes, and how they connect</p>
+    </div>
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="index.html" aria-current="page">Explorer</a>
+      <a href="map.html">Map</a>
+      <a class="lab" href="../overview.html">Decision lab</a>
+    </nav>
+  </header>
+
+  <div class="explorer">
+    <nav class="picker" id="picker" aria-label="Distributions"></nav>
+
+    <main class="page">
+      <section class="basics" aria-label="The four basic ideas">
+        <div><b>PMF / PDF</b>How likely each value is. Bars for counts, a curve for measurements.</div>
+        <div><b>Area = probability</b>For a curve, only areas mean anything. The total area is 1.</div>
+        <div><b>CDF</b>F(x) = P(X ≤ x). It climbs from 0 to 1.</div>
+        <div><b>Mean and SD</b>The balance point, and the typical distance from it.</div>
+      </section>
+
+      <div class="head">
+        <p class="kicker"><span id="kind" class="tag"></span></p>
+        <h2 id="name"></h2>
+        <p class="story" id="story"></p>
+        <p class="formula" id="formula"></p>
+      </div>
+
+      <div class="controls" id="controls"></div>
+
+      <p class="chart-label" id="pdf-label">Density</p>
+      <svg class="chart" id="pdf" viewBox="0 0 760 300" role="img" aria-label="Probability density or mass of the selected distribution"></svg>
+      <div class="legend" id="pdf-legend"></div>
+
+      <div class="sampler">
+        <span>Simulate</span>
+        <button data-n="100">100</button><button data-n="1000">1,000</button><button data-n="10000">10,000</button>
+        <span>draws</span>
+        <button id="redraw">Redraw</button>
+        <label><input type="checkbox" id="show-samples" checked> Show draws</label>
+        <span class="gen" id="gen"></span>
+      </div>
+
+      <div class="shade">
+        <div class="ctl"><label for="sa">Shade from a</label><input type="range" id="sa"><output id="sa-out"></output></div>
+        <div class="ctl"><label for="sb">to b</label><input type="range" id="sb"><output id="sb-out"></output></div>
+      </div>
+      <p class="prob" id="prob"></p>
+
+      <p class="chart-label">Cumulative (CDF)</p>
+      <svg class="chart" id="cdf" viewBox="0 0 760 200" role="img" aria-label="Cumulative distribution function of the selected distribution"></svg>
+
+      <div class="stats" id="stats"></div>
+
+      <div class="links" id="links"></div>
+    </main>
+  </div>
+
+  <script src="dist.js"></script>
+  <script src="explorer.js"></script>
+</body>
+</html>

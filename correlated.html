@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="webapp/static/style.css?v=1791856298">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1793865885">
 </head>
 <body>
   <header class="mast">
@@ -30,17 +30,25 @@
           
           <a href="timed.html" >Timed hiding</a>
           
+          <a href="planned.html" >Planned subsets</a>
+          
           <a href="two-actions.html" >The two-action problem</a>
           
           <a href="losses.html" >Alternatives to the regret loss</a>
           
+          <a href="one-feature.html" >One feature a round</a>
+          
           <a href="aware.html" >State-aware subsets</a>
+          
+          <a href="sepsis.html" >Sepsis, from data</a>
           
           <a href="correlated.html" aria-current="page">Correlated features</a>
           
           <a href="experiments.html"  class="apart">Experiment 1 figures</a>
         </div>
       </details>
+      
+      <a href="distributions/index.html" title="Distribution basics: an explorer and a map">Distributions</a>
     </nav>
   </header>
   
@@ -340,12 +348,12 @@
   window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
   window.DEFAULT_WORLD = {"C": [1, 1, 0], "H": [[-1.5, -1.0, 1.5], [-0.5, 0.5, 1.5], [1.5, -1.5, -0.5]], "T": 120, "U": [[-1.5, 0.5, 0.0], [0.5, 1.5, -1.0], [1.0, -1.5, 0.0]], "curve": "exponential", "delta": 0.97, "explore": 12, "k": 2, "p1": 0.15, "rho": [0.8, 0.8, 0.6]};
 </script>
-<script src="webapp/static/charts.js?v=1791856097"></script>
+<script src="webapp/static/charts.js?v=1793865885"></script>
 <script src="webapp/static/figures.js?v=1791524128"></script>
 <script src="webapp/static/matrix.js?v=1791365885"></script>
 <script src="webapp/static/speeds.js?v=1791492951"></script>
-<script src="webapp/static/probes.js?v=1791916034"></script>
-<script src="webapp/static/static-api.js?v=1791525475"></script>
+<script src="webapp/static/probes.js?v=1793866242"></script>
+<script src="webapp/static/static-api.js?v=1793865885"></script>
 <script src="webapp/static/correlated.js?v=1791525576"></script>
 
   <script>

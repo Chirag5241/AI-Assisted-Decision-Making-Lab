@@ -116,6 +116,27 @@ EQUATIONS = [
              "then chooses with the filled-in state, so they act as if their weights were H<sub>t</sub> "
              "P<sub>S</sub>. A filled-in value never corrects the belief about that feature.",
         figures=[], derivation=None),
+    dict(
+        id="two-action-regret", name="Expected regret of a round, with two actions",
+        html="E<sub>x</sub>[&#8467;] = ( |d| &minus; g&middot;d / |g| ) / &radic;(2&pi;),&emsp;"
+             "d = u<sub>1</sub> &minus; u<sub>2</sub>,&ensp;g<sub>j</sub> = h<sub>1j,t</sub> &minus; h<sub>2j,t</sub> "
+             "for j &isin; F<sub>t</sub>, else 0",
+        text="With two actions only the gap between their rows matters. The human picks action 1 when "
+             "g&middot;x &gt; 0 and it is best when d&middot;x &gt; 0, so for x ~ N(0, I) the average regret depends "
+             "only on the angle between g and d: zero when they point the same way, |d| / &radic;(2&pi;) for a "
+             "human who cannot tell the actions apart, twice that for one who is always wrong. The size of g "
+             "does not matter, only its direction.",
+        figures=[], derivation=None),
+    dict(
+        id="plan", name="Planning before the state is drawn",
+        html="V<sub>t</sub>(m) = min<sub>|F| &le; C</sub> [ L(F, m) + &delta; V<sub>t+1</sub>(m + 1<sub>F</sub>) ],"
+             "&emsp;V<sub>T</sub> = 0",
+        text="On the Planned subsets bench the algorithm sets F<sub>t</sub> before x<sub>t</sub> is drawn, so it "
+             "can only weigh a round by its average, L(F, m), the expected regret above with the beliefs that "
+             "the counts m give. m<sub>j</sub> is how often feature j has been shown; showing F adds one to each "
+             "of its counts. V<sub>0</sub>(0) is the least expected discounted regret, and the F that attain it "
+             "are the plan.",
+        figures=[], derivation=None),
 ]
 
 # ---------------------------------------------------------------------------
@@ -205,6 +226,16 @@ BENCHES = [
                 "then brought back.",
         notes={}, absent={}, own=[]),
     dict(
+        endpoint="planned", name="Planned subsets",
+        summary="Two actions. The algorithm sets the features of every round before any state is drawn, to "
+                "minimise the expected discounted regret, and is set against the myopic rule and every fixed subset.",
+        notes=dict(
+            schedule="The plan, set before round 0. Every action is offered.",
+            regret="The dashed average is exact here, a closed form, and it is what the plan minimises.",
+            accuracy="Counted over the probe states, as on the other benches."),
+        absent={},
+        own=["Expected regret of each round: the optimal plan, the myopic rule and the best fixed subset"]),
+    dict(
         endpoint="aware", name="State-aware subsets",
         summary="For each round's state the algorithm shows the top-ranked subset of at most C features from "
                 "which the human picks the best move (or, as an option, on which the truth ranks it first). When "
@@ -247,6 +278,14 @@ NOTES = [
         endpoint="losses_page", name="Alternatives to the regret loss", before="aware",
         summary="Six losses of a round, after Jiang et al. (2014), simulated on the three-action world: what each "
                 "counts, and which policy each prefers."),
+    dict(
+        endpoint="one_feature_page", name="One feature a round", before="aware",
+        summary="Two actions and one feature shown a round: the solution's one-feature-forever schedule simulated "
+                "and checked against a search of every schedule, then correlated features, where it breaks."),
+    dict(
+        endpoint="sepsis_page", name="Sepsis, from data", before="correlated_page",
+        summary="The two-action problem fitted to 40,336 ICU patients (PhysioNet 2019): the labs are the hidden "
+                "features, the vitals the symptoms, U a logistic fit; then the human is taught with a budget of labs."),
 ]
 
 # the page menu: the benches in order, with each note slotted in before its bench

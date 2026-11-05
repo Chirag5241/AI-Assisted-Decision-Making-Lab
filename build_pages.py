@@ -3,9 +3,10 @@
     python build_pages.py
 
 GitHub Pages cannot run the Flask server, so this renders the site's own pages to index.html,
-overview.html, worlds.html, timed.html, two-actions.html, losses.html, aware.html, correlated.html
-and experiments.html at the repository root. They load the same stylesheet and scripts as the Flask
-site (from webapp/static), so the two look and behave alike.
+overview.html, worlds.html, timed.html, planned.html, two-actions.html, losses.html, one-feature.html,
+aware.html, correlated.html, sepsis.html and experiments.html at the repository root. They load the same stylesheet
+and scripts as the Flask site (from webapp/static), so the two look and behave alike. The companion site on
+distributions (distributions/) is plain static files already; the pages only link to it.
 Two extra scripts stand in for the server:
 
   webapp/static/static-api.js   answers /api/run, /api/world and /api/correlated in the browser
@@ -25,8 +26,8 @@ from webapp.app import MAX_FEATURES, N_PROBES, app
 ROOT = Path(__file__).resolve().parent
 STATIC = ROOT / "webapp" / "static"
 PAGES = {"/": "index.html", "/overview": "overview.html", "/worlds": "worlds.html", "/timed": "timed.html",
-         "/two-actions": "two-actions.html", "/losses": "losses.html", "/aware": "aware.html",
-         "/correlated": "correlated.html", "/experiments": "experiments.html"}
+         "/planned": "planned.html", "/two-actions": "two-actions.html", "/losses": "losses.html", "/one-feature": "one-feature.html", "/aware": "aware.html",
+         "/correlated": "correlated.html", "/sepsis": "sepsis.html", "/experiments": "experiments.html"}
 NOTE = "<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->\n"
 
 
@@ -52,6 +53,7 @@ def build():
         # the Flask site is served from the server root; the static copy must work from any folder
         html = html.replace('href="/static/', 'href="webapp/static/').replace('src="/static/', 'src="webapp/static/')
         html = html.replace('src="/results/', 'src="results/')
+        html = html.replace('<a href="/distributions/"', '<a href="distributions/index.html"')   # the companion site
         for target, page in PAGES.items():
             html = html.replace(f'<a href="{target}"', f'<a href="{page}"')
             html = html.replace(f'<a href="{target}#', f'<a href="{page}#')    # a link to a place on that page

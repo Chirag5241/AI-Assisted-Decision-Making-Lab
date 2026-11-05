@@ -1,10 +1,17 @@
 Consider a human $\mathcal{H}$ who needs to take an action $k \in [K]$ based on an observation: $s \in \mathbb{R}^d$ of a hidden state $x \in \mathbb{R}^n$, according to a prior distribution $\mathcal{D} = \mathcal{N}(0, \Sigma)$. 
 
+Each raw feature $r_j$ may follow any distribution, with its own CDF $F_j$ (e.g. log-normal, gamma, a mixture). Before anything else, every raw feature is converted to its normal score $x_j = \Phi^{-1}(F_j(r_j))$, so that $r_j = F_j^{-1}(\Phi(x_j))$; the raw observations are converted the same way, each with its own CDF $G_i$. Each score is $\mathcal{N}(0, 1)$ whatever its CDF is; that the scores are *jointly* normal is an assumption (a Gaussian copula). Everything below runs on the scores, so it holds for any choice of curves $F_j, G_i$.
+
 The ground truth utility matrix $U \in \mathbb{R}^{K \times n}$ with rows $u_1, ..., u_K$, gives us the utility of each move, $k$, from the state $x$ as $u_k^T x$.  Thus the optimal action to make from $x$ is $y^*(x) = \arg\max_k u_k^T x$. 
 
 The human makes an action based on only an observation she sees, $s = Bx$, where $B \in \mathbb{R}^{d \times n}$ and a limited number of revealed true features $x_F := \{x_j : j \in F\}$ for $F \subseteq [n]$ with $|F| \leq c$. From the observation, she is able to estimate the true features: $x | s \sim \mathcal{N}(\mu(s), \Sigma_{x | s})$ where $\mu(s) = \Sigma B^\top (B \Sigma B^\top)^{-1} s$ and $\Sigma_{x \mid s} = \Sigma - \Sigma B^\top (B \Sigma B^\top)^{-1} B \Sigma$.
 
-At time $t$, the human holds belief matrix  $H^{(t)} \in \mathbb{R}^{K \times n}$ with rows $h_1^{(t)}, ..., h_K^{(t)}$. Thus from the observation $s^{(t)}$ and revealed features $x^{(t)}_F$, she holds the utility for action $j \in [K]$ as: $$\hat{u}_j(F, x_F, s; H^{(t)}) = \sum_{j \in F} H_{kj}^{(t)} x_j + \sum_{j \notin F} H_{kj}^{(t)} \mu_j(s)$$
+At time $t$, the human holds belief matrix  $H^{(t)} \in \mathbb{R}^{K \times n}$ with rows $h_1^{(t)}, ..., h_K^{(t)}$. Thus from the observation $s^{(t)}$ and revealed features $x^{(t)}_F$, she holds the utility for action $j \in [K]$ as:
+
+$$
+\hat{u}_j(F, x_F, s; H^{(t)}) = \sum_{j \in F} H_{kj}^{(t)} x_j + \sum_{j \notin F} H_{kj}^{(t)} \mu_j(s)
+$$
+
 and takes action $\hat{y}\big(F, x_F, s; H^{(t)}\big) = \arg\max_{k \in [K]} \hat{u}_k(F, x_F, s; H^{(t)})$.
 
 We look at the problem of an algorithm $\mathcal{A}$ assisting $\mathcal{H}$ in learning the true utilities, making the correct move, and selecting the correct set of features to reveal. This consists of two phases: a training phase and graduation phase. 
@@ -16,12 +23,21 @@ The training phase occurs for $t = 1, ..., T$. Here,:
 - $\mathcal{H}$ updates her matrix, contracting towards the true utility for the features and actions observed: $H_{kj}^{(t + 1)} - U_{kj} = \psi(m_{kj}(t)) [H_{kj}^{(t)} - U_{kj}]$ for $(k, j) \in [K] \times F_t$ ,                                            and where $m_{kj}(t) = |\{ s < t : k \in [K], j \in F_s \}|$ and $\psi: \mathbb{N} \rightarrow [0, 1]$ is non-increasing with $\psi(0) = 1$. For unmeasured features, the beliefs remain the same.
 
 The graduation phase occurs after time $T$, where for each $t > T$:
-- $\mathcal{H}$ observes $s^{(t)}$ and picks subset $F^{(t)} = F^*_{\mathcal{H}}(s^{(t)}; H^{(T)})$ where $F^{(t)}$ is chosen to maximize their perceived value of information: $$ F_{\mathcal{H}}^*(s; H^{(T)}) = \arg\max_{|F| \le c} \mathbb{E}_{x_F \mid s} \left[ \max_{k \in [K]} \hat{u}_k(F, x_F, s; H^{(t)}) \right]$$
+- $\mathcal{H}$ observes $s^{(t)}$ and picks subset $F^{(t)} = F^*_{\mathcal{H}}(s^{(t)}; H^{(T)})$ where $F^{(t)}$ is chosen to maximize their perceived value of information:
+
+  $$
+  F_{\mathcal{H}}^*(s; H^{(T)}) = \arg\max_{|F| \le c} \mathbb{E}_{x_F \mid s} \left[ \max_{k \in [K]} \hat{u}_k(F, x_F, s; H^{(t)}) \right]
+  $$
+
 - The true features $(F_t, x^{(t)}_{F^{(t)}})$ are revealed to $\mathcal{H}$. 
 - $\mathcal{H}$ makes move $\hat{y}_t = \hat{y}(\hat{F}_t, x_{\hat{F}_t}^{(t)}, s^{(t)}; H^{(T)})$ and observes loss: $\ell_{\text{grad}}(x^{(t)}, \hat{y}_t)$ 
 
-The goal of the algorithm is to select training policy: $\pi = (F^{(1)}, F^{(2)}, ..., F^{(T)})$ minimizing the combined objective: 
-$$\mathcal{L}(\pi) := \lambda \sum_{t=1}^T \mathbb{E}\big[\ell_{\text{reg}}(x^{(t)}, \hat{y}_t)\big] + \sum_{t > T} \delta^{(t-T)} \mathbb{E}\big[\ell_{\text{grad}}(x^{(t)}, s^{(t)}; H^{(T)})\big]$$ 
+The goal of the algorithm is to select training policy: $\pi = (F^{(1)}, F^{(2)}, ..., F^{(T)})$ minimizing the combined objective:
+
+$$
+\mathcal{L}(\pi) := \lambda \sum_{t=1}^T \mathbb{E}\big[\ell_{\text{reg}}(x^{(t)}, \hat{y}_t)\big] + \sum_{t > T} \delta^{(t-T)} \mathbb{E}\big[\ell_{\text{grad}}(x^{(t)}, s^{(t)}; H^{(T)})\big]
+$$
+
 where $\lambda \in [0, 1)$ is small cost incurred ($\lambda \approx 0$) on the training phase, and $\delta \in (0, 1)$ is discount factor.
 
 To start, we consider that $\mathcal{A}$ has full access to $U, H^{(0)}, \psi$ .
@@ -29,6 +45,9 @@ To start, we consider that $\mathcal{A}$ has full access to $U, H^{(0)}, \psi$ .
 
 To confirm/further:
 - [ ] learning dependent on error (?) so then the curriculum is not just number of times i need to show this feature, but when i must show the feautre? or as a function? 
-- [ ] moving from gaussian to arbitrary distribution where certain symptoms/underlying conditions more frequent than others -- standardize and turn into gaussian?
-- [ ] Should $s = Bx$ where there is one $B$ matrix for each patient, or $B$ is dependent on each patient -- mask for what they disclose to doctor
+- [x] moving from gaussian to arbitrary distribution where certain symptoms/underlying conditions more frequent than others -- standardize and turn into gaussian?
+	- Decided 2026-10-29: yes. Each feature gets its own curve $F_j$, and $x_j = \Phi^{-1}(F_j(r_j))$ (Gaussian copula); the algorithm is unchanged. On sepsis this raised the share of lab variance the symptoms explain from 1.4% (risk-score map) to 4.2% (median). Not captured: relations that aren't monotone, which a flexible model still adds (5.8%). If utilities must be in raw units, replace $\mu_j(s)$ with $\mathbb{E}[F_j^{-1}(\Phi(x_j)) \mid s]$ and compute regret by sampling.
+- [x] Should $s = Bx$ where there is one $B$ matrix for each patient, or $B$ is dependent on each patient -- mask for what they disclose to doctor
+	- Decided 2026-10-26: one fixed, deterministic $B$ per environment (not learned); vary $B$ across environments. See [[<C> - 2026-10-26 Correlations, then Lossy Observation]].
+- [ ] Correlated case first ($B = 0$, $\Sigma \ne I$), then reintroduce $s = Bx$. With $\Sigma \ne I$, should hidden features be filled with $\mu_j(s)$ or $\mathbb{E}[x_j \mid x_F, s]$?
 

@@ -1,0 +1,351 @@
+<!doctype html>
+<!-- Built by build_pages.py from webapp/templates for GitHub Pages. Edit the template, then rebuild. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planned subsets &middot; AI-Assisted Decision Making Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="webapp/static/style.css?v=1793865885">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="overview.html">AI-Assisted Decision Making Lab</a></h1>
+      <p class="strapline">CS 598 · Helping a learning human pick the best move</p>
+    </div>
+    
+    
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="overview.html" >Overview</a>
+      <details class="mast-menu">
+        <summary class="current" title="Go to an experiment">Planned subsets</summary>
+        <div class="mast-list">
+          
+          <a href="index.html" >1 feature, 2 actions</a>
+          
+          <a href="worlds.html" >More actions and features</a>
+          
+          <a href="timed.html" >Timed hiding</a>
+          
+          <a href="planned.html" aria-current="page">Planned subsets</a>
+          
+          <a href="two-actions.html" >The two-action problem</a>
+          
+          <a href="losses.html" >Alternatives to the regret loss</a>
+          
+          <a href="one-feature.html" >One feature a round</a>
+          
+          <a href="aware.html" >State-aware subsets</a>
+          
+          <a href="sepsis.html" >Sepsis, from data</a>
+          
+          <a href="correlated.html" >Correlated features</a>
+          
+          <a href="experiments.html"  class="apart">Experiment 1 figures</a>
+        </div>
+      </details>
+      
+      <a href="distributions/index.html" title="Distribution basics: an explorer and a map">Distributions</a>
+    </nav>
+  </header>
+  
+<div class="layout">
+  <aside class="rail">
+    <form id="setup" class="controls" autocomplete="off">
+      <fieldset class="card">
+        <legend>The algorithm's choice</legend>
+        
+        <p class="group-label first">Features it may show in a round</p>
+        <div class="row">
+          <label for="budget"><span class="sym plain">at most C</span></label>
+          <input type="range" id="budget" data-budget min="1" max="3" step="1">
+          <input type="number" data-budget min="1" max="3" step="1" aria-label="the most features shown in a round">
+        </div>
+        <p class="group-label">It shows, each round</p>
+        <div class="segmented two" role="radiogroup" aria-label="How the schedule is chosen">
+          <label><input type="radio" name="rule" value="optimal" checked><span>the optimal plan</span></label>
+          <label><input type="radio" name="rule" value="myopic"><span>what loses least now</span></label>
+        </div>
+        <p class="hint">The algorithm sets F<sub>t</sub> for every round <b>before any state is drawn</b>: it knows
+          U, H<sub>0</sub>, the learning curve and that x<sub>t</sub> ~ N(0, I), not x<sub>t</sub> itself. Every
+          action is offered.</p>
+        
+        
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>World size</legend>
+        
+        <div class="row">
+          <label for="n"><span class="sym plain">features</span></label>
+          <input type="range" id="n" data-size="n" min="1" max="3" step="1">
+          <input type="number" data-size="n" min="1" max="3" step="1" aria-label="number of features">
+        </div>
+        
+        <p class="hint">Two actions and at most 3 features here: the plan is searched over how often each feature has been shown. A new feature gets random truth weights and zero beliefs.</p>
+        
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Truth <i>U</i></legend>
+        <div class="entries" id="matrix-U" role="group" aria-label="True utility weights, grouped by feature"></div>
+        <div class="actions"><button type="button" data-fill="U:random">Randomize</button></div>
+        <p class="hint">u<sub>kj</sub> is the weight of feature j in the value of action k. Each slider's dot is the colour of its line in Fig. 2.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Human's first belief <i>H</i><sub>0</sub></legend>
+        <div class="entries" id="matrix-H" role="group" aria-label="The human's initial weights, grouped by feature"></div>
+        <div class="actions"><button type="button" data-fill="H:random">Randomize</button><button type="button" data-fill="H:zeros">All zeros</button><button type="button" data-fill="H:truth">Copy the truth</button></div>
+        <p class="hint">Faded weights belong to a hidden feature or an action that is not offered. They keep their values.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>How the human learns</legend>
+        <div class="segmented" role="radiogroup" aria-label="Learning curve">
+          
+          <label><input type="radio" name="curve" value="exponential"><span>Exponential</span></label>
+          
+          <label><input type="radio" name="curve" value="hyperbolic"><span>Hyperbolic</span></label>
+          
+          <label><input type="radio" name="curve" value="power law"><span>Power law</span></label>
+          
+          <label><input type="radio" name="curve" value="sigmoid"><span>Sigmoid</span></label>
+          
+        </div>
+        <div class="row">
+          <label for="p1"><span class="sym plain" id="p1-label">rate</span></label>
+          <input type="range" id="p1" data-key="p1">
+          <input type="number" data-key="p1" aria-label="learning speed">
+        </div>
+        <div id="speed-rows"></div>
+        <p class="hint" id="curve-hint"></p>
+        <label class="check"><input type="checkbox" id="each-speed"> A separate speed for each feature</label>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>States <i>x</i><sub>t</sub></legend>
+        <div class="row">
+          <label for="seed"><span class="sym plain">draw</span></label>
+          <input type="range" id="seed" data-key="seed" min="0" max="999" step="1" value="0">
+          <input type="number" data-key="seed" min="0" max="999" step="1" value="0" aria-label="which draw of the states">
+        </div>
+        <div class="actions"><button type="button" id="redraw">Draw new states</button></div>
+        <p class="hint">Each round has its own state, drawn from N(0, I). The loss of a round is taken at that state, and everything on this page runs on the same draw. The number picks the draw.</p>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>Discount <i>&delta;</i> and horizon</legend>
+        <div class="row">
+          <label for="delta"><span class="sym plain">&delta;</span></label>
+          <input type="range" id="delta" data-key="delta" min="0.01" max="0.99" step="0.01">
+          <input type="number" data-key="delta" min="0.01" max="0.99" step="0.01" aria-label="discount factor">
+        </div>
+        <p class="hint">&delta; is the algorithm's patience: one number in (0, 1), as in the proposal, Noti et al. and Guan et al. Near 0 only the first rounds count; near 1 later rounds count almost as much.</p>
+        <div class="row">
+          <label for="T"><span class="sym plain">rounds</span></label>
+          <input type="range" id="T" data-key="T" min="10" max="100" step="10">
+          <input type="number" data-key="T" min="10" max="100" step="10" aria-label="number of rounds">
+        </div>
+      </fieldset>
+    </form>
+  </aside>
+
+  <main id="bench" aria-busy="true">
+    <section class="verdict" aria-live="polite">
+      <div class="numeral-block">
+        <div class="numeral" id="numeral">&nbsp;</div>
+        <div class="numeral-label" id="numeral-label">expected discounted regret</div>
+      </div>
+      <div class="verdict-text">
+        <p class="sentence" id="sentence">Running the first world&hellip;</p>
+        <div class="strip-wrap">
+          <div class="strip share" id="strip" role="img" aria-label="Share of states in which the human picks the wrong action, round by round"><i class="wrong" id="strip-wrong"></i></div>
+          <div class="strip-axis"><span>round 0</span><span class="strip-key"><i class="key wrong"></i>share of states with the wrong action <i class="key right"></i>with the right action</span><span id="strip-end"></span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="tiles" id="tiles"></section>
+
+    
+<header class="set-head">
+  <h2>Standard figures</h2>
+  <p>The same six on every bench, under the same numbers. <a href="overview.html#figures">How to read them</a></p>
+</header>
+<section class="figs one">
+
+
+<figure id="std-schedule">
+  <figcaption><b><a href="overview.html#fig-1" title="How to read this figure">Fig. 1</a></b>What the algorithm shows and offers, round by round<span class="cap-note">The plan, set before round 0. Every action is offered.</span></figcaption>
+  
+  <div class="legend"><span><i class="on-key"></i>shown or offered</span><span><i class="off-key"></i>held back</span></div>
+  <div class="chart" id="fig-schedule"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-beliefs">
+  <figcaption><b><a href="overview.html#fig-2" title="How to read this figure">Fig. 2</a></b>What the human believes: each action's weight on each feature</figcaption>
+  
+  <div class="legend" id="beliefs-legend"></div>
+  <div class="belief-grid" id="fig-beliefs" data-fig="2"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-choice">
+  <figcaption><b><a href="overview.html#fig-3" title="How to read this figure">Fig. 3</a></b>The human's choice &ycirc; against the best move y*, at the state drawn each round</figcaption>
+  
+  <div class="chart" id="fig-choice"></div>
+  
+</figure>
+
+</section>
+<section class="figs">
+
+
+<figure id="std-regret">
+  <figcaption><b><a href="overview.html#fig-4" title="How to read this figure">Fig. 4</a></b>Regret loss each round, at the state drawn for it<span class="cap-note">The dashed average is exact here, a closed form, and it is what the plan minimises.</span></figcaption>
+  
+  <div class="chart" id="fig-regret"></div>
+  
+</figure>
+
+
+
+
+<figure id="std-value">
+  <figcaption><b><a href="overview.html#fig-5" title="How to read this figure">Fig. 5</a></b>Value gap: the best move's true value minus what the human expects from their choice</figcaption>
+  
+  <div class="chart" id="fig-value"></div>
+  
+</figure>
+
+</section>
+<section class="figs one">
+
+
+<figure id="std-accuracy">
+  <figcaption><b><a href="overview.html#fig-6" title="How to read this figure">Fig. 6</a></b>How often the human picks the best move<span class="cap-note">Counted over the probe states, as on the other benches.</span></figcaption>
+  
+  <div class="chart" id="fig-accuracy"></div>
+  
+</figure>
+
+</section>
+
+
+    
+    
+<header class="set-head">
+  <h2>Only on this bench</h2>
+  <p>Figures this experiment needs and the others do not.</p>
+</header>
+
+    <section class="figs one">
+      <figure>
+        <figcaption><b>Fig. 7</b>Expected regret of each round: the optimal plan, the myopic rule and the best fixed subset</figcaption>
+        <div class="chart" id="fig-plan"></div>
+      </figure>
+    </section>
+    
+
+    <section class="rankings one-table">
+      <div>
+        <h2 class="section-title">Against a fixed subset</h2>
+        <p class="section-sub" id="ranking-features-sub"></p>
+        <div class="table-scroll"><table class="ranking">
+          <thead><tr><th scope="col">Rank</th><th scope="col">Features shown</th>
+            
+            <th scope="col" class="num">Expected discounted regret</th><th scope="col" class="num">On this draw</th>
+            
+            <th scope="col" class="num">Best move, first &rarr; last</th><th scope="col" class="num">Regret once learned</th></tr></thead>
+          <tbody id="ranking-features"></tbody>
+        </table></div>
+      </div>
+      
+    </section>
+  </main>
+</div>
+
+<footer class="reading">
+  <div class="reading-lead">
+    <h2>Reading this bench</h2>
+    
+    <p class="callout"><mark>Without seeing the state, the algorithm can only choose what to teach. Some rounds are worth losing for that.</mark></p>
+    <p class="callout-sub">The schedule is set before round 0, so each round is weighed by its average over states.
+      Showing a feature the human has backwards loses more now than hiding it, and is the only way they learn it.
+      <a href="aware.html">State-aware subsets</a> is the same budget with the state seen first.</p>
+    
+  </div>
+  <div class="reading-body notes">
+    <p>Each round has its own state <span class="math">x<sub>t</sub> ~ N(0, I)</span>, and the regret of the round is
+      taken there: zero if the human picks the best move at <span class="math">x<sub>t</sub></span>, otherwise what that
+      mistake costs in that state. The large number is its discounted sum on this draw, and every row of the tables is
+      run on the same draw. Draw the states again to see how much of a result is the draw.</p>
+    <p>With several features the human is no longer simply right or wrong: whether the choice is best depends on the
+      state. The grey in the figures, the bar at the top and the &ldquo;averaged over states&rdquo; numbers therefore
+      score each round over 2,000 probe states drawn from <span class="math">N(0, I)</span>.</p>
+    
+    <p>With two actions only the gap between their rows matters: <span class="math">d = u<sub>1</sub> &minus; u<sub>2</sub></span>
+      is the true gap and g the gap the human believes on the shown features. The average regret of a round is then exact:</p>
+    <p class="formula">L(F, m) = ( |d| &minus; g&middot;d / |g| ) / &radic;(2&pi;)</p>
+    <p>Only the direction of g counts. A feature whose gap the human has backwards pulls g away from d, so showing
+      it loses more than hiding it, until enough rounds have turned it round.</p>
+    <p class="formula">V<sub>t</sub>(m) = min<sub>|F| &le; C</sub> [ L(F, m) + &delta; V<sub>t+1</sub>(m + 1<sub>F</sub>) ]</p>
+    <p><b>The optimal plan</b> solves this over the counts m of how often each feature has been shown.
+      <b>What loses least now</b> takes the smallest L(F, m) each round and never looks ahead. Fig. 7 sets the two
+      against the best fixed subset; a grey box is a round the plan on the bench gives up.</p>
+    <p>The table ranks by the expected discounted regret, which the plan minimises, so the optimal plan is never
+      below a fixed subset. One draw of the states can still order them differently.</p>
+    
+    
+    <p>The value gap in Fig. 5 is <span class="math">max<sub>k</sub> (Ux<sub>t</sub>)<sub>k</sub> &minus; &ucirc;(&ycirc;)</span> at
+      each round's state: above zero the human expects too little from their pick, below zero too much.</p>
+    <p>Fig. 3 follows the drawn states: the action the human picks at <span class="math">x<sub>t</sub></span> against the
+      best move there, with a grey box over the rounds where they differ. How often they would differ over all states
+      is the bar at the top and the lighter grey in the other figures.</p>
+    <p>Features here are independent, and every weight follows the chosen learning curve on the rounds it is shown.
+      Learning speed belongs to the feature: all features share one speed, or each has its own, and an action's
+      weights on a feature always move at that feature's speed.</p>
+  </div>
+</footer>
+
+<script>
+  window.CURVE_SPECS = {"exponential": {"default": 0.1, "hint": "closes this fraction of the remaining gap every round", "label": "Exponential", "max": 0.5, "min": 0.01, "param": "rate", "step": 0.01}, "hyperbolic": {"default": 5, "hint": "rounds needed to close half of the gap", "label": "Hyperbolic", "max": 50, "min": 1, "param": "half-life", "step": 0.5}, "power law": {"default": 0.5, "hint": "remaining gap decays as (1 + t) to minus this power", "label": "Power law", "max": 2, "min": 0.1, "param": "exponent", "step": 0.05}, "sigmoid": {"default": 20, "hint": "round of the sudden \u0027aha\u0027; little is learned before it", "label": "Sigmoid", "max": 80, "min": 2, "param": "midpoint", "step": 1}};
+  window.DEFAULT_WORLD = {"C": 2, "H": [[1.0, 0.5, 0.0], [0.0, 1.0, 1.5]], "T": 100, "U": [[1.0, 0.5, 1.5], [0.0, 1.0, 0.0]], "curve": "exponential", "delta": 0.95, "p1": 0.1, "rule": "optimal"};
+  window.BENCH_MODE = "planned";
+  window.MAX_WINDOWS = 12;
+</script>
+<script src="webapp/static/charts.js?v=1793865885"></script>
+<script src="webapp/static/figures.js?v=1791524128"></script>
+<script src="webapp/static/matrix.js?v=1791365885"></script>
+<script src="webapp/static/speeds.js?v=1791492951"></script>
+<script src="webapp/static/probes.js?v=1793866242"></script>
+<script src="webapp/static/static-api.js?v=1793865885"></script>
+<script src="webapp/static/worlds.js?v=1793865885"></script>
+
+  <script>
+    // the page menu closes on Escape and on a click anywhere else
+    (function () {
+      const menu = document.querySelector(".mast-menu");
+      document.addEventListener("click", (event) => { if (!menu.contains(event.target)) menu.open = false; });
+      document.addEventListener("keydown", (event) => {
+        if (event.key !== "Escape" || !menu.open) return;
+        menu.open = false;
+        menu.querySelector("summary").focus();
+      });
+    })();
+  </script>
+</body>
+</html>

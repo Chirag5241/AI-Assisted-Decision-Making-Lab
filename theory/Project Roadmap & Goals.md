@@ -29,3 +29,24 @@ The active repository consists of the following modules:
 * **Human Review:** Review AI-written modules (`<G>` files) across binary dynamic assistance and multi-action theory.
 * **Simulation Verification:** Implement Monte Carlo rollouts validating the theoretical regret bounds and benchmarking the Online Preceptor against Oracle, Symptom Clairvoyant, and baseline policies.
 * **Conference Paper Preparation:** Package the finalized theoretical framework and empirical results into a conference submission draft.
+
+### Next, in order (agreed 2026-10-26 — see [[<C> - 2026-10-26 Correlations, then Lossy Observation]])
+
+**Stage 1 — correlated $x$** (current setup, $B = 0$, $\Sigma \ne I$):
+* [ ] **C1** Formalize; choose the hidden-feature fill-in: $\mu_j(s)$ (current) vs. $\mathbb{E}[x_j \mid x_F, s]$ (Guan et al.).
+* [ ] **C2** Theory; first pin down what "a solution that is not a global optimum" means (likely: does a stationary $F$ stay optimal?).
+* [ ] **C3** Implement + simulate — extend the `/correlated` bench (`simlab/correlated.py`).
+* [ ] **C4** Cross-review derivations and code; re-check the notes that assume $\Sigma = I$ (Graduation Regret, Ex-Post Dynamic Teaching, Kingmaker).
+
+**Stage 2 — lossy observation** (after stage 1):
+* [ ] **H1** $\mathcal{A}$ picks $F_t$ from $s = Bx$ only; $B$ fixed and deterministic per environment (not learned).
+* [ ] **H2** Sweep $B$ across environments; figures of how $\mathcal{A}$ responds.
+
+**Sharing:**
+* [ ] **D1** Work and notes on GitHub. **D2** One Markdown explaining the work and its assumptions.
+
+### Longer term
+
+* [ ] **Non-Gaussian Robustness (Copula Transport / Berry-Esseen)**: Establish formal bounds for discrete vital sign scores (e.g., categorical Glasgow Coma Scale) via central limit projections.
+* [x] **Sepsis benchmark (PhysioNet 2019)**, $K = 2$: $\Sigma$, $B$, $U$ fitted to 40,336 ICU patients; teaching simulated. See [[<C> - Sepsis Formulation (PhysioNet 2019)]], page `/sepsis`. Both fill-ins run side by side (C1).
+* [ ] **Empirical Benchmark on MIMIC-IV**: Adapt simulation scripts to run on real-world emergency triage EHR data (e.g., MIMIC-IV ED triage vitals and ICD-10 dispositions).

@@ -2,21 +2,27 @@
 // two on/off masks); every number comes back from /api/world (simlab) and is drawn here.
 // The "Timed hiding" page is the same bench with one more input: windows of rounds in
 // which one feature or one action is held back. On the "State-aware subsets" page the
-// algorithm chooses the features itself for each round's state, within a budget C.
+// algorithm chooses the features itself for each round's state, within a budget C; on the
+// "Planned subsets" page it sets them for every round before any state is drawn.
 (function () {
   const SPECS = window.CURVE_SPECS;
   const $ = (id) => document.getElementById(id);
   const bench = $("bench");
   const SUB = ["₁", "₂", "₃", "₄", "₅", "₆"];
 
-  const MODE = window.BENCH_MODE, TIMED = MODE === "timed", AWARE = MODE === "aware";
+  const MODE = window.BENCH_MODE, TIMED = MODE === "timed", AWARE = MODE === "aware", PLANNED = MODE === "planned";
+  const CHOSEN = AWARE || PLANNED;      // the algorithm chooses the features itself, within a budget
   const MAX_WINDOWS = window.MAX_WINDOWS || 0, LAST_ROUND = 299;
+  const MAX_FEATURES = parseInt(document.querySelector('input[data-size="n"]').max, 10);
   // W: the windows, each {kind: "f" or "a", index, from, to}; hidden from round `from` to round `to`, both included
   // S: null while every feature learns at the one speed p1, otherwise one speed per feature
   // C, judge, prefer: on the state-aware page, the most features shown in a round, whose weights decide
   // whether a subset works ("truth" or "belief"), and which working subset is shown ("margin" or "most")
-  const world = { K: 3, n: 3, U: [], H: [], F: [], A: [], W: [], S: null, C: 2, judge: "belief", prefer: "margin" };
-  const REMEMBER = "decision-lab:" + (TIMED ? "timed" : AWARE ? "aware" : "worlds");
+  // rule: on the planned page, the schedule with the least expected regret ("optimal") or the one that takes
+  // each round's best subset ("myopic")
+  const world = { K: 3, n: 3, U: [], H: [], F: [], A: [], W: [], S: null, C: 2, judge: "belief", prefer: "margin", rule: "optimal" };
+  const REMEMBER = "decision-lab:" + (TIMED ? "timed" : AWARE ? "aware" : PLANNED ? "planned" : "worlds");
+  const PLAN_NAMES = { optimal: "the optimal plan", myopic: "what loses least now", fixed: "the best fixed subset" };
 
   const randomWeight = () => Math.round((Math.random() * 4 - 2) * 10) / 10;
   const clamp = (v, lo, hi) => Math.min(Math.max(v, lo), hi);
@@ -126,10 +132,11 @@
 
   function drawAll() {
     document.querySelectorAll("[data-size]").forEach((el) => { el.value = world[el.dataset.size]; });
-    if (AWARE) {
+    if (CHOSEN) {
       document.querySelectorAll("[data-budget]").forEach((el) => { el.max = world.n; el.value = world.C; });
-      document.querySelector(`input[name="judge"][value="${world.judge}"]`).checked = true;
-      document.querySelector(`input[name="prefer"][value="${world.prefer}"]`).checked = true;
+      for (const name of AWARE ? ["judge", "prefer"] : ["rule"]) {
+        document.querySelector(`input[name="${name}"][value="${world[name]}"]`).checked = true;
+      }
     } else {
       drawChips("feature-chips", world.F, "x", "feature");
       drawChips("action-chips", world.A, "a", "action");
@@ -165,6 +172,10 @@
     if (AWARE) {      // the algorithm chooses the features itself and offers every action
       q.delete("F"); q.delete("A");
       q.set("policy", "aware"); q.set("C", world.C); q.set("judge", world.judge); q.set("prefer", world.prefer);
+    }
+    if (PLANNED) {    // the same, with the whole schedule set before any state is drawn
+      q.delete("F"); q.delete("A");
+      q.set("policy", "planned"); q.set("C", world.C); q.set("rule", world.rule);
     }
     if (world.W.length) q.set("W", world.W.map((w) => `${w.kind}${w.index + 1}:${span(w).join("-")}`).join(";"));
     return q;
@@ -224,6 +235,26 @@
           alt: "The number of candidate feature subsets for which the human picks the best move, in each round" });
     }
 
+    // Fig. 7, on the planned page: the expected regret of each round under the optimal plan, the myopic rule and
+    // the best fixed subset, with a box over the rounds the plan on the bench gives up. The axis is fixed by the
+    // truth: it tops out at the regret of a human who is always wrong.
+    if (PLANNED) {
+      const { compare, gave_up: gaveUp, top, guess, rule } = data.policy, boxes = [];
+      for (const t of gaveUp) {
+        if (boxes.length && boxes[boxes.length - 1][1] === t) boxes[boxes.length - 1][1] = t + 1;
+        else boxes.push([t, t + 1]);
+      }
+      const look = { optimal: "c-ink", myopic: "c-s6", fixed: "c-ref" };
+      Charts.line($("fig-plan"), data.T,
+        compare.map((c) => ({ v: c.series, cls: look[c.key], dash: c.key === "fixed",
+          name: PLAN_NAMES[c.key] + (c.key === "fixed" ? ", " + c.mask.map((on, j) => (on ? "x" + SUB[j] : "")).join("") : "")
+            + (c.key === rule ? " (on the bench)" : "") })),
+        [{ y: guess, label: "a human who guesses" }], boxes,
+        { ylabel: "expected regret of the round", step: true, width: 1120, height: 300, lo: -0.04 * top, hi: 1.04 * top,
+          shadeLabel: "rounds the plan on the bench gives up to teach",
+          alt: "The expected regret of each round under the optimal plan, the myopic rule and the best fixed subset" });
+    }
+
     if (data.rankings) {   // only the full answer ranks every subset
       // a fixed subset put on the bench replaces that family's windows as well as its chips
       const fixed = (name, kind) => (mask) => { world[name] = mask; world.W = world.W.filter((w) => w.kind !== kind); };
@@ -239,17 +270,20 @@
     const subsets = total - (rows.some((r) => r.scheduled) ? 1 : 0);   // the bench's own schedule can be an extra row
     $("ranking-" + key + "-sub").textContent = (AWARE
       ? `The policy on the bench against ${subsets === 1 ? "the one fixed subset" : `all ${subsets} fixed subsets`} within its budget, each kept every round, on the same draw.`
+      : PLANNED ? `The plan on the bench against ${subsets === 1 ? "the one fixed subset" : `all ${subsets} fixed subsets`} within its budget, each kept every round, ranked by expected discounted regret.`
       : subsets === 1 ? `With one ${noun} there is only one subset.`
       : TIMED ? `All ${subsets} ${noun} subsets, each kept every round, with the ${other} as scheduled on the bench.`
         : `All ${subsets} ${noun} subsets, each run with the chosen ${other}.`)
       + (rows.length < total ? ` The best ${Math.min(8, rows.length)} and the one on the bench are listed.` : "");
-    const worst = Math.max(...rows.map((r) => r.discounted), 1e-9);
+    // the column the rows are ranked by carries the bar: the expectation for a plan, this draw elsewhere
+    const [lead, second] = PLANNED ? ["mean", "discounted"] : ["discounted", "mean"];
+    const worst = Math.max(...rows.map((r) => r[lead]), 1e-9);
     const pct = (v) => Math.round(v * 100) + "%";
     $("ranking-" + key).replaceChildren(...rows.map((r) => {
       const tr = document.createElement("tr");
       if (r.current) tr.className = "current";
       tr.tabIndex = 0;
-      tr.title = r.current ? "On the bench now" : AWARE ? "A fixed subset, for comparison" : TIMED ? `Put this subset on the bench, in place of the ${noun} windows` : "Put this subset on the bench";
+      tr.title = r.current ? "On the bench now" : CHOSEN ? "A fixed subset, for comparison" : TIMED ? `Put this subset on the bench, in place of the ${noun} windows` : "Put this subset on the bench";
       const cell = (text, cls) => {
         const td = document.createElement("td");
         if (cls) td.className = cls;
@@ -257,7 +291,7 @@
         return td;
       };
       const members = document.createElement("td");
-      if (r.scheduled) members.textContent = AWARE ? "chosen for each state" : "the windows on the bench";
+      if (r.scheduled) members.textContent = AWARE ? "chosen for each state" : PLANNED ? "planned round by round" : "the windows on the bench";
       else r.mask.forEach((on, j) => {
         const dot = document.createElement("span");
         dot.className = "feat" + (on ? " on" : "");
@@ -268,13 +302,13 @@
       bar.className = "num bar-cell";
       const fill = document.createElement("span");
       fill.className = "bar";
-      fill.style.width = (r.discounted / worst) * 100 + "%";
+      fill.style.width = (r[lead] / worst) * 100 + "%";
       const value = document.createElement("span");
-      value.textContent = r.discounted.toFixed(2);
+      value.textContent = r[lead].toFixed(2);
       bar.append(fill, value);
-      tr.append(cell(r.rank + (r.current ? "  \u2190 now" : ""), "rank"), members, bar, cell(r.mean.toFixed(2), "num"),
+      tr.append(cell(r.rank + (r.current ? "  \u2190 now" : ""), "rank"), members, bar, cell(r[second].toFixed(2), "num"),
         cell(`${pct(r.start)} \u2192 ${pct(r.end)}`, "num"), cell(r.floor.toFixed(2), "num"));
-      const apply = () => { if (r.scheduled || AWARE) return; choose(r.mask.slice()); drawAll(); run(); };   // the state-aware page keeps its policy
+      const apply = () => { if (r.scheduled || CHOSEN) return; choose(r.mask.slice()); drawAll(); run(); };   // a page that chooses the features keeps its policy
       tr.addEventListener("click", apply);
       tr.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apply(); } });
       return tr;
@@ -389,7 +423,7 @@
     schedule();
   });
 
-  if (AWARE) {
+  if (CHOSEN) {
     document.querySelectorAll("[data-budget]").forEach((el) => {
       el.addEventListener("input", () => {
         const v = parseInt(el.value, 10);
@@ -400,7 +434,7 @@
       });
       el.addEventListener("change", () => { el.value = world.C; });
     });
-    for (const name of ["judge", "prefer"]) {
+    for (const name of AWARE ? ["judge", "prefer"] : ["rule"]) {
       document.querySelectorAll(`input[name="${name}"]`).forEach((el) =>
         el.addEventListener("change", () => { world[name] = el.value; run(); }));
     }
@@ -436,6 +470,7 @@
     const valid = (M) => Array.isArray(M) && M.length >= 2 && M.length <= 6 && M[0].length >= 1 && M[0].length <= 6
       && M.every((row) => row.length === M[0].length && row.every(Number.isFinite));
     if (!valid(U) || !valid(H) || H.length !== U.length || H[0].length !== U[0].length) return false;
+    if (PLANNED && (U.length !== 2 || U[0].length > MAX_FEATURES)) return false;      // a plan is for two actions and a few features
     world.U = U; world.H = H; world.K = U.length; world.n = U[0].length;
     world.F = s.F ? mask(s.F) : []; world.A = s.A ? mask(s.A) : [];
     if (world.F.length !== world.n) world.F = [];
@@ -445,6 +480,11 @@
       if (s.C !== undefined && isFinite(s.C)) world.C = Math.max(1, Math.trunc(Number(s.C)));
       world.judge = s.judge === "truth" ? "truth" : "belief";
       world.prefer = s.prefer === "most" ? "most" : "margin";
+    }
+    if (PLANNED) {
+      world.F = []; world.A = [];
+      if (s.C !== undefined && isFinite(s.C)) world.C = Math.max(1, Math.trunc(Number(s.C)));
+      world.rule = s.rule === "myopic" ? "myopic" : "optimal";
     }
     world.W = [];
     for (const part of TIMED && typeof s.W === "string" ? s.W.split(";").slice(0, MAX_WINDOWS) : []) {

@@ -32,6 +32,12 @@ This index outlines the active, streamlined reading flow for the CS 598 project 
 
 ---
 
-## 4. Archive
+## 4. Meetings
+
+* [[<C> - 2026-10-26 Correlations, then Lossy Observation]]: Next steps — correlated $x$ first, then a fixed lossy observation $s = Bx$; whiteboard and action items.
+
+---
+
+## 5. Archive
 
 * `Archive/`: Preserved historical drafts, superseded derivations, and earlier working notes.
