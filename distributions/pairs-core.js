@@ -21,6 +21,10 @@
     const byA = order(a), byW = order(w), X = new Float64Array(N), Y = new Float64Array(N);
     for (let j = 0; j < N; j++) { X[byA[j]] = xs[j]; Y[byW[j]] = ys[j]; }
     const P = { X, Y, N, xs, ys, xd, yd, px, py };
+    // running sums of Y and Y² in the order of X (X sorted is xs), so any band's average is two lookups
+    const ox = order(X);
+    P.cum = new Float64Array(N + 1); P.cum2 = new Float64Array(N + 1);
+    for (let j = 0; j < N; j++) { const y = Y[ox[j]]; P.cum[j + 1] = P.cum[j] + y; P.cum2[j + 1] = P.cum2[j] + y * y; }
     P.mx = mean(X); P.my = mean(Y); P.sx = sd(X); P.sy = sd(Y);
     P.rx = robust(xs); P.ry = robust(ys);        // spreads that heavy tails cannot blow up, for axes and bands
     P.cov = cov(X, Y); P.r = P.cov / (P.sx * P.sy); P.rs = spearman(X, Y);
@@ -68,13 +72,18 @@
     return total > 0 ? between / total : 0;
   }
 
+  // first index of a sorted array whose value is >= v (or > v when strict)
+  function bound(a, v, strict) {
+    let lo = 0, hi = a.length;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (strict ? a[mid] <= v : a[mid] < v) lo = mid + 1; else hi = mid; }
+    return lo;
+  }
   // the average Y of the population at X near s (its spread too): the true conditional mean
   function band(P, s) {
     const h = P.xd.kind === "discrete" ? 0.5 : Math.max(0.15 * P.rx, 1e-6);
-    let n = 0, s1 = 0, s2 = 0;
-    for (let i = 0; i < P.N; i++) if (Math.abs(P.X[i] - s) <= h) { n++; s1 += P.Y[i]; s2 += P.Y[i] * P.Y[i]; }
-    const m = n ? s1 / n : NaN;
-    return { n, mean: m, sd: n > 1 ? Math.sqrt(Math.max(0, s2 / n - m * m)) : NaN, h };
+    const a = bound(P.xs, s - h, false), b = bound(P.xs, s + h, true), n = b - a;
+    const m = n ? (P.cum[b] - P.cum[a]) / n : NaN;
+    return { n, mean: m, sd: n > 1 ? Math.sqrt(Math.max(0, (P.cum2[b] - P.cum2[a]) / n - m * m)) : NaN, h };
   }
 
   // band averages and spreads along X, on a fixed grid of centres

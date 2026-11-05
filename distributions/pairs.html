@@ -44,6 +44,14 @@
       <div class="axis-pick">
         <div class="ctl"><label for="s">Look at X = s</label><input type="range" id="s"><output id="s-out"></output></div>
       </div>
+      <div class="axis-pick">
+        <span class="lab">View</span>
+        <div class="seg" id="view">
+          <button data-z="full">Full range</button><button data-z="fit">Fit data</button>
+          <button data-z="out" aria-label="Zoom out">−</button><button data-z="in" aria-label="Zoom in">+</button>
+        </div>
+        <p class="note"><span id="view-out">Full range</span>. Drag a chart to pan, pinch or ctrl-scroll to zoom, double-click to reset.</p>
+      </div>
       <button id="new-pop">New population</button>
       <p class="note">20,000 draws. Every number on this page comes from them.</p>
     </aside>
@@ -58,7 +66,7 @@
           <label><input type="checkbox" id="show-cond"> Y for the band only</label>
           <label><input type="checkbox" id="show-cov"> Covariance signs</label>
         </div>
-        <canvas id="scatter" role="img" aria-label="Scatter of the population with each variable's curve beside its axis"></canvas>
+        <canvas id="scatter" class="zoomable" role="img" aria-label="Scatter of the population with each variable's curve beside its axis"></canvas>
         <div class="legend" id="scatter-legend"></div>
         <div class="stats" id="corr-tiles"></div>
       </section>
@@ -69,7 +77,7 @@
         <div class="vbar" id="var-bar"></div>
         <div class="legend" id="var-legend"></div>
         <p class="chart-label">Spread of Y at each X</p>
-        <canvas id="spread" role="img" aria-label="Standard deviation of Y among patients at each X"></canvas>
+        <canvas id="spread" class="zoomable" role="img" aria-label="Standard deviation of Y among patients at each X"></canvas>
         <div class="stats" id="var-tiles"></div>
       </section>
 
@@ -83,7 +91,7 @@
           <span class="lab">n</span><div class="seg" id="samp-n"></div>
           <button id="draw-1">Draw 1 sample</button><button id="draw-500">Draw 500</button><button id="draw-clear">Clear</button>
         </div>
-        <canvas id="samp-scatter" role="img" aria-label="The latest sample against the population"></canvas>
+        <canvas id="samp-scatter" class="zoomable" role="img" aria-label="The latest sample against the population"></canvas>
         <div class="legend" id="samp-legend"></div>
         <p class="chart-label" id="hist-label">Estimates from every sample so far</p>
         <canvas id="samp-hist" role="img" aria-label="Histogram of the estimates from repeated samples"></canvas>
@@ -102,7 +110,7 @@
         <div class="toolbar">
           <span class="lab">n</span><div class="seg" id="spec-n"></div>
         </div>
-        <canvas id="spec-plot" role="img" aria-label="Fits of the chosen model from forty samples, beside the true band averages"></canvas>
+        <canvas id="spec-plot" class="zoomable" role="img" aria-label="Fits of the chosen model from forty samples, beside the true band averages"></canvas>
         <div class="legend" id="spec-legend"></div>
         <div class="stats" id="spec-tiles"></div>
         <p class="chart-label">Error at X = s against n (200 samples each)</p>

@@ -13,6 +13,7 @@
     x: "normal", y: "normal", px: {}, py: {}, link: "straight", rho: 0.6, s: 1, seed: 1,
     stat: "mean", sampN: 25, est: [], last: null, sampSeed: 1,
     model: "line", specN: 50,
+    vx: null, vy: null,                 // the view of X and Y; null is the fixed full range
   };
   let P = null;
 
@@ -34,7 +35,11 @@
   }
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
   const xRange = (d) => (d.kind === "discrete" ? [d.x[0] - 0.5, d.x[1] + 0.5] : d.x.slice());
-  const axisTicks = (d, r) => (d.kind === "discrete" ? ticks(d.x[0], d.x[1], Math.min(8, d.x[1] - d.x[0])).filter(Number.isInteger) : ticks(r[0], r[1], 8));
+  function axisTicks(d, r) {
+    if (d.kind !== "discrete") return ticks(r[0], r[1], 8);
+    const lo = Math.ceil(r[0]), hi = Math.floor(r[1]);
+    return hi - lo < 1 ? [Math.round((r[0] + r[1]) / 2)] : ticks(lo, hi, Math.min(8, hi - lo)).filter(Number.isInteger);
+  }
   const tile = (k, v, s) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   const sw = (color, kind) => kind === "line" ? `<i style="background:none;border-top:2px solid ${color};height:0;width:16px"></i>`
     : kind === "dash" ? `<i style="background:none;border-top:2px dashed ${color};height:0;width:16px"></i>`
@@ -81,10 +86,35 @@
     ctx.globalAlpha = 1;
   }
   const everyone = () => Q.all(P);
-  // x positions to draw a curve along X: whole numbers for a count, a fine grid otherwise
-  function grid(d, n = 120) {
-    if (d.kind === "discrete") { const g = []; for (let k = d.x[0]; k <= d.x[1]; k++) g.push(k); return g; }
-    const r = d.x; return Array.from({ length: n + 1 }, (_, i) => r[0] + (r[1] - r[0]) * i / n);
+  // x positions to draw a curve along X: whole numbers for a count, a fine grid otherwise (within r, if given)
+  function grid(d, n = 120, r = d.x) {
+    if (d.kind === "discrete") { const g = []; for (let k = Math.max(d.x[0], Math.ceil(r[0])); k <= Math.min(d.x[1], Math.floor(r[1])); k++) g.push(k); return g; }
+    return Array.from({ length: n + 1 }, (_, i) => r[0] + (r[1] - r[0]) * i / n);
+  }
+
+  // ---------- the view ----------
+  // Every chart of X against Y shares one view. It starts at the fixed full range and only changes when you
+  // zoom or pan; it can never be wider than the full range.
+  const fullX = () => xRange(byId[st.x]), fullY = () => xRange(byId[st.y]);
+  const viewX = () => st.vx || fullX(), viewY = () => st.vy || fullY();
+  function clampRange(lo, hi, full) {
+    const fw = full[1] - full[0];
+    const w = Math.max(fw / 400, Math.min(hi - lo, fw));
+    if (w >= fw - 1e-9) return null;
+    let a = (lo + hi) / 2 - w / 2, b = a + w;
+    if (a < full[0]) { b += full[0] - a; a = full[0]; }
+    if (b > full[1]) { a -= b - full[1]; b = full[1]; }
+    return [a, b];
+  }
+  const scaleRange = (r, full, c, f) => clampRange(c + (r[0] - c) * f, c + (r[1] - c) * f, full);
+  // the box holding 99% of the population, with a margin
+  function fitView() {
+    const box = (sorted, d, full) => {
+      let lo = Q.quantile(sorted, 0.005), hi = Q.quantile(sorted, 0.995);
+      const pad = Math.max((hi - lo) * 0.08, d.kind === "discrete" ? 0.5 : 1e-6);
+      return clampRange(lo - pad, hi + pad, full);
+    };
+    st.vx = box(P.xs, byId[st.x], fullX()); st.vy = box(P.ys, byId[st.y], fullY());
   }
   // band averages along X depend on the population only, not on s, so each grid is worked out once per population
   const profiles = new WeakMap();
@@ -94,7 +124,8 @@
     if (!m.has(k)) m.set(k, Q.profile(P, grid(d, n)));
     return m.get(k);
   }
-  const curveOf = (d) => profileOf(d, 80).map((b) => [b.x, b.n >= 20 ? b.mean : NaN]);
+  // the true band averages across whatever part of X is in view
+  const curveOf = (d) => Q.profile(P, grid(d, 120, viewX())).map((b) => [b.x, b.n >= 20 ? b.mean : NaN]);
 
   // ---------- population controls ----------
   function fillSelect(id, value) {
@@ -132,9 +163,12 @@
 
   // ---------- 1. correlation ----------
   const SR = { l: 130, r: 750, t: 10, b: 390 }, XS = { t: 430, b: 500 }, YS = { l: 8, r: 78 };
+  // the plotting box of each chart that shows the view, and whether zooming it moves Y as well as X
+  const RECT = { scatter: SR, "samp-scatter": { l: 56, r: 750, t: 10, b: 262 }, "spec-plot": { l: 56, r: 750, t: 10, b: 300 }, spread: { l: 56, r: 750, t: 10, b: 190 } };
+  const HEIGHT = { scatter: 512, "samp-scatter": 300, "spec-plot": 340, spread: 230 };
   function drawScatter() {
     const H = 512, ctx = canvas("scatter", H), xd = byId[st.x], yd = byId[st.y];
-    const xr = xRange(xd), yr = xRange(yd);
+    const xr = viewX(), yr = viewY();
     const { X, Y } = frame(ctx, SR, xr, yr, axisTicks(xd, xr), axisTicks(yd, yr), { xlab: "X: " + xd.name, ylab: "Y: " + yd.name, ylabX: 92 });
     const b = Q.band(P, st.s), inBand = [], rest = [];
     for (let i = 0; i < P.N; i++) (Math.abs(P.X[i] - st.s) <= b.h ? inBand : rest).push(i);
@@ -157,23 +191,27 @@
     const pdfX = (v) => Math.min(1.04, xd.pdf(v, st.px) / xd.y), pdfY = (v) => Math.min(1.04, yd.pdf(v, st.py) / yd.y);
     const hX = XS.b - XS.t, wY = YS.r - YS.l;
     ctx.strokeStyle = C.rule2; ctx.beginPath(); ctx.moveTo(SR.l, XS.b + 0.5); ctx.lineTo(SR.r, XS.b + 0.5); ctx.moveTo(YS.l + 0.5, SR.t); ctx.lineTo(YS.l + 0.5, SR.b); ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.rect(SR.l, XS.t - 6, SR.r - SR.l, XS.b - XS.t + 8); ctx.clip();
     if (xd.kind === "discrete") {
       ctx.fillStyle = C.disc; const bw = Math.max(1.5, (X(1) - X(0)) * 0.55);
-      for (const k of grid(xd)) { const v = pdfX(k); if (v > 0.002) ctx.fillRect(X(k) - bw / 2, XS.b - v * hX, bw, v * hX); }
+      for (const k of grid(xd, 0, xr)) { const v = pdfX(k); if (v > 0.002) ctx.fillRect(X(k) - bw / 2, XS.b - v * hX, bw, v * hX); }
     } else {
-      const g = grid(xd, 200).map((x) => [X(x), XS.b - (Number.isFinite(pdfX(x)) ? pdfX(x) : 1.04) * hX]);
+      const g = grid(xd, 200, xr).map((x) => [X(x), XS.b - (Number.isFinite(pdfX(x)) ? pdfX(x) : 1.04) * hX]);
       ctx.fillStyle = C.cont; ctx.globalAlpha = 0.2; ctx.beginPath(); ctx.moveTo(X(xr[0]), XS.b); g.forEach(([a, c]) => ctx.lineTo(a, c)); ctx.lineTo(X(xr[1]), XS.b); ctx.fill(); ctx.globalAlpha = 1;
       path(ctx, g, C.cont, 1.8);
     }
+    ctx.restore();
+    ctx.save(); ctx.beginPath(); ctx.rect(YS.l - 2, SR.t, YS.r - YS.l + 8, SR.b - SR.t); ctx.clip();
     const yAt = (v) => YS.l + (Number.isFinite(pdfY(v)) ? pdfY(v) : 1.04) * wY;
     if (yd.kind === "discrete") {
       ctx.fillStyle = C.disc; const bh = Math.max(1.5, (Y(0) - Y(1)) * 0.55);
-      for (const k of grid(yd)) { const v = pdfY(k); if (v > 0.002) ctx.fillRect(YS.l, Y(k) - bh / 2, v * wY, bh); }
+      for (const k of grid(yd, 0, yr)) { const v = pdfY(k); if (v > 0.002) ctx.fillRect(YS.l, Y(k) - bh / 2, v * wY, bh); }
     } else {
-      const g = grid(yd, 200).map((y) => [yAt(y), Y(y)]);
+      const g = grid(yd, 200, yr).map((y) => [yAt(y), Y(y)]);
       ctx.fillStyle = C.cont; ctx.globalAlpha = 0.2; ctx.beginPath(); ctx.moveTo(YS.l, Y(yr[0])); g.forEach(([a, c]) => ctx.lineTo(a, c)); ctx.lineTo(YS.l, Y(yr[1])); ctx.fill(); ctx.globalAlpha = 1;
       path(ctx, g, C.cont, 1.8);
     }
+    ctx.restore();
     // the band's own Y, on the same density scale as Y's curve
     if ($("show-cond").checked && inBand.length > 5) {
       const B = yd.kind === "discrete" ? null : 60, ys = inBand.map((i) => P.Y[i]);
@@ -190,7 +228,7 @@
       ctx.restore();
     }
     // connectors from the band's average to both curves
-    if (Number.isFinite(b.mean)) {
+    if (Number.isFinite(b.mean) && st.s >= xr[0] && st.s <= xr[1] && b.mean >= yr[0] && b.mean <= yr[1]) {
       const ax = X(st.s), ay = Y(b.mean), hx = XS.b - Math.min(1, pdfX(st.s) || 0) * hX, ly = yAt(b.mean);
       path(ctx, [[ax, ay], [ax, hx]], C.line, 1.4, [3, 3]);
       path(ctx, [[ax, ay], [Math.min(ly, YS.r), ay]], C.line, 1.4, [3, 3]);
@@ -213,12 +251,12 @@
       [r2, C.line, "the straight line explains"], [e2 - r2, C.truth, "a curve explains on top"], [1 - e2, C.dot, "left over at a fixed X"]];
     $("var-bar").innerHTML = parts.map(([v, c]) => `<span style="width:${(v * 100).toFixed(2)}%;background:${c}"></span>`).join("");
     $("var-legend").innerHTML = parts.map(([v, c, t]) => `<span><i style="background:${c}"></i>${t}: ${(v * 100).toFixed(1)}%</span>`).join("");
-    const H = 230, ctx = canvas("spread", H), R = { l: 56, r: 750, t: 10, b: 190 }, xr = xRange(xd);
-    const top = (yd.x[1] - yd.x[0]) / 4;
+    const H = 230, ctx = canvas("spread", H), R = RECT.spread, xr = viewX(), yr = viewY();
+    const top = (yr[1] - yr[0]) / 4;     // a quarter of the Y view, so zooming Y zooms this too
     const { X, Y } = frame(ctx, R, xr, [0, top], axisTicks(xd, xr), ticks(0, top, 4), { xlab: "X: " + xd.name, ylab: "SD of Y", ylabX: 16 });
     clip(ctx, R);
     path(ctx, [[R.l, Y(P.sy)], [R.r, Y(P.sy)]], C.ink2, 1.4, [5, 4]);
-    path(ctx, profileOf(xd, 80).map((b) => [X(b.x), b.n >= 20 ? Y(b.sd) : NaN]), C.band, 2.4);
+    path(ctx, Q.profile(P, grid(xd, 120, xr)).map((b) => [X(b.x), b.n >= 20 ? Y(b.sd) : NaN]), C.band, 2.4);
     const b = Q.band(P, st.s);
     path(ctx, [[X(st.s), R.t], [X(st.s), R.b]], C.ink3, 1, [2, 3]);
     if (Number.isFinite(b.sd)) dot(ctx, X(st.s), Y(b.sd), 5.5, C.band);
@@ -252,7 +290,7 @@
     const xd = byId[st.x], yd = byId[st.y], S = Q.STATS[st.stat];
     // the latest sample
     let ctx = canvas("samp-scatter", 300);
-    const R = { l: 56, r: 750, t: 10, b: 262 }, xr = xRange(xd), yr = xRange(yd);
+    const R = RECT["samp-scatter"], xr = viewX(), yr = viewY();
     let F = frame(ctx, R, xr, yr, axisTicks(xd, xr), axisTicks(yd, yr), { xlab: "X: " + xd.name, ylab: "Y", ylabX: 16 });
     clip(ctx, R);
     points(ctx, F.X, F.Y, everyone(), C.dot, 1.4, 0.18);
@@ -316,25 +354,35 @@
 
   // ---------- 4. specification error ----------
   let specCache = null;
+  // the forty sample fits and the best fit depend on the population, model and n, not on the view
+  const fitCache = new WeakMap();
+  function specFits() {
+    if (!fitCache.has(P)) fitCache.set(P, new Map());
+    const m = fitCache.get(P), k = st.model + ":" + st.specN;
+    if (!m.has(k)) {
+      const M = Q.MODELS[st.model], r = rng(st.seed * 31 + st.specN), fits = [];
+      for (let i = 0; i < 40; i++) { const f = M.fit(P, Q.sample(P, r, st.specN)); if (f) fits.push(f); }
+      m.set(k, { fits, best: M.fit(P, everyone()) });
+    }
+    return m.get(k);
+  }
   function specSweep() {
     const key = [P.N, st.x, st.y, JSON.stringify(st.px), JSON.stringify(st.py), st.link, st.rho, st.seed, st.model, st.s].join("|");
     if (!specCache || specCache.key !== key) specCache = { key, rows: NS.map((n) => Q.predictionError(P, st.model, st.s, n, 200, 77 + n)) };
     return specCache.rows;
   }
   function drawSpec() {
-    const xd = byId[st.x], yd = byId[st.y], M = Q.MODELS[st.model], xr = xRange(xd), yr = xRange(yd);
+    const xd = byId[st.x], yd = byId[st.y], M = Q.MODELS[st.model], xr = viewX(), yr = viewY();
     let ctx = canvas("spec-plot", 340);
-    const R = { l: 56, r: 750, t: 10, b: 300 };
+    const R = RECT["spec-plot"];
     let F = frame(ctx, R, xr, yr, axisTicks(xd, xr), axisTicks(yd, yr), { xlab: "X: " + xd.name, ylab: "Y", ylabX: 16 });
     clip(ctx, R);
     points(ctx, F.X, F.Y, everyone(), C.dot, 1.4, 0.18);
-    const g = grid(xd, 120), r = rng(st.seed * 31 + st.specN);
-    for (let k = 0; k < 40; k++) {
-      const f = M.fit(P, Q.sample(P, r, st.specN));
-      if (f) { ctx.globalAlpha = 0.35; path(ctx, g.map((x) => [F.X(x), F.Y(f(x))]), C.samp, 1.2); ctx.globalAlpha = 1; }
-    }
+    const g = grid(xd, 120, xr), { fits, best } = specFits();
+    ctx.globalAlpha = 0.35;
+    for (const f of fits) path(ctx, g.map((x) => [F.X(x), F.Y(f(x))]), C.samp, 1.2);
+    ctx.globalAlpha = 1;
     path(ctx, curveOf(xd).map(([x, y]) => [F.X(x), F.Y(y)]), C.truth, 2.8);
-    const best = M.fit(P, everyone());
     path(ctx, g.map((x) => [F.X(x), F.Y(best(x))]), C.line, 2.4, [7, 5]);
     path(ctx, [[F.X(st.s), R.t], [F.X(st.s), R.b]], C.ink3, 1, [2, 3]);
     const rows = specSweep(), row = rows[NS.indexOf(st.specN)];
@@ -375,7 +423,7 @@
     sync();
   }
   function resetSamples() { st.est = []; st.last = null; drawSamples(500); }
-  function renderAll() { drawScatter(); drawVariance(); drawSampling(); drawSweep(); drawSpec(); }
+  function renderAll() { drawScatter(); drawVariance(); drawSampling(); drawSweep(); drawSpec(); syncView(); }
   let pending = 0, pendingReset = false;
   function rebuild(resetS) {
     cancelAnimationFrame(pending);
@@ -397,8 +445,8 @@
 
   fillSelect("x-dist", st.x); fillSelect("y-dist", st.y);
   setDist("x", st.x); setDist("y", st.y);
-  $("x-dist").addEventListener("change", (e) => { setDist("x", e.target.value); rebuild(true); });
-  $("y-dist").addEventListener("change", (e) => { setDist("y", e.target.value); rebuild(); });
+  $("x-dist").addEventListener("change", (e) => { setDist("x", e.target.value); st.vx = null; rebuild(true); });
+  $("y-dist").addEventListener("change", (e) => { setDist("y", e.target.value); st.vy = null; rebuild(); });
   const linkBox = $("link");
   const syncLink = () => linkBox.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.v === st.link ? "true" : "false"));
   linkBox.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => { st.link = b.dataset.v; syncLink(); rebuild(); }));
@@ -415,5 +463,80 @@
   $("draw-1").addEventListener("click", () => { drawSamples(1); drawSampling(); });
   $("draw-500").addEventListener("click", () => { drawSamples(500); drawSampling(); });
   $("draw-clear").addEventListener("click", () => { st.est = []; st.last = null; drawSampling(); });
+
+  // ---------- zoom and pan ----------
+  let viewFrame = 0;
+  function redrawViews() {
+    if (!P) return;
+    cancelAnimationFrame(viewFrame);
+    viewFrame = requestAnimationFrame(() => { drawScatter(); drawVariance(); drawSampling(); drawSpec(); syncView(); });
+  }
+  function syncView() {
+    const zoomed = !!(st.vx || st.vy);
+    $("view").querySelector('[data-z="full"]').setAttribute("aria-pressed", zoomed ? "false" : "true");
+    Object.keys(RECT).forEach((id) => $(id).classList.toggle("zoomed", zoomed));
+    const vx = viewX(), vy = viewY();
+    const r2 = (v) => String(+v.toFixed(2));
+    $("view-out").textContent = zoomed ? `Showing X ${r2(vx[0])} to ${r2(vx[1])}, Y ${r2(vy[0])} to ${r2(vy[1])}` : "Full range";
+  }
+  function zoomBy(f, cx, cy, xOnly) {
+    const vx = viewX(), vy = viewY();
+    st.vx = scaleRange(vx, fullX(), cx ?? (vx[0] + vx[1]) / 2, f);
+    if (!xOnly) st.vy = scaleRange(vy, fullY(), cy ?? (vy[0] + vy[1]) / 2, f);
+    redrawViews();
+  }
+  // where a pointer sits, in the chart's own units
+  function at(id, ev) {
+    const c = $(id), b = c.getBoundingClientRect(), R = RECT[id], vx = viewX(), vy = viewY();
+    const lx = (ev.clientX - b.left) * W / b.width, ly = (ev.clientY - b.top) * HEIGHT[id] / b.height;
+    return { lx, ly, inside: lx >= R.l && lx <= R.r && ly >= R.t && ly <= R.b,
+      x: vx[0] + (lx - R.l) / (R.r - R.l) * (vx[1] - vx[0]), y: vy[1] - (ly - R.t) / (R.b - R.t) * (vy[1] - vy[0]) };
+  }
+  for (const id of Object.keys(RECT)) {
+    const c = $(id), R = RECT[id], xOnly = id === "spread", touch = new Map();
+    let drag = null;
+    c.addEventListener("wheel", (ev) => {
+      if (!ev.ctrlKey && !ev.metaKey) return;          // a plain scroll still scrolls the page; pinch arrives with ctrl
+      const p = at(id, ev);
+      if (!p.inside) return;
+      ev.preventDefault();
+      zoomBy(Math.exp(Math.max(-0.5, Math.min(0.5, ev.deltaY * 0.01))), p.x, p.y, xOnly);
+    }, { passive: false });
+    c.addEventListener("pointerdown", (ev) => {
+      const p = at(id, ev);
+      if (!p.inside) return;
+      touch.set(ev.pointerId, p);
+      c.setPointerCapture(ev.pointerId);
+      drag = touch.size === 1 ? { lx: p.lx, ly: p.ly, vx: viewX(), vy: viewY() } : null;
+    });
+    c.addEventListener("pointermove", (ev) => {
+      if (!touch.has(ev.pointerId)) return;
+      const p = at(id, ev);
+      if (touch.size === 2) {                           // two fingers: pinch about their midpoint
+        const [a, b] = [...touch.values()], before = Math.hypot(a.lx - b.lx, a.ly - b.ly);
+        touch.set(ev.pointerId, p);
+        const [a2, b2] = [...touch.values()], after = Math.hypot(a2.lx - b2.lx, a2.ly - b2.ly);
+        if (before > 4 && after > 4) zoomBy(before / after, (a2.x + b2.x) / 2, (a2.y + b2.y) / 2, xOnly);
+        return;
+      }
+      touch.set(ev.pointerId, p);
+      if (!drag || !(st.vx || st.vy)) return;
+      const dx = (p.lx - drag.lx) / (R.r - R.l) * (drag.vx[1] - drag.vx[0]), dy = (p.ly - drag.ly) / (R.b - R.t) * (drag.vy[1] - drag.vy[0]);
+      if (st.vx) st.vx = clampRange(drag.vx[0] - dx, drag.vx[1] - dx, fullX());
+      if (st.vy && !xOnly) st.vy = clampRange(drag.vy[0] + dy, drag.vy[1] + dy, fullY());
+      redrawViews();
+    });
+    const lift = (ev) => { touch.delete(ev.pointerId); drag = null; };
+    c.addEventListener("pointerup", lift);
+    c.addEventListener("pointercancel", lift);
+    c.addEventListener("dblclick", () => { st.vx = st.vy = null; redrawViews(); });
+  }
+  $("view").querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
+    const z = b.dataset.z;
+    if (z === "full") { st.vx = st.vy = null; redrawViews(); }
+    else if (z === "fit") { fitView(); redrawViews(); }
+    else zoomBy(z === "in" ? 1 / 1.5 : 1.5);
+  }));
+
   rebuild(true);
 })();
