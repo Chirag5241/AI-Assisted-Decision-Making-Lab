@@ -648,6 +648,69 @@
     },
   ];
 
+  // How each arrow changes the formula: a short TeX label for the map, and the step itself.
+  // Keyed "from>to"; every arrow in E has one (tests/test_distributions.py checks).
+  const EDGE_MATH = {
+    "uniform>bernoulli": [String.raw`\mathbf 1\{U<p\}`, String.raw`X=\mathbf 1\{U<p\}\;\Rightarrow\;P(X=1)=P(U<p)=p`],
+    "uniform>discUniform": [String.raw`\lfloor nU\rfloor`, String.raw`X=a+\lfloor (b-a+1)\,U\rfloor\;\Rightarrow\;P(X=k)=P\!\left(\tfrac{k-a}{b-a+1}\le U<\tfrac{k-a+1}{b-a+1}\right)=\frac{1}{b-a+1}`],
+    "uniform>exponential": [String.raw`-\ln U`, String.raw`X=-\tfrac{1}{\lambda}\ln U\;\Rightarrow\;P(X>x)=P\!\left(U<e^{-\lambda x}\right)=e^{-\lambda x}\;\Rightarrow\;f(x)=\lambda e^{-\lambda x}`],
+    "uniform>normal": [String.raw`\text{Box–Muller}`, String.raw`Z=\sqrt{-2\ln U_1}\,\cos(2\pi U_2)\;\Rightarrow\;f(z)=\frac{1}{\sqrt{2\pi}}e^{-z^2/2},\qquad X=\mu+\sigma Z`],
+    "uniform>triangular": [String.raw`U_1+U_2`, String.raw`X=U_1+U_2\;\Rightarrow\;f(x)=\int_0^1\mathbf 1\{0\le x-u\le 1\}\,du=\begin{cases}x&0\le x\le 1\\2-x&1<x\le 2\end{cases}\quad(a=0,\,c=1,\,b=2)`],
+    "uniform>logistic": [String.raw`\ln\frac{U}{1-U}`, String.raw`X=\mu+s\ln\frac{U}{1-U}\;\Rightarrow\;P(X\le x)=P\!\left(U\le\frac{e^{z}}{1+e^{z}}\right)=\frac{1}{1+e^{-z}},\quad z=\frac{x-\mu}{s}`],
+    "bernoulli>binomial": [String.raw`\textstyle\sum_{i=1}^{n}X_i`, String.raw`Y=\sum_{i=1}^{n}X_i\;\Rightarrow\;P(Y=k)=\underbrace{\binom{n}{k}}_{\text{which trials}}p^{k}(1-p)^{n-k}`],
+    "bernoulli>geometric": [String.raw`\min\{k:X_k=1\}`, String.raw`K=\min\{k:X_k=1\}\;\Rightarrow\;P(K=k)=\underbrace{(1-p)^{k-1}}_{k-1\text{ misses}}\;p`],
+    "bernoulli>discUniform": [String.raw`p=\tfrac12`, String.raw`p=\tfrac12:\quad P(X=0)=P(X=1)=\tfrac12=\frac{1}{b-a+1}\quad(a=0,\,b=1)`],
+    "binomial>poisson": [String.raw`n\to\infty,\;np=\lambda`, String.raw`\binom{n}{k}\Big(\frac{\lambda}{n}\Big)^{k}\Big(1-\frac{\lambda}{n}\Big)^{n-k}\;\xrightarrow{\;n\to\infty\;}\;\frac{\lambda^{k}}{k!}\,e^{-\lambda}`],
+    "binomial>normal": [String.raw`n\to\infty`, String.raw`\frac{Y-np}{\sqrt{np(1-p)}}\;\xrightarrow{\;n\to\infty\;}\;\mathcal N(0,1),\qquad Y\approx\mathcal N\big(np,\;np(1-p)\big)`],
+    "hypergeom>binomial": [String.raw`N\to\infty`, String.raw`\frac{\binom{K}{k}\binom{N-K}{n-k}}{\binom{N}{n}}\;\xrightarrow[\;K/N=p\;]{\;N\to\infty\;}\;\binom{n}{k}p^{k}(1-p)^{n-k}`],
+    "betabinom>binomial": [String.raw`\alpha+\beta\to\infty`, String.raw`\binom{n}{k}\frac{B(k+\alpha,\,n-k+\beta)}{B(\alpha,\beta)}\;\xrightarrow[\;\alpha/(\alpha+\beta)=p\;]{\;\alpha+\beta\to\infty\;}\;\binom{n}{k}p^{k}(1-p)^{n-k}`],
+    "betabinom>discUniform": [String.raw`\alpha=\beta=1`, String.raw`\binom{n}{k}\frac{B(k+1,\,n-k+1)}{B(1,1)}=\binom{n}{k}\frac{k!\,(n-k)!}{(n+1)!}=\frac{1}{n+1}`],
+    "beta>betabinom": [String.raw`p\sim\text{Beta}`, String.raw`P(X=k)=\int_0^1\binom{n}{k}p^{k}(1-p)^{n-k}\,\frac{p^{\alpha-1}(1-p)^{\beta-1}}{B(\alpha,\beta)}\,dp=\binom{n}{k}\frac{B(k+\alpha,\,n-k+\beta)}{B(\alpha,\beta)}`],
+    "geometric>negbin": [String.raw`\textstyle\sum_{i=1}^{r}G_i`, String.raw`K=\sum_{i=1}^{r}G_i\;\Rightarrow\;P(K=k)=\underbrace{\binom{k-1}{r-1}}_{\text{first }r-1\text{ yeses}}p^{r}(1-p)^{k-r}`],
+    "geometric>exponential": [String.raw`p\to 0`, String.raw`P(pG>x)=(1-p)^{\lfloor x/p\rfloor}\;\xrightarrow{\;p\to 0\;}\;e^{-x}\qquad(\lambda=1)`],
+    "negbin>poisson": [String.raw`r\to\infty`, String.raw`F=K-r,\;\mu=\tfrac{r(1-p)}{p}\text{ fixed}:\quad\binom{r+f-1}{f}p^{r}(1-p)^{f}\;\xrightarrow{\;r\to\infty\;}\;\frac{\mu^{f}e^{-\mu}}{f!}`],
+    "gamma>negbin": [String.raw`\lambda\sim\text{Gamma}`, String.raw`\int_0^\infty\frac{\lambda^{f}e^{-\lambda}}{f!}\cdot\frac{\lambda^{k-1}e^{-\lambda/\theta}}{\Gamma(k)\,\theta^{k}}\,d\lambda=\binom{f+k-1}{f}p^{k}(1-p)^{f},\quad p=\frac{1}{1+\theta}`],
+    "poisson>normal": [String.raw`\lambda\to\infty`, String.raw`\frac{X-\lambda}{\sqrt{\lambda}}\;\xrightarrow{\;\lambda\to\infty\;}\;\mathcal N(0,1)`],
+    "poisson>skellam": [String.raw`X_1-X_2`, String.raw`K=X_1-X_2\;\Rightarrow\;P(K=k)=\sum_{j}P(X_1=j+k)\,P(X_2=j)`],
+    "exponential>poisson": [String.raw`\#\{\textstyle\sum E\le 1\}`, String.raw`N=\#\{n:E_1+\dots+E_n\le 1\}\;\Rightarrow\;P(N=k)=\frac{\lambda^{k}e^{-\lambda}}{k!}`],
+    "exponential>erlang": [String.raw`\textstyle\sum_{i=1}^{k}E_i`, String.raw`S=\sum_{i=1}^{k}E_i\;\Rightarrow\;f(x)=\underbrace{\lambda e^{-\lambda x}*\cdots*\lambda e^{-\lambda x}}_{k\text{ convolutions}}=\frac{\lambda^{k}x^{k-1}e^{-\lambda x}}{(k-1)!}`],
+    "exponential>laplace": [String.raw`X_1-X_2`, String.raw`f(x)=\int_0^\infty\lambda e^{-\lambda(y+|x|)}\,\lambda e^{-\lambda y}\,dy=\frac{\lambda}{2}e^{-\lambda|x|}\qquad(b=1/\lambda)`],
+    "exponential>weibull": [String.raw`X^{1/k}`, String.raw`X\sim\text{Exp}(1),\;Y=\lambda X^{1/k}\;\Rightarrow\;P(Y>y)=P\big(X>(y/\lambda)^{k}\big)=e^{-(y/\lambda)^{k}}`],
+    "exponential>pareto": [String.raw`x_m e^{X}`, String.raw`X\sim\text{Exp}(\alpha),\;Y=x_m e^{X}\;\Rightarrow\;P(Y>y)=P\!\left(X>\ln\tfrac{y}{x_m}\right)=\Big(\frac{x_m}{y}\Big)^{\alpha}`],
+    "exponential>gumbel": [String.raw`-\ln X`, String.raw`X\sim\text{Exp}(1),\;Y=-\ln X\;\Rightarrow\;P(Y\le y)=P\big(X\ge e^{-y}\big)=e^{-e^{-y}}`],
+    "erlang>gamma": [String.raw`k\in\mathbb R^{+}`, String.raw`\frac{\lambda^{k}x^{k-1}e^{-\lambda x}}{(k-1)!}\;\longrightarrow\;\frac{x^{k-1}e^{-x/\theta}}{\Gamma(k)\,\theta^{k}},\qquad (k-1)!\to\Gamma(k),\;\theta=1/\lambda`],
+    "gamma>exponential": [String.raw`k=1`, String.raw`\frac{x^{k-1}e^{-x/\theta}}{\Gamma(k)\,\theta^{k}}\bigg|_{k=1}=\frac{1}{\theta}\,e^{-x/\theta}\qquad(\lambda=1/\theta)`],
+    "gamma>chi2": [String.raw`k=\tfrac{\nu}{2},\;\theta=2`, String.raw`\frac{x^{k-1}e^{-x/\theta}}{\Gamma(k)\,\theta^{k}}\bigg|_{k=\nu/2,\;\theta=2}=\frac{x^{\nu/2-1}e^{-x/2}}{2^{\nu/2}\,\Gamma(\nu/2)}`],
+    "gamma>beta": [String.raw`\frac{X}{X+Y}`, String.raw`X\sim\Gamma(\alpha,\theta),\;Y\sim\Gamma(\beta,\theta)\;\Rightarrow\;\frac{X}{X+Y}\;\text{has}\;\frac{x^{\alpha-1}(1-x)^{\beta-1}}{B(\alpha,\beta)}`],
+    "gamma>invgamma": [String.raw`1/X`, String.raw`Y=1/X\;\Rightarrow\;f_Y(y)=f_X(1/y)\,\frac{1}{y^{2}}=\frac{\beta^{\alpha}}{\Gamma(\alpha)}\,y^{-\alpha-1}e^{-\beta/y}\qquad(\beta=1/\theta)`],
+    "gamma>normal": [String.raw`k\to\infty`, String.raw`\frac{X-k\theta}{\sqrt{k}\,\theta}\;\xrightarrow{\;k\to\infty\;}\;\mathcal N(0,1)`],
+    "chi2>exponential": [String.raw`\nu=2`, String.raw`\frac{x^{\nu/2-1}e^{-x/2}}{2^{\nu/2}\,\Gamma(\nu/2)}\bigg|_{\nu=2}=\frac{1}{2}\,e^{-x/2}\qquad(\lambda=\tfrac12)`],
+    "chi2>chi": [String.raw`\sqrt{X}`, String.raw`Y=\sqrt{X}\;\Rightarrow\;f_Y(y)=f_X(y^{2})\cdot 2y=\frac{y^{\nu-1}e^{-y^{2}/2}}{2^{\nu/2-1}\,\Gamma(\nu/2)}`],
+    "chi2>t": [String.raw`Z/\sqrt{V/\nu}`, String.raw`T=\frac{Z}{\sqrt{V/\nu}},\;V\sim\chi^{2}_{\nu}\;\Rightarrow\;f(t)=\frac{\Gamma\!\left(\frac{\nu+1}{2}\right)}{\sqrt{\nu\pi}\,\Gamma\!\left(\frac{\nu}{2}\right)}\left(1+\frac{t^{2}}{\nu}\right)^{-\frac{\nu+1}{2}}`],
+    "chi2>F": [String.raw`\frac{V_1/\nu_1}{V_2/\nu_2}`, String.raw`F=\frac{V_1/\nu_1}{V_2/\nu_2},\quad V_i\sim\chi^{2}_{\nu_i}\text{ independent}`],
+    "normal>chi2": [String.raw`\textstyle\sum Z_i^{2}`, String.raw`Z^{2}\;\text{has}\;\frac{x^{-1/2}e^{-x/2}}{\sqrt{2\pi}}=\chi^{2}_{1};\qquad V=\sum_{i=1}^{\nu}Z_i^{2}\sim\chi^{2}_{\nu}\;\;(\text{degrees add})`],
+    "normal>lognormal": [String.raw`e^{X}`, String.raw`Y=e^{X}\;\Rightarrow\;f_Y(y)=f_X(\ln y)\,\frac{1}{y}=\frac{1}{y\,\sigma\sqrt{2\pi}}\exp\!\left(-\frac{(\ln y-\mu)^{2}}{2\sigma^{2}}\right)`],
+    "normal>halfnormal": [String.raw`|X|`, String.raw`Y=|X|,\;\mu=0\;\Rightarrow\;f_Y(y)=2f_X(y)=\frac{\sqrt{2}}{\sigma\sqrt{\pi}}\,e^{-y^{2}/2\sigma^{2}},\quad y\ge 0`],
+    "normal>t": [String.raw`Z/\sqrt{V/\nu}`, String.raw`T=\frac{Z}{\sqrt{V/\nu}},\quad Z\sim\mathcal N(0,1),\;V\sim\chi^{2}_{\nu}\text{ independent}`],
+    "normal>cauchy": [String.raw`Z_1/Z_2`, String.raw`C=\frac{Z_1}{Z_2}\;\Rightarrow\;f(c)=\int|z|\,\varphi(cz)\,\varphi(z)\,dz=\frac{1}{\pi(1+c^{2})}`],
+    "normal>levy": [String.raw`1/Z^{2}`, String.raw`Y=\frac{1}{Z^{2}}\;\Rightarrow\;P(Y\le y)=P\big(|Z|\ge y^{-1/2}\big)\;\Rightarrow\;f(y)=\frac{1}{\sqrt{2\pi}}\,\frac{e^{-1/(2y)}}{y^{3/2}}\quad(c=1)`],
+    "chi>halfnormal": [String.raw`\nu=1`, String.raw`\frac{x^{\nu-1}e^{-x^{2}/2}}{2^{\nu/2-1}\,\Gamma(\nu/2)}\bigg|_{\nu=1}=\sqrt{\tfrac{2}{\pi}}\,e^{-x^{2}/2}\qquad(\sigma=1)`],
+    "chi>rayleigh": [String.raw`\nu=2`, String.raw`\frac{x^{\nu-1}e^{-x^{2}/2}}{2^{\nu/2-1}\,\Gamma(\nu/2)}\bigg|_{\nu=2}=x\,e^{-x^{2}/2}\qquad(\sigma=1)`],
+    "chi>maxwell": [String.raw`\nu=3`, String.raw`\frac{x^{\nu-1}e^{-x^{2}/2}}{2^{\nu/2-1}\,\Gamma(\nu/2)}\bigg|_{\nu=3}=\sqrt{\tfrac{2}{\pi}}\,x^{2}e^{-x^{2}/2}\qquad(a=1)`],
+    "weibull>rayleigh": [String.raw`k=2`, String.raw`\frac{k}{\lambda}\Big(\frac{x}{\lambda}\Big)^{k-1}e^{-(x/\lambda)^{k}}\bigg|_{k=2}=\frac{2x}{\lambda^{2}}\,e^{-x^{2}/\lambda^{2}}\qquad(\lambda=\sigma\sqrt{2})`],
+    "t>normal": [String.raw`\nu\to\infty`, String.raw`\Big(1+\frac{x^{2}}{\nu}\Big)^{-\frac{\nu+1}{2}}\;\xrightarrow{\;\nu\to\infty\;}\;e^{-x^{2}/2}`],
+    "t>cauchy": [String.raw`\nu=1`, String.raw`\frac{\Gamma(1)}{\sqrt{\pi}\,\Gamma(\frac12)}\big(1+x^{2}\big)^{-1}=\frac{1}{\pi(1+x^{2})}`],
+    "t>F": [String.raw`T^{2}`, String.raw`T^{2}=\frac{Z^{2}/1}{V/\nu}\sim F(1,\nu)\qquad(Z^{2}\sim\chi^{2}_{1})`],
+    "F>beta": [String.raw`\frac{\nu_1X}{\nu_2+\nu_1X}`, String.raw`\frac{\nu_1X}{\nu_2+\nu_1X}=\frac{V_1}{V_1+V_2}\sim\text{Beta}\big(\tfrac{\nu_1}{2},\tfrac{\nu_2}{2}\big)\qquad(\chi^{2}_{\nu}=\Gamma(\tfrac{\nu}{2},2))`],
+    "beta>uniform": [String.raw`\alpha=\beta=1`, String.raw`\frac{x^{\alpha-1}(1-x)^{\beta-1}}{B(\alpha,\beta)}\bigg|_{\alpha=\beta=1}=\frac{1}{B(1,1)}=1`],
+    "beta>arcsine": [String.raw`\alpha=\beta=\tfrac12`, String.raw`\frac{x^{-1/2}(1-x)^{-1/2}}{B(\frac12,\frac12)}=\frac{1}{\pi\sqrt{x(1-x)}}\qquad(B(\tfrac12,\tfrac12)=\pi)`],
+    "beta>powerfn": [String.raw`\beta=1`, String.raw`\frac{x^{\alpha-1}(1-x)^{0}}{B(\alpha,1)}=\alpha\,x^{\alpha-1}\qquad(B(\alpha,1)=1/\alpha)`],
+    "powerfn>pareto": [String.raw`1/X`, String.raw`Y=1/X\;\Rightarrow\;P(Y>y)=P(X<1/y)=y^{-\alpha}\qquad(x_m=1)`],
+    "gumbel>logistic": [String.raw`G_1-G_2`, String.raw`P(G_1-G_2\le x)=\int f_G(g)\,F_G(x+g)\,dg=\frac{1}{1+e^{-x}}`],
+    "logistic>loglogistic": [String.raw`e^{X}`, String.raw`Y=\alpha e^{X/\beta}\;\Rightarrow\;P(Y\le y)=P\big(X\le\beta\ln\tfrac{y}{\alpha}\big)=\frac{1}{1+(y/\alpha)^{-\beta}}`],
+    "invgamma>levy": [String.raw`\alpha=\tfrac12`, String.raw`\frac{\beta^{\alpha}}{\Gamma(\alpha)}\,x^{-\alpha-1}e^{-\beta/x}\bigg|_{\alpha=\frac12,\;\beta=\frac{c}{2}}=\sqrt{\frac{c}{2\pi}}\;\frac{e^{-c/(2x)}}{x^{3/2}}`],
+  };
+
   // ---------- how they connect ----------
   // [from, to, label, type]. type: transform (do something to draws), special (set a parameter),
   // limit (a parameter runs off to infinity), mix (a parameter is itself random).
@@ -710,7 +773,7 @@
     ["gumbel", "logistic", "X₁ − X₂", "transform"],
     ["logistic", "loglogistic", "eˣ", "transform"],
     ["invgamma", "levy", "α = ½", "special"],
-  ].map(([from, to, label, type]) => ({ from, to, label, type }));
+  ].map(([from, to, label, type]) => ({ from, to, label, type, tex: (EDGE_MATH[from + ">" + to] || [])[0], math: (EDGE_MATH[from + ">" + to] || [])[1] }));
 
   const EDGE_TYPES = {
     transform: { name: "Transform the draws", dash: "" },

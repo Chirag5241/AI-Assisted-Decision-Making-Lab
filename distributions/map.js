@@ -1,4 +1,5 @@
-// The map: every distribution as a card with its shape, every known relationship as a labelled arrow.
+// The map: every distribution as a card with its shape, every known relationship as an arrow. Selecting a
+// card or an arrow brings up the formulas, and for an arrow the step that turns one formula into the other.
 (function () {
   "use strict";
   const { list, byId, edges, edgeTypes, defaults } = DIST;
@@ -6,6 +7,8 @@
   const COLOR = { discrete: "#2a78d6", continuous: "#eb6834" };
   const NW = 150, NH = 92;
   const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+  // TeX through KaTeX when it loaded; the source as plain text otherwise
+  const tex = (src, display) => (window.katex ? katex.renderToString(src, { displayMode: !!display, throwOnError: false }) : esc(src));
 
   // ---------- layout ----------
   // Grid cells [column, row], found by an annealing search that keeps arrows short, few crossings,
@@ -90,9 +93,10 @@
   svg += `</defs><g id="edges">`;
   edges.forEach((e, i) => {
     const r = ROUTES[i], dash = edgeTypes[e.type].dash;
-    svg += `<g class="edge" data-from="${e.from}" data-to="${e.to}"><title>${esc(byId[e.from].name)} → ${esc(byId[e.to].name)}: ${esc(e.label)}</title>` +
-      `<path d="M${r.p0.x.toFixed(1)},${r.p0.y.toFixed(1)}Q${r.c.x.toFixed(1)},${r.c.y.toFixed(1)} ${r.p1.x.toFixed(1)},${r.p1.y.toFixed(1)}" ${dash ? `stroke-dasharray="${dash}"` : ""} marker-end="url(#arrow)"/>` +
-      `<text x="${r.mid.x.toFixed(1)}" y="${(r.mid.y + 4).toFixed(1)}" text-anchor="middle">${esc(e.label)}</text></g>`;
+    const d = `M${r.p0.x.toFixed(1)},${r.p0.y.toFixed(1)}Q${r.c.x.toFixed(1)},${r.c.y.toFixed(1)} ${r.p1.x.toFixed(1)},${r.p1.y.toFixed(1)}`;
+    svg += `<g class="edge" data-i="${i}" data-from="${e.from}" data-to="${e.to}"><title>${esc(byId[e.from].name)} → ${esc(byId[e.to].name)}: ${esc(e.label)}. Click for the math.</title>` +
+      `<path class="line" d="${d}" ${dash ? `stroke-dasharray="${dash}"` : ""} marker-end="url(#arrow)"/>` +
+      `<path class="hit" d="${d}"/></g>`;
   });
   svg += `</g><g id="nodes">`;
   for (const d of list) {
@@ -100,13 +104,28 @@
     svg += `<g class="node" data-id="${d.id}" tabindex="0" role="button" aria-label="${esc(d.name)}">` +
       `<rect class="box" x="${x}" y="${y}" width="${NW}" height="${NH}" rx="3"/>` +
       `<text class="nm" x="${n.x}" y="${y + 18}" text-anchor="middle">${esc(d.name)}</text>` +
-      `<line x1="${x + 10}" x2="${x + NW - 10}" y1="${y + NH - 10}" y2="${y + NH - 10}" stroke="#c9c8c1"/>` +
-      spark(d, x + 10, y + 26, NW - 20, NH - 37) + `</g>`;
+      `<g class="spark"><line x1="${x + 10}" x2="${x + NW - 10}" y1="${y + NH - 10}" y2="${y + NH - 10}" stroke="#c9c8c1"/>` +
+      spark(d, x + 10, y + 26, NW - 20, NH - 37) + `</g></g>`;
   }
   svg += `</g>`;
   const el = $("map");
   el.setAttribute("viewBox", `0 0 ${W} ${H}`);
   el.innerHTML = svg;
+
+  // the typeset layer, in map units and scaled with the map: each card's formula (shown under the card while
+  // it is selected) and each arrow's label
+  const stage = $("stage"), layer = $("tex-layer");
+  layer.style.width = W + "px"; layer.style.height = H + "px";
+  let html = "";
+  for (const d of list) {
+    const n = at(d.id);
+    html += `<div class="fx" data-id="${d.id}" style="left:${n.x}px;top:${n.y + NH / 2 + 4}px">${tex(d.formula)}</div>`;
+  }
+  edges.forEach((e, i) => {
+    const m = ROUTES[i].mid;
+    html += `<div class="elab" data-i="${i}" data-from="${e.from}" data-to="${e.to}" style="left:${m.x.toFixed(1)}px;top:${m.y.toFixed(1)}px">${tex(e.tex)}</div>`;
+  });
+  layer.innerHTML = html;
 
   // ---------- legend ----------
   const sample = (dash) => `<svg width="34" height="10" aria-hidden="true"><line x1="0" x2="34" y1="5" y2="5" stroke="#52514e" stroke-width="1.6" ${dash ? `stroke-dasharray="${dash}"` : ""}/></svg>`;
@@ -117,59 +136,87 @@
   // ---------- zoom ----------
   let zoom = 1;
   const scroll = $("scroll");
-  function applyZoom() { el.setAttribute("width", Math.round(W * zoom)); el.setAttribute("height", Math.round(H * zoom)); }
+  function applyZoom() {
+    el.setAttribute("width", Math.round(W * zoom)); el.setAttribute("height", Math.round(H * zoom));
+    stage.style.width = Math.round(W * zoom) + "px"; stage.style.height = Math.round(H * zoom) + "px";
+    layer.style.transform = `scale(${zoom})`;
+  }
   function fit() { zoom = Math.min(1, (scroll.clientWidth - 2) / W); applyZoom(); }
   $("zoom-in").addEventListener("click", () => { zoom = Math.min(2, zoom * 1.25); applyZoom(); });
   $("zoom-out").addEventListener("click", () => { zoom = Math.max(0.25, zoom / 1.25); applyZoom(); });
   $("zoom-fit").addEventListener("click", fit);
-  $("all-labels").addEventListener("change", (ev) => el.classList.toggle("all-labels", ev.target.checked));
+  $("all-labels").addEventListener("change", (ev) => stage.classList.toggle("all-labels", ev.target.checked));
+
   fit();
 
   // ---------- selection ----------
+  // the selection is a card ("normal") or an arrow ("e12")
   let selected = null;
-  function highlight(id) {
-    const nodes = el.querySelectorAll(".node"), eds = el.querySelectorAll(".edge");
-    if (!id) {
+  const edgeOf = (key) => (key && key[0] === "e" && edges[+key.slice(1)] ? +key.slice(1) : -1);
+  function highlight(key) {
+    const nodes = el.querySelectorAll(".node"), eds = [...el.querySelectorAll(".edge"), ...layer.querySelectorAll(".elab")];
+    if (!key) {
       nodes.forEach((n) => n.classList.remove("dim", "sel"));
-      eds.forEach((e) => { e.classList.remove("dim", "hot"); e.querySelector("path").setAttribute("marker-end", "url(#arrow)"); });
+      eds.forEach((e) => e.classList.remove("dim", "hot"));
+      el.querySelectorAll(".edge .line").forEach((p) => p.setAttribute("marker-end", "url(#arrow)"));
       return;
     }
-    const near = new Set([id]);
-    eds.forEach((e) => {
-      const hot = e.dataset.from === id || e.dataset.to === id;
-      if (hot) { near.add(e.dataset.from); near.add(e.dataset.to); }
-      e.classList.toggle("hot", hot);
-      e.classList.toggle("dim", !hot);
-      e.querySelector("path").setAttribute("marker-end", hot ? "url(#arrow-hot)" : "url(#arrow)");
-    });
-    nodes.forEach((n) => { n.classList.toggle("dim", !near.has(n.dataset.id)); n.classList.toggle("sel", n.dataset.id === id); });
+    const ei = edgeOf(key), near = new Set(ei >= 0 ? [edges[ei].from, edges[ei].to] : [key]);
+    const isHot = (e) => (ei >= 0 ? +e.dataset.i === ei : e.dataset.from === key || e.dataset.to === key);
+    if (ei < 0) eds.forEach((e) => { if (isHot(e)) { near.add(e.dataset.from); near.add(e.dataset.to); } });
+    eds.forEach((e) => { const hot = isHot(e); e.classList.toggle("hot", hot); e.classList.toggle("dim", !hot); });
+    el.querySelectorAll(".edge").forEach((e) => e.querySelector(".line").setAttribute("marker-end", isHot(e) ? "url(#arrow-hot)" : "url(#arrow)"));
+    nodes.forEach((n) => { n.classList.toggle("dim", !near.has(n.dataset.id)); n.classList.toggle("sel", ei < 0 && n.dataset.id === key); });
   }
 
-  function panel(id) {
+  const kind = (e) => edgeTypes[e.type].name.split(" (")[0].toLowerCase();
+  function panel(key) {
     const side = $("side");
-    if (!id) {
-      side.innerHTML = `<p class="kicker">How to read it</p><p class="empty">Each arrow says how to get one distribution from another: transform the draws, fix a parameter, push a parameter to infinity, or make a parameter random.</p><p class="empty">Hover or click a card to see its connections and their labels.</p>`;
+    if (!key) {
+      side.innerHTML = `<p class="kicker">How to read it</p><p class="empty">Each arrow turns one formula into another: transform the draws, fix a parameter, push a parameter to infinity, or make a parameter random.</p><p class="empty">Click a card for its connections, or an arrow for the math of that step.</p>`;
       return;
     }
-    const d = byId[id], out = edges.filter((e) => e.from === id), inn = edges.filter((e) => e.to === id);
-    const li = (o, e, arrow) => `<li>${arrow} <a data-go="${o.id}">${esc(o.name)}</a><br><span class="how">${esc(e.label)} · ${edgeTypes[e.type].name.split(" (")[0].toLowerCase()}</span></li>`;
-    side.innerHTML =
-      `<p class="kicker"><span class="tag ${d.kind}">${d.kind}</span></p><h2>${esc(d.name)}</h2><p>${esc(d.story)}</p>` +
-      `<svg viewBox="0 0 280 110" width="100%" aria-hidden="true" style="margin:0 0 12px"><line x1="0" x2="280" y1="104" y2="104" stroke="#c9c8c1"/>${spark(d, 0, 4, 280, 100)}</svg>` +
-      (inn.length ? `<p class="kicker">Comes from</p><ul>${inn.map((e) => li(byId[e.from], e, "←")).join("")}</ul>` : "") +
-      (out.length ? `<p class="kicker">Leads to</p><ul>${out.map((e) => li(byId[e.to], e, "→")).join("")}</ul>` : "") +
-      `<a class="go" href="index.html#${d.id}">Open in the explorer →</a>`;
+    const ei = edgeOf(key);
+    if (ei >= 0) {                       // one arrow: start, step, result
+      const e = edges[ei], a = byId[e.from], b = byId[e.to];
+      side.innerHTML =
+        `<p class="kicker">${esc(edgeTypes[e.type].name)}</p>` +
+        `<h2><a data-go="${a.id}">${esc(a.name)}</a> → <a data-go="${b.id}">${esc(b.name)}</a></h2>` +
+        `<p class="step-k">Start: ${esc(a.name)}</p><div class="eq">${tex(a.formula, true)}</div>` +
+        `<p class="step-k">The arrow: ${tex(e.tex)}</p><div class="eq step">${tex(e.math, true)}</div>` +
+        `<p class="step-k">Result: ${esc(b.name)}</p><div class="eq">${tex(b.formula, true)}</div>` +
+        `<a class="go" href="index.html#${b.id}">Open ${esc(b.name)} in the explorer →</a>`;
+    } else {                             // one card: its formula and every arrow in or out
+      const d = byId[key], out = [], inn = [];
+      edges.forEach((e, i) => { if (e.from === key) out.push(i); if (e.to === key) inn.push(i); });
+      const li = (i, other, arrow) => `<li>${arrow} <a data-go="${other.id}">${esc(other.name)}</a><br>` +
+        `<a class="math-link" data-edge="${i}">${tex(edges[i].tex)}</a> <span class="how">· ${kind(edges[i])}</span></li>`;
+      side.innerHTML =
+        `<p class="kicker"><span class="tag ${d.kind}">${d.kind}</span></p><h2>${esc(d.name)}</h2><p>${esc(d.story)}</p>` +
+        `<div class="eq">${tex(d.formula, true)}</div>` +
+        `<svg viewBox="0 0 280 90" width="100%" aria-hidden="true" style="margin:4px 0 12px"><line x1="0" x2="280" y1="86" y2="86" stroke="#c9c8c1"/>${spark(d, 0, 4, 280, 82)}</svg>` +
+        (inn.length ? `<p class="kicker">Comes from</p><ul>${inn.map((i) => li(i, byId[edges[i].from], "←")).join("")}</ul>` : "") +
+        (out.length ? `<p class="kicker">Leads to</p><ul>${out.map((i) => li(i, byId[edges[i].to], "→")).join("")}</ul>` : "") +
+        `<p class="empty" style="font-size:14px">Click a formula step above for its math.</p>` +
+        `<a class="go" href="index.html#${d.id}">Open in the explorer →</a>`;
+    }
     side.querySelectorAll("[data-go]").forEach((a) => a.addEventListener("click", () => select(a.dataset.go, true)));
+    side.querySelectorAll("[data-edge]").forEach((a) => a.addEventListener("click", () => select("e" + a.dataset.edge, true)));
   }
 
-  function select(id, reveal) {
-    selected = id && byId[id] ? id : null;
+  // an arrow's address in the URL is "#from~to"
+  const fromHash = (h) => { const [f, t] = h.split("~"); const i = edges.findIndex((e) => e.from === f && e.to === t); return i >= 0 ? "e" + i : h; };
+  function select(key, reveal) {
+    selected = key && (byId[key] || edgeOf(key) >= 0) ? key : null;
     highlight(selected);
     panel(selected);
+    // formulas appear on the map only for what is selected: the card, or both ends of the arrow
+    const ei = edgeOf(selected), shown = new Set(ei >= 0 ? [edges[ei].from, edges[ei].to] : selected ? [selected] : []);
+    layer.querySelectorAll(".fx").forEach((f) => f.classList.toggle("on", shown.has(f.dataset.id)));
     if (selected) {
-      history.replaceState(null, "", "#" + selected);
+      history.replaceState(null, "", "#" + (ei >= 0 ? edges[ei].from + "~" + edges[ei].to : selected));
       if (reveal) {
-        const n = at(selected);
+        const n = ei >= 0 ? ROUTES[ei].mid : at(selected);
         scroll.scrollTo({ left: n.x * zoom - scroll.clientWidth / 2, top: n.y * zoom - scroll.clientHeight / 2, behavior: "smooth" });
       }
     } else history.replaceState(null, "", location.pathname);
@@ -181,6 +228,11 @@
     n.addEventListener("mouseenter", () => { if (!selected) highlight(n.dataset.id); });
     n.addEventListener("mouseleave", () => { if (!selected) highlight(null); });
   });
+  el.querySelectorAll(".edge").forEach((g) => {
+    g.addEventListener("click", (ev) => { ev.stopPropagation(); const k = "e" + g.dataset.i; select(k === selected ? null : k); });
+    g.addEventListener("mouseenter", () => { if (!selected) highlight("e" + g.dataset.i); });
+    g.addEventListener("mouseleave", () => { if (!selected) highlight(null); });
+  });
   el.addEventListener("click", () => select(null));
-  select(location.hash.slice(1), true);
+  select(fromHash(decodeURIComponent(location.hash.slice(1))), true);
 })();

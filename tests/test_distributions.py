@@ -1,6 +1,6 @@
 """The companion site's distributions (distributions/dist.js), checked under Node: every pdf has total mass 1,
 every CDF is the running integral of its pdf, every sampler draws with the stated mean and spread,
-and every arrow on the map joins two distributions the site knows."""
+and every arrow on the map joins two distributions the site knows and carries its TeX label and derivation."""
 import json
 import shutil
 import subprocess
@@ -14,7 +14,7 @@ pytestmark = pytest.mark.skipif(shutil.which("node") is None, reason="needs Node
 CHECK = r"""
 require(process.argv[1]);
 const {list, cdf, defaults, rng, edges, byId} = DIST;
-const out = {bad_edges: edges.filter(e => !byId[e.from] || !byId[e.to]).map(e => e.from + "->" + e.to),
+const out = {bad_edges: edges.filter(e => !byId[e.from] || !byId[e.to] || !e.tex || !e.math).map(e => e.from + "->" + e.to),
              unlinked: list.filter(d => !edges.some(e => e.from === d.id || e.to === d.id)).map(d => d.id), rows: []};
 for (const d of list) {
   const p = defaults(d); d.fix && d.fix(p);
@@ -53,7 +53,7 @@ def report():
     return json.loads(run.stdout)
 
 
-def test_every_arrow_joins_two_known_distributions_and_none_is_left_alone(report):
+def test_every_arrow_joins_two_known_distributions_with_its_math_and_none_is_left_alone(report):
     assert report["bad_edges"] == [] and report["unlinked"] == []
     assert len(report["rows"]) == 35
 
