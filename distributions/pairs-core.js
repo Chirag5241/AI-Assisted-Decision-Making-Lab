@@ -130,16 +130,16 @@
   // n patients drawn from the population, with replacement
   function sample(P, r, n) { const idx = new Uint32Array(n); for (let q = 0; q < n; q++) idx[q] = Math.floor(r.u() * P.N); return idx; }
 
-  // what one sample estimates
+  // what one sample estimates, and the textbook standard error (ruleTex is TeX for the page to typeset)
   const STATS = {
     mean: { name: "Mean of Y", pop: (P) => P.my, est: (P, idx) => { let s = 0; for (const i of idx) s += P.Y[i]; return s / idx.length; },
-      rule: (P, n) => P.sy / Math.sqrt(n), ruleText: "σ_Y / √n" },
+      rule: (P, n) => P.sy / Math.sqrt(n), ruleTex: String.raw`\sigma_Y/\sqrt{n}`, ruleNote: "" },
     sd: { name: "SD of Y", pop: (P) => P.sy, est: (P, idx) => { let s = 0, s2 = 0; for (const i of idx) { s += P.Y[i]; s2 += P.Y[i] ** 2; } const m = s / idx.length; return Math.sqrt(Math.max(0, s2 / idx.length - m * m)); },
-      rule: (P, n) => P.sy / Math.sqrt(2 * n), ruleText: "σ_Y / √(2n), exact for normal Y" },
+      rule: (P, n) => P.sy / Math.sqrt(2 * n), ruleTex: String.raw`\sigma_Y/\sqrt{2n}`, ruleNote: "for normal Y" },
     r: { name: "Correlation r", pop: (P) => P.r, est: (P, idx) => sampleR(P, idx),
-      rule: (P, n) => (1 - P.r * P.r) / Math.sqrt(n), ruleText: "(1 − r²) / √n, for normal pairs" },
+      rule: (P, n) => (1 - P.r * P.r) / Math.sqrt(n), ruleTex: String.raw`(1-r^2)/\sqrt{n}`, ruleNote: "for normal pairs" },
     slope: { name: "Slope of the line", pop: (P) => P.slope, est: (P, idx) => sampleSlope(P, idx),
-      rule: (P, n) => P.sy * Math.sqrt(Math.max(0, 1 - P.r * P.r)) / (P.sx * Math.sqrt(n)), ruleText: "σ_residual / (σ_X √n)" },
+      rule: (P, n) => P.sy * Math.sqrt(Math.max(0, 1 - P.r * P.r)) / (P.sx * Math.sqrt(n)), ruleTex: String.raw`\sigma_{\text{resid}}/(\sigma_X\sqrt{n})`, ruleNote: "" },
   };
   function moments(P, idx) {
     let sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0;

@@ -68,7 +68,10 @@ svg text { font-family: var(--mono); }
 
 .head h2 { font: 600 34px/1.1 var(--display); font-variation-settings: "opsz" 144; letter-spacing: -0.02em; margin: 0 0 6px; }
 .head .story { margin: 0 0 4px; font-size: 18px; }
-.formula { font: 400 14px/1.5 var(--mono); color: var(--ink-2); margin: 0 0 18px; }
+.formula { font-size: 17px; color: var(--ink); margin: 2px 0 18px; overflow-x: auto; overflow-y: hidden; }
+.formula .katex-display { margin: 0; text-align: left; }
+.formula .katex-display > .katex { text-align: left; }
+.stat .s .katex, .legend .katex { font-size: 1.18em; }
 
 .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 8px 28px; margin: 0 0 12px; }
 .ctl { display: flex; align-items: center; gap: 10px; font: 400 13px/1.2 var(--mono); }

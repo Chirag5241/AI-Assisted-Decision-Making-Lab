@@ -236,7 +236,9 @@
     $("kind").className = "tag " + d.kind;
     $("name").textContent = d.name;
     $("story").textContent = d.story;
-    $("formula").textContent = d.formula;
+    // the formula is TeX; without KaTeX (offline) the source still reads
+    if (window.katex) katex.render(d.formula, $("formula"), { displayMode: true, throwOnError: false });
+    else $("formula").textContent = d.formula;
     $("gen").textContent = "How one draw is made: " + d.gen;
     document.title = d.name + " · Distribution Basics";
     buildControls(d);

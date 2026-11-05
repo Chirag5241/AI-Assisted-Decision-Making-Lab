@@ -40,6 +40,9 @@
     const lo = Math.ceil(r[0]), hi = Math.floor(r[1]);
     return hi - lo < 1 ? [Math.round((r[0] + r[1]) / 2)] : ticks(lo, hi, Math.min(8, hi - lo)).filter(Number.isInteger);
   }
+  // inline math, typeset by KaTeX when it loaded
+  const tex = (src) => (window.katex ? katex.renderToString(src, { throwOnError: false }) : esc(src));
+  const rule = (S) => tex(S.ruleTex) + (S.ruleNote ? ", " + S.ruleNote : "");
   const tile = (k, v, s) => `<div class="stat"><div class="k">${k}</div><div class="v">${v}</div><div class="s">${s}</div></div>`;
   const sw = (color, kind) => kind === "line" ? `<i style="background:none;border-top:2px solid ${color};height:0;width:16px"></i>`
     : kind === "dash" ? `<i style="background:none;border-top:2px dashed ${color};height:0;width:16px"></i>`
@@ -236,12 +239,12 @@
     }
 
     legend("scatter-legend", [[C.band, "box", "X ≈ s"], [C.line, "box", "their average Y"], [C.truth, "line", "true band averages"], [C.line, "dash", "straight line"], [C.cont, "box", "each variable's own curve, beside its axis"]]
-      .concat($("show-cov").checked ? [[C.pos, "box", "(X − X̄)(Y − Ȳ) > 0"], [C.neg, "box", "< 0"]] : []));
+      .concat($("show-cov").checked ? [[C.pos, "box", tex(String.raw`(X-\bar X)(Y-\bar Y)>0`)], [C.neg, "box", tex("<0")]] : []));
     const lineAt = P.icpt + P.slope * st.s;
     $("corr-tiles").innerHTML =
       tile("Correlation r", fmt(P.r), "straight-line fit, −1 to 1") +
       tile("Rank correlation", fmt(P.rs), "any steady rise or fall") +
-      tile("Covariance", fmt(P.cov), `average (X − X̄)(Y − Ȳ) = r·σ_X·σ_Y`) +
+      tile("Covariance", fmt(P.cov), tex(String.raw`\operatorname{avg}(X-\bar X)(Y-\bar Y)=r\,\sigma_X\sigma_Y`)) +
       tile(`Average Y at X ≈ ${fmt(st.s)}`, fmt(b.mean), `the line says ${fmt(lineAt)} · ${b.n} patients`);
   }
 
@@ -267,7 +270,7 @@
       tile("Var(Y), all patients", fmt(P.sy * P.sy), inf ? "infinite in theory; this is the 20,000" : `SD ${fmt(P.sy)}`) +
       tile(`Var(Y) at X ≈ ${fmt(st.s)}`, fmt(b.sd * b.sd), `SD ${fmt(b.sd)}`) +
       tile("Knowing X shrinks the SD by", Number.isFinite(b.sd) ? `${Math.round((1 - b.sd / P.sy) * 100)}%` : "—", "at this s; the curve shows every s") +
-      tile("R² of the line", fmt(r2), "= r², the line's share of Var(Y)");
+      tile("R² of the line", fmt(r2), tex("R^2=r^2") + ": the line's share of Var(Y)");
   }
 
   // ---------- 3. sampling error ----------
@@ -332,7 +335,7 @@
       tile("The population's value", fmt(pop), "what every sample is trying to hit") +
       tile("Latest sample", st.est.length ? fmt(st.est[st.est.length - 1]) : "—", "black tick on the histogram") +
       tile("Standard error", st.est.length > 1 ? fmt(sm.sd) : "—", `SD of the ${st.est.length.toLocaleString()} estimates`) +
-      tile("Rule of thumb", fmt(S.rule(P, st.sampN)), S.ruleText);
+      tile("Rule of thumb", fmt(S.rule(P, st.sampN)), rule(S));
   }
   let sweepCache = null;
   function drawSweep() {
@@ -349,7 +352,7 @@
     path(ctx, NS.map((n, i) => [F.X(n), F.Y(sweepCache.se[i])]), C.samp, 2.2);
     NS.forEach((n, i) => dot(ctx, F.X(n), F.Y(sweepCache.se[i]), n === st.sampN ? 6 : 4, n === st.sampN ? C.ink : C.samp));
     ctx.restore();
-    legend("sweep-legend", [[C.samp, "line", "measured over 300 samples at each n"], [C.ink2, "dash", "rule of thumb: " + S.ruleText]]);
+    legend("sweep-legend", [[C.samp, "line", "measured over 300 samples at each n"], [C.ink2, "dash", "rule of thumb: " + rule(S)]]);
   }
 
   // ---------- 4. specification error ----------
@@ -398,7 +401,7 @@
       tile("Specification error, all X", fmt(Math.sqrt(ss / w)), "root mean square over every patient") +
       tile("Specification error", fmt(row.spec), `best ${M.name.toLowerCase()} − truth; fixed in n`) +
       tile("Sampling error", fmt(row.sampling), `SD over 200 samples of n = ${st.specN}` + (row.missing ? ` · ${row.missing} had no point near s` : "")) +
-      tile("Total error (RMSE)", fmt(row.rmse), "≈ √(specification² + sampling²)");
+      tile("Total error (RMSE)", fmt(row.rmse), tex(String.raw`\approx\sqrt{\text{spec}^2+\text{sampling}^2}`));
 
     ctx = canvas("spec-sweep", 220);
     const SRR = { l: 56, r: 732, t: 10, b: 180 }, top = Math.max(0.5, +(1.2 * P.ry).toPrecision(2));
