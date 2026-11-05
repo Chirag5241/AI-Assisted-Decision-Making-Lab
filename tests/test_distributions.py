@@ -71,3 +71,50 @@ def test_every_sampler_draws_with_the_stated_mean_and_spread(report):
             assert abs(row["sampleMean"] - row["mean"]) < 0.02 * max(1, row["sd"] or 1), row
         if row["sd"] is not None and row["sd"] != float("inf"):                 # NaN and infinity arrive as null
             assert abs(row["sampleSd"] - row["sd"]) < 0.03 * max(1, row["sd"]), row
+
+
+PAIRS = r"""
+require(process.argv[1]); require(process.argv[2]);
+const {defaults, byId, rng} = DIST, Q = PAIRS;
+const pop = (x, y, link, rho) => Q.population({xId: x, yId: y, px: defaults(byId[x]), py: defaults(byId[y]), link, rho});
+const G = pop("normal", "normal", "straight", 0.6), U = pop("normal", "normal", "u", 0.9), C = pop("cauchy", "binomial", "straight", 0.7);
+const sorted = Array.from(G.X).sort((a, b) => a - b), r = rng(5), means = [];
+for (let k = 0; k < 2000; k++) means.push(Q.STATS.mean.est(G, Q.sample(G, r, 25)));
+const err = (P, m, n) => Q.predictionError(P, m, 1.5, n, 200, 3);
+console.log(JSON.stringify({
+  keepsCurve: sorted.every((v, i) => v === G.xs[i]),
+  r: G.r, rs: G.rs, eta2: G.eta2, band: Q.band(G, 1.5).mean,
+  uR: U.r, uEta2: U.eta2, cauchyR: C.r, cauchyRs: C.rs,
+  se: Q.summary(means).sd, rule: Q.STATS.mean.rule(G, 25),
+  line10: err(U, "line", 10), line1000: err(U, "line", 1000), local1000: err(U, "local", 1000), straight1000: err(G, "line", 1000),
+}));
+"""
+
+
+@pytest.fixture(scope="module")
+def pairs():
+    run = subprocess.run(["node", "-e", PAIRS, str(DIST), str(DIST.parent / "pairs-core.js")], capture_output=True, text=True, check=True)
+    return json.loads(run.stdout)
+
+
+def test_the_link_pairs_draws_up_without_changing_either_curve(pairs):
+    assert pairs["keepsCurve"]
+    # a straight link of strength 0.6 on two normals: r = 0.6, rank correlation (6/pi) asin(0.3), r^2 explained
+    assert abs(pairs["r"] - 0.6) < 0.03 and abs(pairs["rs"] - 0.582) < 0.03 and abs(pairs["eta2"] - 0.36) < 0.03
+    assert abs(pairs["band"] - 0.9) < 0.1
+    # a U-shaped link has no straight-line correlation, yet X explains much of Y
+    assert abs(pairs["uR"]) < 0.05 and pairs["uEta2"] > 0.4
+    # heavy tails wreck r but not the rank correlation
+    assert pairs["cauchyRs"] > 0.5 and abs(pairs["cauchyR"]) < pairs["cauchyRs"] - 0.3
+
+
+def test_sampling_error_follows_one_over_root_n(pairs):
+    assert abs(pairs["se"] / pairs["rule"] - 1) < 0.08
+
+
+def test_specification_error_stays_put_while_sampling_error_shrinks(pairs):
+    line10, line1000 = pairs["line10"], pairs["line1000"]
+    assert line10["spec"] == line1000["spec"] and abs(line1000["spec"]) > 0.5      # the line misses the U by the same amount
+    assert line1000["sampling"] < line10["sampling"] / 5                            # sampling error falls about like 1/sqrt(n)
+    assert abs(pairs["local1000"]["spec"]) < 0.15                                   # a shape that can bend misses far less
+    assert abs(pairs["straight1000"]["spec"]) < 0.1                                 # and a line is right when the truth is a line

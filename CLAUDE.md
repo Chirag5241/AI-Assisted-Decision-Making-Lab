@@ -26,7 +26,7 @@ Repo: `github.com/Chirag5241/AI-Assisted-Decision-Making-Lab`, served on GitHub 
 | `webapp/templates/` | Jinja. `base.html` (masthead + page menu from `MENU`), `lab.html`, `worlds.html` (one template for 4 benches via `mode`), `correlated.html`, `overview.html`, `_figures.html`, note pages |
 | `webapp/static/` | Browser code only places marks: `charts.js` (SVG primitives), `figures.js` (the standard figures), `matrix.js` / `speeds.js` (editors), one script per page, `static-api.js` (JS port of the API), `probes.js` (generated), `style.css` |
 | `*.html` at repo root | **Generated** by `build_pages.py` for GitHub Pages. Never hand-edit; edit the template and rebuild |
-| `distributions/` | Separate hand-written static companion site (35 distributions: explorer + map) |
+| `distributions/` | Separate hand-written static companion site: `index.html` explorer (35 distributions, `dist.js`), `pairs.html` two variables (correlation, variance, sampling and specification error; math in `pairs-core.js`), `map.html` |
 | `experiments/` | `exp01_single_feature_flip.py` (matplotlib → `results/exp01/`), `sepsis_data.py` (PhysioNet 2019 loader), `sepsis_fit.py` (writes `results/sepsis/fit.json`, `study.json`) |
 | `results/` | Committed outputs the site reads. `data/` (raw PhysioNet) is gitignored |
 | `theory/` | Obsidian notes (math), synced from a teammate's vault by `sync_theory.sh` (`rsync --delete` — it overwrites local edits). `<G>`/`<C>` prefixes are authorship tags; `Archive/` is superseded |

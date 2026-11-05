@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Two Variables · Distribution Basics</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..600&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="mast">
+    <div class="mast-title">
+      <h1><a href="index.html">Distribution Basics</a></h1>
+      <p class="strapline">A companion to the decision lab · 35 distributions, their shapes, and how they connect</p>
+    </div>
+    <nav class="mast-nav" aria-label="Pages">
+      <a href="index.html">Explorer</a>
+      <a href="pairs.html" aria-current="page">Two variables</a>
+      <a href="map.html">Map</a>
+      <a class="lab" href="../overview.html">Decision lab</a>
+    </nav>
+  </header>
+
+  <div class="explorer">
+    <aside class="picker popctl" aria-label="The population">
+      <h2>Population</h2>
+      <div class="axis-pick">
+        <label for="x-dist">X, across</label>
+        <select id="x-dist"></select>
+        <div class="axis-params" id="x-params"></div>
+      </div>
+      <div class="axis-pick">
+        <label for="y-dist">Y, up</label>
+        <select id="y-dist"></select>
+        <div class="axis-params" id="y-params"></div>
+      </div>
+      <div class="axis-pick">
+        <span class="lab">Link</span>
+        <div class="seg" id="link"><button data-v="straight">Straight</button><button data-v="u">U-shaped</button></div>
+        <div class="ctl"><label for="rho">Strength ρ</label><input type="range" id="rho" min="-1" max="1" step="0.05" value="0.6"><output id="rho-out"></output></div>
+      </div>
+      <div class="axis-pick">
+        <div class="ctl"><label for="s">Look at X = s</label><input type="range" id="s"><output id="s-out"></output></div>
+      </div>
+      <button id="new-pop">New population</button>
+      <p class="note">20,000 draws. Every number on this page comes from them.</p>
+    </aside>
+
+    <main class="page">
+      <section id="corr">
+        <h2 class="sec">Correlation</h2>
+        <p class="cap">Each axis keeps its own curve; the link only decides who is high together. Blue: the patients at X ≈ s. Orange dot: their average Y.</p>
+        <div class="checks">
+          <label><input type="checkbox" id="show-line" checked> Straight line (r)</label>
+          <label><input type="checkbox" id="show-true" checked> True band averages</label>
+          <label><input type="checkbox" id="show-cond"> Y for the band only</label>
+          <label><input type="checkbox" id="show-cov"> Covariance signs</label>
+        </div>
+        <canvas id="scatter" role="img" aria-label="Scatter of the population with each variable's curve beside its axis"></canvas>
+        <div class="legend" id="scatter-legend"></div>
+        <div class="stats" id="corr-tiles"></div>
+      </section>
+
+      <section id="var">
+        <h2 class="sec">Variance</h2>
+        <p class="cap">How much of Y's spread X accounts for, and how much is left once you know X.</p>
+        <div class="vbar" id="var-bar"></div>
+        <div class="legend" id="var-legend"></div>
+        <p class="chart-label">Spread of Y at each X</p>
+        <canvas id="spread" role="img" aria-label="Standard deviation of Y among patients at each X"></canvas>
+        <div class="stats" id="var-tiles"></div>
+      </section>
+
+      <section id="samp">
+        <h2 class="sec">Sampling error</h2>
+        <p class="cap">A study sees n patients, not 20,000. Each sample gives a slightly different answer; the spread of those answers is the standard error.</p>
+        <div class="toolbar">
+          <span class="lab">Estimate</span><div class="seg" id="stat"></div>
+        </div>
+        <div class="toolbar">
+          <span class="lab">n</span><div class="seg" id="samp-n"></div>
+          <button id="draw-1">Draw 1 sample</button><button id="draw-500">Draw 500</button><button id="draw-clear">Clear</button>
+        </div>
+        <canvas id="samp-scatter" role="img" aria-label="The latest sample against the population"></canvas>
+        <div class="legend" id="samp-legend"></div>
+        <p class="chart-label" id="hist-label">Estimates from every sample so far</p>
+        <canvas id="samp-hist" role="img" aria-label="Histogram of the estimates from repeated samples"></canvas>
+        <div class="stats" id="samp-tiles"></div>
+        <p class="chart-label">Standard error against n</p>
+        <canvas id="samp-sweep" role="img" aria-label="Standard error of the estimate at each sample size"></canvas>
+        <div class="legend" id="sweep-legend"></div>
+      </section>
+
+      <section id="spec">
+        <h2 class="sec">Specification error</h2>
+        <p class="cap">Fit the wrong shape and you miss the truth by the same amount however many patients you see. More data only shrinks sampling error.</p>
+        <div class="toolbar">
+          <span class="lab">Model</span><div class="seg" id="model"></div>
+        </div>
+        <div class="toolbar">
+          <span class="lab">n</span><div class="seg" id="spec-n"></div>
+        </div>
+        <canvas id="spec-plot" role="img" aria-label="Fits of the chosen model from forty samples, beside the true band averages"></canvas>
+        <div class="legend" id="spec-legend"></div>
+        <div class="stats" id="spec-tiles"></div>
+        <p class="chart-label">Error at X = s against n (200 samples each)</p>
+        <canvas id="spec-sweep" role="img" aria-label="Specification error, sampling error, and total error of the model at each sample size"></canvas>
+        <div class="legend" id="spec-sweep-legend"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="dist.js"></script>
+  <script src="pairs-core.js"></script>
+  <script src="pairs.js"></script>
+</body>
+</html>
