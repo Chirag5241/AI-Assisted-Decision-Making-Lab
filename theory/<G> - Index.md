@@ -29,15 +29,27 @@ This index outlines the active, streamlined reading flow for the CS 598 project 
 * [[<G> - 3. Multi-Action Graduation Regret]]: Pointwise pairwise regret upper bound; partition of observation space into polyhedral cones $\mathcal{S}_{k\ell}$; closed-form active-contender decomposition.
 * [[<G> - 4. Dynamic Assistance - Clairvoyant]]: Offline dynamic assistance benchmarks ($\lambda > 0$); Full Oracle DP ($x_{1:T}$ known) with zero-cost debiasing; Symptom Clairvoyant DP ($s_{1:T}$ known); active contender risk; Pedagogical Information Hierarchy.
 * [[<G> - 5. Dynamic Assistance - Online]]: Real-time online pedagogical assistance ($\lambda > 0$); Multi-Action Online Preceptor (M-AOP); Online Pedagogical Index $Q_t$; real-time Shield vs. Teach mode switching; competitive ratio analysis.
+* [[<G> - 6. Adaptive Tutoring & Placement Test]]: Adaptive tutoring without prior knowledge of $H^{(0)}$ or $\psi$; unassisted multiclass placement testing via polyhedral slicing; scale-invariance theorem; dynamic stopping time $\tau$ (adaptive graduation).
 
 ---
 
-## 4. Meetings
+## 4. LLM Assistance (Natural Language Scaffolding)
+
+* [[<G> - 1. Problem Formulation & Two-Stage Architecture]]: Pure decision-theoretic formulation of LLM advice $M_t = (\alpha_t, a_t, \hat{k}_t)$, continuous active engagement $G_j(t)$, cognitive offloading law, and the two-stage (Controller + Verbalizer) architecture.
+* [[<G> - 2. Optimal Scaffolding Policy (Known Parameters)]]: Optimal dynamic policy under known parameters; LLM Preceptor Index $\nu_j(t)$; water-filling attention $a_t^*$; Socratic switching threshold $\alpha_t^*$; Vygotsky fading theorem; proof of the "Helpful AI Trap."
+* [[<G> - 3. Adaptive Estimation & In-Context Scaffolding (Unknown Parameters)]]: Learning student parameters online; diagnostic polyhedral probing for $H^{(0)}$; latency regression for working-memory capacity $C$; sequential Bayesian particle filtering; dynamic graduation stopping time $\tau$.
+* [[<G> - 4. Out-of-the-Box LLM Verbalizer & Prompt Engine]]: Stage 2 prompt compiler; universal system prompt template enforcing $(\alpha_t^*, a_t^*, \hat{k}_t^*)$ while adapting to user style preferences $(V, \tau_{\text{tone}})$; concrete Spanish *ser* vs. *estar* execution transcripts.
+* [[<G> - 5. Core Tradeoffs & Fundamental Theorems]]: Five foundational theorems distinguishing pedagogical discrete assistance from continuous MSE: The Kingmaker non-monotonicity trap, Dangerous Medicine trade-off, Price of Helpfulness Pareto frontier, Zero-Regret Teachable Moments, and breakdown of policy stationarity.
+* [[<G> - 6. Latent Preference Alignment & Online Learning]]: Personalized steerable alignment via continuous latent preference vector $z \in \mathbb{R}^p$; online Bayesian / Kalman updating from interaction telemetry; Stage 2 constrained alignment optimization.
+
+---
+
+## 5. Meetings
 
 * [[<C> - 2026-10-26 Correlations, then Lossy Observation]]: Next steps — correlated $x$ first, then a fixed lossy observation $s = Bx$; whiteboard and action items.
 
 ---
 
-## 5. Archive
+## 6. Archive
 
 * `Archive/`: Preserved historical drafts, superseded derivations, and earlier working notes.
