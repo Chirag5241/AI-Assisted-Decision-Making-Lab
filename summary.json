@@ -1,0 +1,3126 @@
+{
+ "refs": {
+  "truth_optimal_share": 0.9843309307427138,
+  "perfect_beliefs_mistakes": 0.061586638830897704,
+  "novice_mistakes": 0.33402922755741127,
+  "novice_checks": [
+   "threat",
+   "win"
+  ],
+  "C": 2,
+  "n_decision_positions": 3191,
+  "n_test": 958
+ },
+ "rounds_to_competence": {
+  "exponential 0.2 | take turns": 1,
+  "exponential 0.2 | planned curriculum": 1,
+  "exponential 0.05 | planned curriculum": 2,
+  "power law 0.1 | planned curriculum": 3,
+  "exponential 0.05 | take turns": 5,
+  "exponential 0.2 | help now": 12,
+  "power law 0.1 | help now": 12,
+  "power law 0.1 | take turns": 12,
+  "sigmoid mid 6 | take turns": 12,
+  "sigmoid mid 6 | planned curriculum": 12,
+  "exponential 0.05 | help now": 20,
+  "sigmoid mid 6 | help now": 30
+ },
+ "rows": [
+  {
+   "curve": "exponential 0.05",
+   "T": 0,
+   "policy": "no hints",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 0,
+   "policy": "help now",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 0,
+   "policy": "take turns",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 0,
+   "policy": "planned curriculum",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": []
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 1,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 30.735,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 1,
+   "policy": "help now",
+   "grad_regret": 17.353218510786363,
+   "grad_mistakes": 0.2800139178844816,
+   "train_regret": 13.668333333333333,
+   "checks": {
+    "win": 0.7533333333333333,
+    "block": 0.24666666666666667,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 1,
+   "policy": "take turns",
+   "grad_regret": 7.84812108559499,
+   "grad_mistakes": 0.19415448851774533,
+   "train_regret": 11.228333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 1,
+   "policy": "planned curriculum",
+   "grad_regret": 6.782359081419626,
+   "grad_mistakes": 0.18580375782881006,
+   "train_regret": 21.303333333333335,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 2,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 34.7725,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 2,
+   "policy": "help now",
+   "grad_regret": 12.372787056367432,
+   "grad_mistakes": 0.227839248434238,
+   "train_regret": 12.558333333333334,
+   "checks": {
+    "win": 0.77,
+    "block": 0.2833333333333333,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.9466666666666667
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 2,
+   "policy": "take turns",
+   "grad_regret": 6.782359081419626,
+   "grad_mistakes": 0.18580375782881006,
+   "train_regret": 25.33,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 2,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 8.665833333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 3,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 32.515,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 3,
+   "policy": "help now",
+   "grad_regret": 8.190462769659012,
+   "grad_mistakes": 0.18042449547668757,
+   "train_regret": 10.578333333333333,
+   "checks": {
+    "win": 0.8733333333333333,
+    "block": 0.3333333333333333,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.7933333333333333
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 3,
+   "policy": "take turns",
+   "grad_regret": 6.059498956158664,
+   "grad_mistakes": 0.18475991649269313,
+   "train_regret": 17.244444444444444,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 3,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 6.315,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 5,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 32.75066666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 5,
+   "policy": "help now",
+   "grad_regret": 4.613580375782881,
+   "grad_mistakes": 0.13085247042449544,
+   "train_regret": 8.1,
+   "checks": {
+    "win": 0.9566666666666667,
+    "block": 0.53,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.5133333333333333
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 5,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 23.184,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 5,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 4.165666666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 8,
+   "policy": "no hints",
+   "grad_regret": 23.47912317327766,
+   "grad_mistakes": 0.33194154488517746,
+   "train_regret": 33.89854166666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 8,
+   "policy": "help now",
+   "grad_regret": 2.701231732776618,
+   "grad_mistakes": 0.09183020180932497,
+   "train_regret": 5.49625,
+   "checks": {
+    "win": 0.98,
+    "block": 0.81,
+    "fork": 0.016666666666666666,
+    "block_fork": 0.0,
+    "threat": 0.19333333333333333
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 8,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 21.40875,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 8,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.495625,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 12,
+   "policy": "no hints",
+   "grad_regret": 23.47912317327766,
+   "grad_mistakes": 0.33194154488517746,
+   "train_regret": 32.70333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 12,
+   "policy": "help now",
+   "grad_regret": 1.6015344467640917,
+   "grad_mistakes": 0.0742240779401531,
+   "train_regret": 4.808194444444444,
+   "checks": {
+    "win": 1.0,
+    "block": 0.9066666666666666,
+    "fork": 0.04,
+    "block_fork": 0.0,
+    "threat": 0.05333333333333334
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 12,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 23.44875,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 12,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.1955555555555555,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 20,
+   "policy": "no hints",
+   "grad_regret": 23.47912317327766,
+   "grad_mistakes": 0.33194154488517746,
+   "train_regret": 34.96241666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 20,
+   "policy": "help now",
+   "grad_regret": 1.0083472512178149,
+   "grad_mistakes": 0.06292275574112734,
+   "train_regret": 3.6643333333333334,
+   "checks": {
+    "win": 1.0,
+    "block": 0.99,
+    "fork": 0.01,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 20,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 25.806416666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 20,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.6809166666666666,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 30,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 33.447944444444445,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 30,
+   "policy": "help now",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.401777777777778,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 30,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 26.982444444444443,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 30,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.4049444444444446,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 50,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 33.52016666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 50,
+   "policy": "help now",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.8699333333333332,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 50,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 27.6457,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.05",
+   "T": 50,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.1501,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 0,
+   "policy": "no hints",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 0,
+   "policy": "help now",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 0,
+   "policy": "take turns",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 0,
+   "policy": "planned curriculum",
+   "grad_regret": 22.67171189979123,
+   "grad_mistakes": 0.33402922755741127,
+   "train_regret": NaN,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": []
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 1,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 30.735,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 1,
+   "policy": "help now",
+   "grad_regret": 18.072132915796796,
+   "grad_mistakes": 0.2628427279053584,
+   "train_regret": 13.668333333333333,
+   "checks": {
+    "win": 0.5966666666666667,
+    "block": 0.3433333333333333,
+    "fork": 0.15666666666666668,
+    "block_fork": 0.0,
+    "threat": 0.9033333333333333
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 1,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 11.228333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 1,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 11.228333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 2,
+   "policy": "no hints",
+   "grad_regret": 23.47912317327766,
+   "grad_mistakes": 0.33194154488517746,
+   "train_regret": 34.7725,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 2,
+   "policy": "help now",
+   "grad_regret": 11.489391092553932,
+   "grad_mistakes": 0.184321503131524,
+   "train_regret": 11.873333333333333,
+   "checks": {
+    "win": 0.6866666666666666,
+    "block": 0.57,
+    "fork": 0.26666666666666666,
+    "block_fork": 0.03,
+    "threat": 0.44666666666666666
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 2,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 25.33,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 2,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 7.685833333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 3,
+   "policy": "no hints",
+   "grad_regret": 23.47912317327766,
+   "grad_mistakes": 0.33194154488517746,
+   "train_regret": 32.515,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 3,
+   "policy": "help now",
+   "grad_regret": 6.183745650661099,
+   "grad_mistakes": 0.12983298538622126,
+   "train_regret": 9.757222222222222,
+   "checks": {
+    "win": 0.87,
+    "block": 0.7,
+    "fork": 0.20333333333333334,
+    "block_fork": 0.06,
+    "threat": 0.16666666666666666
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 3,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 16.942222222222224,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 3,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 5.304444444444444,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 5,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 32.75066666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 5,
+   "policy": "help now",
+   "grad_regret": 3.5199860821155182,
+   "grad_mistakes": 0.09729993041057758,
+   "train_regret": 7.557333333333333,
+   "checks": {
+    "win": 0.9566666666666667,
+    "block": 0.84,
+    "fork": 0.13666666666666666,
+    "block_fork": 0.06,
+    "threat": 0.006666666666666667
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 5,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 24.240666666666666,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 5,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 3.6703333333333332,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 8,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 33.89854166666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 8,
+   "policy": "help now",
+   "grad_regret": 1.7563900487125959,
+   "grad_mistakes": 0.07334377174669449,
+   "train_regret": 4.394791666666666,
+   "checks": {
+    "win": 0.99,
+    "block": 0.9366666666666666,
+    "fork": 0.06333333333333334,
+    "block_fork": 0.01,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 8,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 23.55,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 8,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.1191666666666666,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 12,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 32.70333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 12,
+   "policy": "help now",
+   "grad_regret": 1.3519919972164232,
+   "grad_mistakes": 0.06958246346555323,
+   "train_regret": 4.10875,
+   "checks": {
+    "win": 1.0,
+    "block": 0.94,
+    "fork": 0.05,
+    "block_fork": 0.01,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 12,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 27.169305555555557,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 12,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.0641666666666665,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 20,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 34.96241666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 20,
+   "policy": "help now",
+   "grad_regret": 0.9706054279749476,
+   "grad_mistakes": 0.06253653444676409,
+   "train_regret": 3.175333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.99,
+    "fork": 0.01,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 20,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 29.252333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 20,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.5688333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 30,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 33.447944444444445,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 30,
+   "policy": "help now",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.1324444444444444,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 30,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 28.949555555555555,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 30,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.3362777777777777,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 50,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 33.52016666666667,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 50,
+   "policy": "help now",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.6965333333333332,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 50,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 29.126666666666665,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "exponential 0.2",
+   "T": 50,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.0988,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 3,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 32.515,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 3,
+   "policy": "help now",
+   "grad_regret": 7.664620737647877,
+   "grad_mistakes": 0.17389004871259567,
+   "train_regret": 10.446666666666667,
+   "checks": {
+    "win": 0.8733333333333333,
+    "block": 0.3433333333333333,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.7833333333333333
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 3,
+   "policy": "take turns",
+   "grad_regret": 6.059498956158664,
+   "grad_mistakes": 0.18475991649269313,
+   "train_regret": 17.244444444444444,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 3,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 10.496666666666666,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 12,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 32.70333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 12,
+   "policy": "help now",
+   "grad_regret": 1.2687056367432148,
+   "grad_mistakes": 0.06924147529575504,
+   "train_regret": 4.583333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.9433333333333334,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.056666666666666664
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 12,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 22.935833333333335,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 12,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 3.2895833333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 30,
+   "policy": "no hints",
+   "grad_regret": 23.47912317327766,
+   "grad_mistakes": 0.33194154488517746,
+   "train_regret": 33.447944444444445,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 30,
+   "policy": "help now",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.4019444444444447,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 30,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 25.271,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "power law 0.1",
+   "T": 30,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 1.897888888888889,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 3,
+   "policy": "no hints",
+   "grad_regret": 23.48016701461378,
+   "grad_mistakes": 0.3350730688935281,
+   "train_regret": 32.515,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 3,
+   "policy": "help now",
+   "grad_regret": 10.845775922059847,
+   "grad_mistakes": 0.21776965901183024,
+   "train_regret": 10.705,
+   "checks": {
+    "win": 0.9333333333333333,
+    "block": 0.1,
+    "fork": 0.006666666666666667,
+    "block_fork": 0.0,
+    "threat": 0.96
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 3,
+   "policy": "take turns",
+   "grad_regret": 6.151356993736952,
+   "grad_mistakes": 0.18475991649269313,
+   "train_regret": 19.61277777777778,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 3,
+   "policy": "planned curriculum",
+   "grad_regret": 1.3841336116910232,
+   "grad_mistakes": 0.07411273486430062,
+   "train_regret": 19.449444444444445,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "block",
+     "threat"
+    ]
+   ]
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 12,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 32.70333333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 12,
+   "policy": "help now",
+   "grad_regret": 2.4947825330549755,
+   "grad_mistakes": 0.08891092553931801,
+   "train_regret": 4.820277777777778,
+   "checks": {
+    "win": 1.0,
+    "block": 0.8266666666666667,
+    "fork": 0.11666666666666667,
+    "block_fork": 0.03333333333333333,
+    "threat": 0.023333333333333334
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 12,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 23.674027777777777,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 12,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 5.422083333333333,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "block",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 30,
+   "policy": "no hints",
+   "grad_regret": 22.29384133611691,
+   "grad_mistakes": 0.30480167014613785,
+   "train_regret": 33.447944444444445,
+   "checks": {
+    "win": 1.0,
+    "block": 0.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 1.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 30,
+   "policy": "help now",
+   "grad_regret": 0.9394015309672928,
+   "grad_mistakes": 0.06190327070285316,
+   "train_regret": 2.4147777777777777,
+   "checks": {
+    "win": 1.0,
+    "block": 0.9966666666666667,
+    "fork": 0.0033333333333333335,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 30,
+   "policy": "take turns",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 27.573055555555555,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": null
+  },
+  {
+   "curve": "sigmoid mid 6",
+   "T": 30,
+   "policy": "planned curriculum",
+   "grad_regret": 0.9237995824634656,
+   "grad_mistakes": 0.061586638830897704,
+   "train_regret": 2.9246666666666665,
+   "checks": {
+    "win": 1.0,
+    "block": 1.0,
+    "fork": 0.0,
+    "block_fork": 0.0,
+    "threat": 0.0
+   },
+   "plan": [
+    [
+     "win",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "block",
+     "threat"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ],
+    [
+     "win",
+     "block"
+    ]
+   ]
+  }
+ ]
+}
