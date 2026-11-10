@@ -40,16 +40,17 @@ $$\min_{\pi} \mathbb{E}\left[ \sum_{t=0}^\infty \delta^t \sum_{j=1}^n C_j(e_j(t)
 To solve this restless bandit, we introduce a subsidy $\lambda$ for passively idling arm $j$.
 An arm is **Whittle Indexable** if the set of states where idling is optimal monotonically increases as the passive subsidy $\lambda$ increases.
 
-egin{theorem}[Whittle Indexability & Closed-Form Maintenance Priority]
-The pedagogical maintenance restless bandit is strictly Whittle indexable.
-The Whittle index $\mathcal{W}_j(e_j)$ of biomarker $j$ is given in closed form by:
+**Conjecture (unproven; review 2026-11-06).** The maintenance bandit is Whittle indexable, with a priority of the form below.
+
+*Why this is not a theorem yet:* (i) no indexability proof is given; (ii) the cost $C_j$ is not defined precisely ("salience distorted"), and the true graduation loss of [[3. Graduation Regret]] is **not** a sum over features — $\rho$ couples them through $F^*(p)$ — so the problem does not decompose into independent arms; (iii) the displayed index is a one-step (myopic) refresh gain, not the Whittle index (which comes from the subsidy problem and depends on the full arm dynamics); (iv) the subsidy here is unrelated to the training weight $\lambda$ elsewhere in the vault; (v) the exposure rule $|p - d| \to \alpha|p - d|$ replaces the verified count curve $\psi(m)$. A consistent version would contract by $\psi$ on exposure and decay toward $p^{(0)}$ otherwise.
+
+Heuristic priority:
 $$\mathcal{W}_j(e_j) = \frac{C_j(e_j) - C_j(\alpha e_j)}{1 - \delta(1 - \gamma)}$$
-\end{theorem}
 
 ### Clinical Policy: The Whittle Maintenance Preceptor
 In each period, the AI preceptor ranks all $n$ biomarkers by their Whittle Index $\mathcal{W}_j(e_j)$ and presents the top-$c$ features:
 $$F_t^* = \arg\max_{|F| \le c} \sum_{j \in F} \mathcal{W}_j(e_j(t))$$
 
-This guarantees that:
+If the conjecture held, this would ensure that:
 1. Biomarkers with high clinical risk ($|d_j|$) and fast forgetting rates ($\gamma$) are periodically refreshed.
 2. The clinician maintains **permanent autonomous diagnostic competence** over decades of practice.
